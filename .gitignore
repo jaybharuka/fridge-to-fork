@@ -9,3 +9,15 @@ dist/
 assets/sample_images/*.jpg
 assets/sample_images/*.jpeg
 assets/sample_images/*.png
+
+# Root-level images
+*.png
+*.jpg
+*.jpeg
+
+# Tool output dirs
+graphify-out/
+
+# Duplicate nested project dirs
+fridge-to-fork/
+fridge-to-fork-1/
