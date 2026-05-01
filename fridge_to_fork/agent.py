@@ -9,6 +9,8 @@ Usage:
     fridge-to-fork --image path/to/fridge.jpg
     fridge-to-fork --image path/to/fridge.jpg --dry-run
     python -m fridge_to_fork.agent --image fridge.jpg
+
+Requires OPENAI_API_KEY in .env
 """
 
 import argparse
@@ -33,8 +35,8 @@ def run_pipeline(
     *,
     delivery_address: str | None = None,
     dry_run: bool = False,
-    vision_model: str = "claude-opus-4-7",
-    planner_model: str = "claude-sonnet-4-6",
+    vision_model: str = "gemini-2.5-flash",
+    planner_model: str = "gemini-2.5-flash",
 ) -> None:
     """
     Execute the full fridge-to-fork pipeline.
@@ -48,9 +50,9 @@ def run_pipeline(
     dry_run:
         Simulate MCP order calls without hitting real endpoints.
     vision_model:
-        Claude model for image analysis.
+        OpenAI model for image analysis (default: gpt-4o).
     planner_model:
-        Claude model for meal planning.
+        OpenAI model for meal planning (default: gpt-4o-mini).
     """
     address = delivery_address or os.environ.get("DELIVERY_ADDRESS", "Mumbai, India")
 
@@ -103,17 +105,17 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Simulate MCP order calls (no real orders placed)",
     )
-    p.add_argument("--vision-model", default="claude-opus-4-7")
-    p.add_argument("--planner-model", default="claude-sonnet-4-6")
+    p.add_argument("--vision-model", default="gemini-2.5-flash", help="Gemini vision model")
+    p.add_argument("--planner-model", default="gemini-2.5-flash", help="Gemini planner model")
     return p.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        console.print("[bold red]Error:[/bold red] ANTHROPIC_API_KEY is not set.")
-        console.print("Copy .env.example to .env and add your key.")
+    if not os.environ.get("GOOGLE_API_KEY"):
+        console.print("[bold red]Error:[/bold red] GOOGLE_API_KEY is not set.")
+        console.print("Get a free key at https://aistudio.google.com/app/apikey")
         sys.exit(1)
 
     run_pipeline(

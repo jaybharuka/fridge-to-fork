@@ -1,7 +1,7 @@
 """
 Step 2 — Meal Planner
 =====================
-Takes identified fridge contents and uses Claude to:
+Takes identified fridge contents and uses Google Gemini to:
   1. Suggest 3–5 meals
   2. Decide whether to cook (ingredients present) or order
      (either the finished dish from Swiggy Food, or missing
@@ -16,8 +16,8 @@ import json
 import os
 from typing import Optional
 
-import anthropic
 from dotenv import load_dotenv
+from google import genai
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -32,13 +32,9 @@ console = Console()
 # Prompts
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """\
+_PROMPT_TEMPLATE = """\
 You are an expert chef and nutritionist helping a busy person decide what to eat.
-Given a list of available ingredients, suggest meals and determine the best action.
-Respond ONLY with valid JSON — no prose, no markdown fences.
-"""
 
-_USER_PROMPT_TEMPLATE = """\
 Available ingredients:
 {ingredient_list}
 
@@ -51,11 +47,11 @@ Also recommend ONE best action:
 - "order_dish"       → order the finished dish from a food-delivery service
 - "order_groceries"  → order the 1-2 missing ingredients from a quick-commerce service and then cook
 
-Prefer cooking when ≥70 % of ingredients are present and missing items are few.
+Prefer cooking when ≥70% of ingredients are present and missing items are few.
 Prefer ordering the dish when the user would need to buy 5+ ingredients.
 Prefer ordering groceries when the user needs just 1-3 ingredients.
 
-Return ONLY this JSON:
+Return ONLY valid JSON (no markdown, no prose):
 {{
   "suggestions": [
     {{
@@ -81,9 +77,8 @@ Return ONLY this JSON:
 def plan_meals(
     fridge: FridgeContents,
     *,
-    model: str = "claude-sonnet-4-6",
-    max_tokens: int = 1500,
-    client: Optional[anthropic.Anthropic] = None,
+    model: str = "gemini-2.5-flash",
+    client: Optional[genai.Client] = None,
 ) -> MealPlan:
     """
     Suggest meals and decide cook-vs-order given fridge contents.
@@ -93,17 +88,15 @@ def plan_meals(
     fridge:
         Output of step1 identify_ingredients().
     model:
-        Claude model. Sonnet is a good balance of speed/quality here.
-    max_tokens:
-        Response cap.
+        Gemini model. gemini-2.0-flash is fast and free-tier friendly.
     client:
-        Optional pre-built Anthropic client.
+        Optional pre-built Gemini client.
 
     Returns
     -------
     MealPlan with suggestions, a Decision, and the recommended meal.
     """
-    client = client or anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
     # Build ingredient list for the prompt
     ingredient_list = "\n".join(
@@ -113,16 +106,14 @@ def plan_meals(
     if not ingredient_list:
         ingredient_list = "(no ingredients detected)"
 
-    prompt = _USER_PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
+    prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
 
-    response = client.messages.create(
+    response = client.models.generate_content(
         model=model,
-        max_tokens=max_tokens,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
+        contents=prompt,
     )
 
-    raw_text = response.content[0].text.strip()
+    raw_text = response.text.strip()
     if raw_text.startswith("```"):
         raw_text = raw_text.split("```")[1]
         if raw_text.startswith("json"):
@@ -215,7 +206,7 @@ def _parse_args() -> argparse.Namespace:
         required=True,
         help="Comma-separated ingredient list, e.g. 'eggs,butter,cheese'",
     )
-    p.add_argument("--model", default="claude-sonnet-4-6")
+    p.add_argument("--model", default="gemini-2.5-flash")
     p.add_argument("--json", action="store_true")
     return p.parse_args()
 
@@ -229,6 +220,7 @@ def main() -> None:
     plan = plan_meals(fridge, model=args.model)
 
     if args.json:
+        import json as _json
         data = {
             "decision": plan.decision.value,
             "recommended_meal": plan.recommended_meal.name if plan.recommended_meal else None,
@@ -244,7 +236,6 @@ def main() -> None:
                 for s in plan.suggestions
             ],
         }
-        import json as _json
         print(_json.dumps(data, indent=2))
     else:
         display_meal_plan(plan)
