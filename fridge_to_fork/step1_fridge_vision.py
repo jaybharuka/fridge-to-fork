@@ -1,23 +1,25 @@
 """
 Step 1 — Fridge Vision
 ======================
-Accepts a fridge image (file path, URL, or raw bytes) and uses Claude Vision
-to identify all visible ingredients with estimated quantities and confidence.
+Accepts a fridge image (file path, URL, or raw bytes) and uses Google Gemini
+Vision to identify all visible ingredients with estimated quantities and confidence.
 
 Run standalone for a quick smoke-test:
     python -m fridge_to_fork.step1_fridge_vision --image path/to/fridge.jpg
 """
 
 import argparse
-import base64
+import io
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Union
 
-import anthropic
+import httpx
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from PIL import Image
 from rich.console import Console
 from rich.table import Table
 
@@ -31,24 +33,17 @@ console = Console()
 # Prompt
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """\
+_PROMPT = """\
 You are a culinary assistant with expert knowledge of ingredients and food.
-Your job is to examine fridge / pantry images and produce a structured inventory.
-Be thorough: check every shelf, drawer, and door pocket.
-Always respond with valid JSON — nothing else.
-"""
+Examine this fridge / pantry image carefully — check every shelf, drawer, and door pocket.
 
-_USER_PROMPT = """\
-Look carefully at this fridge image.
-List every ingredient you can see.
-
-Return ONLY a JSON object in this exact shape:
+Return ONLY a JSON object in this exact shape (no markdown, no prose):
 {
   "ingredients": [
     {
       "name": "<ingredient name, lowercase>",
       "quantity": "<rough amount: e.g. '3 eggs', 'half a block', 'plenty', '1 bottle'>",
-      "confidence": <float 0.0–1.0, how certain you are this item is present>
+      "confidence": <float 0.0-1.0, how certain you are this item is present>
     }
   ],
   "raw_description": "<one short paragraph describing overall fridge contents>"
@@ -66,33 +61,29 @@ Rules:
 # Image helpers
 # ---------------------------------------------------------------------------
 
-def _load_image_as_base64(source: Union[str, Path, bytes]) -> tuple[str, str]:
-    """Return (base64_data, media_type)."""
+def _load_image(source: Union[str, Path, bytes]) -> tuple[bytes, str]:
+    """Return (raw_bytes, media_type)."""
     if isinstance(source, bytes):
-        # caller already has raw bytes
-        data = source
-        media_type = "image/jpeg"
-    elif isinstance(source, (str, Path)):
-        path = Path(source)
-        if not path.exists():
-            raise FileNotFoundError(f"Image not found: {path}")
-        data = path.read_bytes()
-        suffix = path.suffix.lower()
-        media_type = {
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".gif": "image/gif",
-            ".webp": "image/webp",
-        }.get(suffix, "image/jpeg")
-    else:
-        raise TypeError(f"Unsupported image source type: {type(source)}")
+        return source, "image/jpeg"
 
-    return base64.standard_b64encode(data).decode("utf-8"), media_type
+    if isinstance(source, str) and source.startswith(("http://", "https://")):
+        resp = httpx.get(source, follow_redirects=True, timeout=15)
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0]
+        return resp.content, content_type
 
-
-def _is_url(source: Union[str, Path, bytes]) -> bool:
-    return isinstance(source, str) and source.startswith(("http://", "https://"))
+    path = Path(source)
+    if not path.exists():
+        raise FileNotFoundError(f"Image not found: {path}")
+    suffix = path.suffix.lower()
+    media_type = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }.get(suffix, "image/jpeg")
+    return path.read_bytes(), media_type
 
 
 # ---------------------------------------------------------------------------
@@ -102,9 +93,8 @@ def _is_url(source: Union[str, Path, bytes]) -> bool:
 def identify_ingredients(
     image_source: Union[str, Path, bytes],
     *,
-    model: str = "claude-opus-4-7",
-    max_tokens: int = 1024,
-    client: anthropic.Anthropic | None = None,
+    model: str = "gemini-2.5-flash",
+    client: genai.Client | None = None,
 ) -> FridgeContents:
     """
     Analyse a fridge image and return structured FridgeContents.
@@ -114,53 +104,26 @@ def identify_ingredients(
     image_source:
         File path (str/Path), public image URL (str), or raw image bytes.
     model:
-        Claude model to use. Defaults to claude-opus-4-7 for best vision accuracy.
-    max_tokens:
-        Maximum tokens for the response.
+        Gemini model to use. Defaults to gemini-2.0-flash (free tier, fast vision).
     client:
-        Optional pre-built Anthropic client (useful for testing / DI).
+        Optional pre-built Gemini client (useful for testing / DI).
 
     Returns
     -------
     FridgeContents with a list of Ingredient objects.
     """
-    client = client or anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
-    # Build the image block
-    if _is_url(image_source):
-        image_block: dict = {
-            "type": "image",
-            "source": {"type": "url", "url": image_source},
-        }
-    else:
-        b64_data, media_type = _load_image_as_base64(image_source)
-        image_block = {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": media_type,
-                "data": b64_data,
-            },
-        }
+    raw_bytes, media_type = _load_image(image_source)
 
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                image_block,
-                {"type": "text", "text": _USER_PROMPT},
-            ],
-        }
-    ]
+    image_part = types.Part.from_bytes(data=raw_bytes, mime_type=media_type)
 
-    response = client.messages.create(
+    response = client.models.generate_content(
         model=model,
-        max_tokens=max_tokens,
-        system=_SYSTEM_PROMPT,
-        messages=messages,
+        contents=[image_part, _PROMPT],
     )
 
-    raw_text = response.content[0].text.strip()
+    raw_text = response.text.strip()
 
     # Strip markdown fences if the model wraps the JSON
     if raw_text.startswith("```"):
@@ -218,7 +181,7 @@ def display_fridge_contents(contents: FridgeContents) -> None:
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Identify ingredients in a fridge image.")
     p.add_argument("--image", required=True, help="Path to fridge image or public URL")
-    p.add_argument("--model", default="claude-opus-4-7", help="Claude model ID")
+    p.add_argument("--model", default="gemini-2.5-flash", help="Gemini model ID")
     p.add_argument("--json", action="store_true", help="Output raw JSON instead of table")
     return p.parse_args()
 
@@ -230,6 +193,7 @@ def main() -> None:
     contents = identify_ingredients(args.image, model=args.model)
 
     if args.json:
+        import json as _json
         data = {
             "raw_description": contents.raw_description,
             "ingredients": [
@@ -237,7 +201,7 @@ def main() -> None:
                 for i in contents.ingredients
             ],
         }
-        print(json.dumps(data, indent=2))
+        print(_json.dumps(data, indent=2))
     else:
         display_fridge_contents(contents)
 
