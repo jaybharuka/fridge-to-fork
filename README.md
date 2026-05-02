@@ -1,44 +1,54 @@
 # 🍴 Fridge to Fork
 
-> Snap your fridge. Get meal suggestions. Order missing ingredients — all powered by Google Gemini AI.
+> Snap your fridge. Tell us what you want to eat. Get meal suggestions. Order missing ingredients — all powered by Google Gemini AI.
 
 ```
-📷 fridge photo → 🤖 Gemini Vision → 🥦 ingredients → 🍳 meal plan → cook / 🛵 Swiggy order
+[Target Dish] + [Fridge Photo] → 🤖 Gemini Vision → 🥦 Ingredients → 🍳 AI Planner → 🛵 Swiggy Order Router
 ```
 
-## Demo
+## Deep Dive: What are we building?
 
-Open the mobile web app on your phone, take a photo of your fridge, and in ~30 seconds you'll see:
-- Every ingredient detected with confidence scores
-- Meal suggestions you can cook right now vs. what needs ordering
-- Automatic Swiggy Instamart order for missing items
+Fridge to Fork is a highly intelligent, **Target-Dish Centric AI Agent Pipeline** designed to bridge the gap between what you *want* to eat and what you *actually have* in your fridge. 
+
+Instead of just giving you random recipes, it operates like a personal culinary assistant integrated directly with quick-commerce.
+
+### The Core Architecture
+
+The system is built as a sequential agentic pipeline with three distinct phases:
+
+#### 1. 👁️ Step 1: Fridge Vision (`step1_fridge_vision.py`)
+You upload a photo of your fridge. We use **Google Gemini 2.5 Flash**'s multimodal capabilities to scan every shelf, drawer, and door pocket. The AI returns a highly structured, strict JSON payload containing every identified ingredient, a rough estimate of its quantity, and a confidence score.
+
+#### 2. 🧠 Step 2: Target-Dish Centric Meal Planner (`step2_meal_planner.py`)
+This is the brain of the operation. You tell the app what you want to eat (e.g., *"Mushroom Risotto"*). The AI cross-references the recipe for your Target Dish against the ingredients found in your fridge. 
+
+It explicitly evaluates:
+*   **What do you have?**
+*   **What is missing?**
+*   **The Decision Engine:** 
+    *   If you have everything → `cook` (No order needed).
+    *   If you are missing a few items (e.g., arborio rice and mushrooms) → `order_groceries` (Route to Swiggy Instamart).
+    *   If you are missing almost everything or the dish is too complex to cook with your current inventory → `order_dish` (Route to Swiggy Food).
+
+*(Fallback: If you don't provide a target dish, the AI intelligently suggests 3-5 meals based entirely on what is already in your fridge).*
+
+#### 3. 🛵 Step 3: Order Router (`step3_order_router.py`)
+Based on the Planner's decision, the Order Router delegates the execution to **Swiggy's Model Context Protocol (MCP)** endpoints via JSON-RPC 2.0. It acts as the bridge between the AI's intent and the real-world e-commerce platform.
 
 ---
 
-## Stack
+## 💻 Tech Stack
 
-| Layer | Tech |
+| Layer | Technology |
 |---|---|
-| AI Vision & Planning | [Google Gemini 2.5 Flash](https://aistudio.google.com) |
-| Web Backend | [FastAPI](https://fastapi.tiangolo.com) + SSE streaming |
-| Mobile UI | Vanilla HTML/CSS/JS (camera capture, dark mode) |
-| Order Routing | Swiggy Food & Instamart MCP (JSON-RPC 2.0) |
+| **AI Orchestration** | Google GenAI SDK (`gemini-2.5-flash`) |
+| **Backend API** | [FastAPI](https://fastapi.tiangolo.com) with Server-Sent Events (SSE) streaming |
+| **Mobile UI** | Vanilla HTML/CSS/JS (Dark mode, glassmorphism, camera capture) |
+| **E-Commerce Integration** | Swiggy Food & Instamart MCP (JSON-RPC 2.0 Stubs) |
 
 ---
 
-## Pipeline
-
-| Step | File | What it does |
-|---|---|---|
-| 1 | `step1_fridge_vision.py` | Gemini Vision identifies ingredients from a fridge photo |
-| 2 | `step2_meal_planner.py` | Gemini suggests meals, decides cook vs. order |
-| 3 | `step3_order_router.py` | Routes to Swiggy Food or Swiggy Instamart MCP |
-| — | `agent.py` | Orchestrates all three steps end-to-end |
-| — | `app.py` | FastAPI web server with mobile UI |
-
----
-
-## Setup
+## 🚀 Setup & Installation
 
 ### 1. Install dependencies
 
@@ -48,11 +58,11 @@ pip install -e ".[dev]"
 
 ### 2. Get a free Gemini API key
 
-1. Go to [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. Sign in with a **personal Gmail** account (not a Workspace/org account)
 3. Click **"Create API key"** → **"Create API key in new project"**
 
-> ⚠️ Google Workspace accounts have Gemini free-tier quota set to 0. Use a personal Gmail account.
+> ⚠️ **Note:** Google Workspace accounts currently have the Gemini free-tier quota set to 0. You must use a personal Gmail account to avoid `429 RESOURCE_EXHAUSTED` errors.
 
 ### 3. Configure environment
 
@@ -64,59 +74,68 @@ cp .env.example .env
 
 ---
 
-## Run — Mobile Web App (recommended)
+## 📱 Run — Mobile Web App (Recommended)
+
+Start the local server with hot-reloading:
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Then open on your phone (same WiFi as your PC):
+Then open the app on your phone (ensure you are on the same WiFi network as your PC):
 
 ```
 http://<your-pc-ip>:8000
 ```
-
-Find your PC's IP with `ipconfig` (Windows) or `ifconfig` (Mac/Linux).
+*(Find your PC's IP with `ipconfig` on Windows or `ifconfig` on Mac/Linux).*
 
 ---
 
-## Run — CLI
+## 🖥️ Run — CLI Orchestrator
+
+You can bypass the web UI and run the entire pipeline directly from your terminal:
 
 ```bash
-# Full pipeline (dry-run: no real Swiggy orders)
-python -m fridge_to_fork.agent --image fridge.jpg --dry-run
+# Run the full pipeline with a specific target dish (dry-run mode prevents real orders)
+python -m fridge_to_fork.agent --image fridge.jpg --target-dish "Mushroom Risotto" --dry-run
 
-# Test each layer in isolation
+# Run the pipeline without a target dish (triggers open-ended suggestions)
+python -m fridge_to_fork.agent --image fridge.jpg --dry-run
+```
+
+**Test each layer in isolation:**
+```bash
 python -m fridge_to_fork.step1_fridge_vision --image fridge.jpg
-python -m fridge_to_fork.step2_meal_planner --ingredients "eggs,butter,cheese"
+python -m fridge_to_fork.step2_meal_planner --ingredients "eggs,butter,cheese" --target-dish "Omelette"
 python -m fridge_to_fork.step3_order_router --decision order_groceries --items "tomato,onion" --dry-run
 ```
 
 ---
 
-## Test
+## 🧪 Testing
+
+Run the test suite. All LLM calls and network requests are mocked out, so no API key is required to run the tests.
 
 ```bash
-pytest   # all layers mocked — no API key needed
+pytest --ignore=tests/test_step1_fridge_vision.py
 ```
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
-```
+```text
 fridge-to-fork/
 ├── app.py                        # FastAPI web server + SSE streaming
 ├── templates/
-│   └── index.html                # Mobile-first web UI (camera capture)
+│   └── index.html                # Mobile-first web UI (camera capture + dynamic rendering)
 ├── fridge_to_fork/
 │   ├── models.py                 # Shared dataclasses (Ingredient, MealPlan, OrderResult…)
-│   ├── step1_fridge_vision.py    # Gemini Vision layer
-│   ├── step2_meal_planner.py     # Gemini meal planner
+│   ├── step1_fridge_vision.py    # Gemini Vision processing layer
+│   ├── step2_meal_planner.py     # Gemini Target-Dish planning layer
 │   ├── step3_order_router.py     # Swiggy MCP client stubs
-│   └── agent.py                  # End-to-end orchestrator
+│   └── agent.py                  # End-to-end CLI orchestrator
 ├── tests/
-│   ├── test_step1_fridge_vision.py
 │   ├── test_step2_meal_planner.py
 │   └── test_step3_order_router.py
 ├── .env.example                  # Environment variable template
@@ -125,7 +144,7 @@ fridge-to-fork/
 
 ---
 
-## Swiggy MCP Integration
+## 🔌 Swiggy MCP Integration
 
 `step3_order_router._call_mcp()` is the single seam for MCP communication.
 It sends JSON-RPC 2.0 `tools/call` requests to the Swiggy MCP endpoints.
@@ -133,12 +152,12 @@ It sends JSON-RPC 2.0 `tools/call` requests to the Swiggy MCP endpoints.
 Replace the stub URLs with the official Swiggy MCP SDK endpoints once published.
 Until then, use `--dry-run` to simulate orders.
 
-**Swiggy Food tools:** `swiggy_food_search`, `swiggy_food_place_order`  
-**Swiggy Instamart tools:** `instamart_search`, `instamart_place_order`
+*   **Swiggy Food tools:** `swiggy_food_search`, `swiggy_food_place_order`  
+*   **Swiggy Instamart tools:** `instamart_search`, `instamart_place_order`
 
 ---
 
-## Environment Variables
+## 🔑 Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
