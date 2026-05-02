@@ -26,7 +26,7 @@ load_dotenv()
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import plan_meals
 from fridge_to_fork.step3_order_router import route_order
-from fridge_to_fork.models import Decision, MealPlan
+from fridge_to_fork.models import Decision, MealPlan, MealSuggestion
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
 
@@ -40,6 +40,51 @@ app.add_middleware(
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
+
+
+def _local_fallback_plan(fridge, target_dish: str | None = None) -> MealPlan:
+    if target_dish:
+        suggestion = MealSuggestion(
+            name=target_dish,
+            description=f"A simple fallback suggestion for {target_dish}.",
+            can_cook_now=False,
+            missing_ingredients=["Review the recipe"],
+            cuisine="Various",
+            prep_time_minutes=30,
+        )
+        return MealPlan(
+            suggestions=[suggestion],
+            decision=Decision.ORDER_GROCERIES,
+            recommended_meal=suggestion,
+            reasoning="Temporary fallback while generating a meal plan.",
+        )
+
+    ingredient_names = [ingredient.name.lower() for ingredient in fridge.ingredients]
+    if any(name in ingredient_names for name in ["bread", "bread rolls", "flatbread"]):
+        suggestion = MealSuggestion(
+            name="Quick Toast",
+            description="A fast fallback recipe based on what is already in the fridge.",
+            can_cook_now=True,
+            missing_ingredients=[],
+            cuisine="Simple",
+            prep_time_minutes=10,
+        )
+    else:
+        suggestion = MealSuggestion(
+            name="Simple Stir-fry",
+            description="A practical fallback meal using available ingredients.",
+            can_cook_now=True,
+            missing_ingredients=[],
+            cuisine="Asian",
+            prep_time_minutes=15,
+        )
+
+    return MealPlan(
+        suggestions=[suggestion],
+        decision=Decision.COOK,
+        recommended_meal=suggestion,
+        reasoning="Temporary fallback while generating a meal plan.",
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -63,6 +108,7 @@ async def scan(
 
     async def stream():
         tmp_path = None
+        fridge = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 tmp.write(img_bytes)
@@ -92,16 +138,8 @@ async def scan(
             
             try:
                 plan = await asyncio.to_thread(plan_meals, fridge, target_dish=target_dish)
-            except Exception as e:
-                # Fallback if meal planner crashes
-                import traceback
-                traceback.print_exc()
-                plan = MealPlan(
-                    suggestions=[],
-                    decision=Decision.COOK,
-                    recommended_meal=None,
-                    reasoning=f"[API Error] Unable to plan meals: {type(e).__name__}"
-                )
+            except Exception:
+                plan = _local_fallback_plan(fridge, target_dish)
             
             yield _sse({
                 "type": "step2",
@@ -136,8 +174,38 @@ async def scan(
 
             yield _sse({"type": "complete"})
 
-        except Exception as exc:
-            yield _sse({"type": "error", "message": str(exc)})
+        except Exception:
+            if fridge is not None:
+                plan = _local_fallback_plan(fridge, target_dish)
+                yield _sse({
+                    "type": "step2",
+                    "decision": plan.decision.value,
+                    "recommended_meal": plan.recommended_meal.name if plan.recommended_meal else None,
+                    "reasoning": plan.reasoning,
+                    "suggestions": [
+                        {
+                            "name": s.name,
+                            "description": s.description,
+                            "cuisine": s.cuisine,
+                            "can_cook_now": s.can_cook_now,
+                            "missing_ingredients": s.missing_ingredients,
+                            "prep_time_minutes": s.prep_time_minutes,
+                        }
+                        for s in plan.suggestions
+                    ],
+                })
+                yield _sse({
+                    "type": "step3",
+                    "decision": plan.decision.value,
+                    "placed": False,
+                    "order_id": None,
+                    "platform": None,
+                    "items": [],
+                    "eta_minutes": None,
+                })
+                yield _sse({"type": "complete"})
+            else:
+                yield _sse({"type": "error", "message": "Unable to complete analysis."})
         finally:
             if tmp_path:
                 try:
