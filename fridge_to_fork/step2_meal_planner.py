@@ -268,15 +268,12 @@ def plan_meals(
         return result
         
     except Exception as e:
-        error_msg = str(e).lower()
-        # If it's a quota/rate limit error, use fallback
-        if "429" in error_msg or "quota" in error_msg or "resource_exhausted" in error_msg:
-            console.print("[yellow]⚠ Google API quota exceeded — using fallback suggestions[/yellow]")
-            result = _fallback_meal_plan(fridge, target_dish)
-            _MEAL_PLAN_CACHE[cache_key] = result
-            return result
-        # For other errors, re-raise
-        raise
+        error_msg = str(e)
+        console.print(f"[yellow]⚠ API error (falling back to defaults):[/yellow] {type(e).__name__}")
+        # Always use fallback for any API error — quota, timeout, auth, etc.
+        result = _fallback_meal_plan(fridge, target_dish)
+        _MEAL_PLAN_CACHE[cache_key] = result
+        return result
 
 
 # ---------------------------------------------------------------------------
