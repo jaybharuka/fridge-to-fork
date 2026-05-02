@@ -110,9 +110,7 @@ async def scan(
 
             # ── Step 3: Order routing ───────────────────────────────────────
             yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
-            result = await asyncio.to_thread(
-                route_order, plan, delivery_address, dry_run=True
-            )
+            result = await route_order(plan, delivery_address, dry_run=True)
             yield _sse({
                 "type": "step3",
                 "decision": plan.decision.value,
