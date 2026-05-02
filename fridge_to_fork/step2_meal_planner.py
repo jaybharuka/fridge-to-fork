@@ -14,6 +14,7 @@ Run standalone:
 import argparse
 import json
 import os
+import time
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -27,6 +28,67 @@ from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggesti
 load_dotenv()
 
 console = Console()
+
+# Simple in-memory cache to avoid hitting API multiple times
+_MEAL_PLAN_CACHE = {}
+
+# ---------------------------------------------------------------------------
+# Fallback suggestions (when API quota is exceeded)
+# ---------------------------------------------------------------------------
+
+def _fallback_meal_plan(
+    fridge: FridgeContents,
+    target_dish: Optional[str] = None
+) -> MealPlan:
+    """Return sensible defaults when Google API quota is exceeded."""
+    if target_dish:
+        suggestions = [
+            MealSuggestion(
+                name=target_dish,
+                description=f"A delicious {target_dish}.",
+                can_cook_now=False,
+                missing_ingredients=["Check recipe"],
+                cuisine="Various",
+                prep_time_minutes=30,
+            )
+        ]
+        decision = Decision.ORDER_GROCERIES
+        reasoning = f"Evaluate {target_dish} — order missing ingredients if needed."
+    else:
+        has_eggs = any(ing.name.lower() in ["eggs", "egg"] for ing in fridge.ingredients)
+        has_bread = any(ing.name.lower() in ["bread", "bread rolls", "flatbread"] for ing in fridge.ingredients)
+        has_veggies = any(
+            ing.name.lower() in ["tomato", "cucumber", "lettuce", "carrot", "onion"]
+            for ing in fridge.ingredients
+        )
+        
+        suggestions = []
+        if has_eggs and has_bread:
+            suggestions.append(MealSuggestion(
+                name="Egg Toast", description="Quick breakfast.",
+                can_cook_now=True, missing_ingredients=[], cuisine="Simple", prep_time_minutes=10,
+            ))
+        if has_veggies:
+            suggestions.append(MealSuggestion(
+                name="Vegetable Salad", description="Fresh & healthy.",
+                can_cook_now=True, missing_ingredients=[], cuisine="International", prep_time_minutes=5,
+            ))
+        if len(fridge.ingredients) >= 3:
+            suggestions.append(MealSuggestion(
+                name="Stir-fry", description="With available ingredients.",
+                can_cook_now=True, missing_ingredients=[], cuisine="Asian", prep_time_minutes=15,
+            ))
+        if not suggestions:
+            suggestions.append(MealSuggestion(
+                name="Order Food", description="Limited ingredients.",
+                can_cook_now=False, missing_ingredients=["Most"], cuisine="Any", prep_time_minutes=0,
+            ))
+        
+        decision = Decision.COOK if any(s.can_cook_now for s in suggestions) else Decision.ORDER_DISH
+        reasoning = "[API quota exceeded] Showing basic suggestions. Try again later."
+    
+    recommended = suggestions[0] if suggestions else None
+    return MealPlan(suggestions=suggestions, decision=decision, recommended_meal=recommended, reasoning=reasoning)
 
 # ---------------------------------------------------------------------------
 # Prompts
@@ -136,8 +198,15 @@ def plan_meals(
     Returns
     -------
     MealPlan with suggestions, a Decision, and the recommended meal.
+    
+    Falls back to basic suggestions if API quota is exceeded.
     """
-    client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    # Check cache first
+    cache_key = f"{frozenset((ing.name, ing.quantity) for ing in fridge.ingredients)}_{target_dish}"
+    if cache_key in _MEAL_PLAN_CACHE:
+        return _MEAL_PLAN_CACHE[cache_key]
+
+    client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
     # Build ingredient list for the prompt
     ingredient_list = "\n".join(
@@ -154,44 +223,60 @@ def plan_meals(
     else:
         prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
 
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-    )
-
-    raw_text = response.text.strip()
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("```")[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
-
-    payload = json.loads(raw_text)
-
-    suggestions = [
-        MealSuggestion(
-            name=s["name"],
-            description=s.get("description", ""),
-            can_cook_now=bool(s.get("can_cook_now", False)),
-            missing_ingredients=s.get("missing_ingredients", []),
-            cuisine=s.get("cuisine", ""),
-            prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
         )
-        for s in payload.get("suggestions", [])
-    ]
 
-    decision = Decision(payload.get("decision", Decision.COOK))
-    recommended_name = payload.get("recommended_meal", "")
-    recommended = next((s for s in suggestions if s.name == recommended_name), None)
-    if recommended is None and suggestions:
-        recommended = suggestions[0]
+        raw_text = response.text.strip()
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("```")[1]
+            if raw_text.startswith("json"):
+                raw_text = raw_text[4:]
+            raw_text = raw_text.strip()
 
-    return MealPlan(
-        suggestions=suggestions,
-        decision=decision,
-        recommended_meal=recommended,
-        reasoning=payload.get("reasoning", ""),
-    )
+        payload = json.loads(raw_text)
+
+        suggestions = [
+            MealSuggestion(
+                name=s["name"],
+                description=s.get("description", ""),
+                can_cook_now=bool(s.get("can_cook_now", False)),
+                missing_ingredients=s.get("missing_ingredients", []),
+                cuisine=s.get("cuisine", ""),
+                prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+            )
+            for s in payload.get("suggestions", [])
+        ]
+
+        decision = Decision(payload.get("decision", Decision.COOK))
+        recommended_name = payload.get("recommended_meal", "")
+        recommended = next((s for s in suggestions if s.name == recommended_name), None)
+        if recommended is None and suggestions:
+            recommended = suggestions[0]
+
+        result = MealPlan(
+            suggestions=suggestions,
+            decision=decision,
+            recommended_meal=recommended,
+            reasoning=payload.get("reasoning", ""),
+        )
+        
+        # Cache the result
+        _MEAL_PLAN_CACHE[cache_key] = result
+        return result
+        
+    except Exception as e:
+        error_msg = str(e).lower()
+        # If it's a quota/rate limit error, use fallback
+        if "429" in error_msg or "quota" in error_msg or "resource_exhausted" in error_msg:
+            console.print("[yellow]⚠ Google API quota exceeded — using fallback suggestions[/yellow]")
+            result = _fallback_meal_plan(fridge, target_dish)
+            _MEAL_PLAN_CACHE[cache_key] = result
+            return result
+        # For other errors, re-raise
+        raise
 
 
 # ---------------------------------------------------------------------------
