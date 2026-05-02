@@ -152,6 +152,11 @@
       <p>Snap your fridge. Get meals. Order the rest.</p>
     </div>
 
+    <!-- Target Dish Input -->
+    <div style="margin-bottom: 16px;">
+      <input type="text" id="targetDish" placeholder="What do you want to eat? (optional)" style="width: 100%; padding: 14px 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 15px; font-family: inherit; outline: none; transition: .3s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" />
+    </div>
+
     <!-- Upload -->
     <div class="upload" id="uploadZone">
       <input type="file" id="fileInput" accept="image/*" capture="environment" />
@@ -305,6 +310,11 @@
 
       const form = new FormData();
       form.append('file', selectedFile);
+      
+      const targetDish = document.getElementById('targetDish').value.trim();
+      if (targetDish) {
+        form.append('target_dish', targetDish);
+      }
 
       try {
         const res = await fetch('/api/scan', { method: 'POST', body: form });

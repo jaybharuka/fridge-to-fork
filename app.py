@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 
@@ -52,7 +52,10 @@ async def health():
 
 
 @app.post("/api/scan")
-async def scan(file: UploadFile = File(...)):
+async def scan(
+    file: UploadFile = File(...),
+    target_dish: str | None = Form(None)
+):
     img_bytes = await file.read()
     suffix = Path(file.filename or "image.jpg").suffix or ".jpg"
     delivery_address = os.environ.get("DELIVERY_ADDRESS", "Mumbai, India")
@@ -81,8 +84,12 @@ async def scan(file: UploadFile = File(...)):
             })
 
             # ── Step 2: Meal planning ───────────────────────────────────────
-            yield _sse({"type": "progress", "step": 2, "message": "Planning your meals…"})
-            plan = await asyncio.to_thread(plan_meals, fridge)
+            if target_dish:
+                yield _sse({"type": "progress", "step": 2, "message": f"Evaluating '{target_dish}'…"})
+            else:
+                yield _sse({"type": "progress", "step": 2, "message": "Planning your meals…"})
+                
+            plan = await asyncio.to_thread(plan_meals, fridge, target_dish=target_dish)
             yield _sse({
                 "type": "step2",
                 "decision": plan.decision.value,

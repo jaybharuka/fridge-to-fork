@@ -70,6 +70,43 @@ Return ONLY valid JSON (no markdown, no prose):
 """
 
 
+_TARGET_DISH_PROMPT = """\
+You are an expert chef and nutritionist helping a busy person.
+
+The user explicitly wants to eat: "{target_dish}"
+
+Available ingredients in their fridge:
+{ingredient_list}
+
+Evaluate if they can make "{target_dish}" with what they have.
+State:
+- Whether it can be cooked right now
+- Exactly which ingredients are missing to make it
+
+Recommend ONE best action:
+- "cook"             → if they have everything needed to make "{target_dish}"
+- "order_groceries"  → if they are missing a few ingredients and should order them via quick-commerce to cook it
+- "order_dish"       → if they are missing almost everything and should just order the finished dish from a restaurant
+
+Return ONLY valid JSON (no markdown, no prose) with a single suggestion representing the target dish:
+{{
+  "suggestions": [
+    {{
+      "name": "<name of the target dish>",
+      "description": "<one sentence describing the dish>",
+      "can_cook_now": <true|false>,
+      "missing_ingredients": ["<missing item 1>", ...],
+      "cuisine": "<cuisine type>",
+      "prep_time_minutes": <integer>
+    }}
+  ],
+  "decision": "<cook|order_dish|order_groceries>",
+  "recommended_meal": "<name of the target dish>",
+  "reasoning": "<one or two sentences explaining why they should cook, order groceries, or order the dish>"
+}}
+"""
+
+
 # ---------------------------------------------------------------------------
 # Core planner function
 # ---------------------------------------------------------------------------
@@ -77,18 +114,22 @@ Return ONLY valid JSON (no markdown, no prose):
 def plan_meals(
     fridge: FridgeContents,
     *,
+    target_dish: Optional[str] = None,
     model: str = "gemini-2.5-flash",
     client: Optional[genai.Client] = None,
 ) -> MealPlan:
     """
     Suggest meals and decide cook-vs-order given fridge contents.
+    If target_dish is provided, evaluate that specific dish instead of suggesting random meals.
 
     Parameters
     ----------
     fridge:
         Output of step1 identify_ingredients().
+    target_dish:
+        Optional specific dish the user wants to make.
     model:
-        Gemini model. gemini-2.0-flash is fast and free-tier friendly.
+        Gemini model. gemini-2.5-flash is fast and free-tier friendly.
     client:
         Optional pre-built Gemini client.
 
@@ -106,7 +147,12 @@ def plan_meals(
     if not ingredient_list:
         ingredient_list = "(no ingredients detected)"
 
-    prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
+    if target_dish:
+        prompt = _TARGET_DISH_PROMPT.format(
+            ingredient_list=ingredient_list, target_dish=target_dish
+        )
+    else:
+        prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
 
     response = client.models.generate_content(
         model=model,
@@ -207,6 +253,7 @@ def _parse_args() -> argparse.Namespace:
         help="Comma-separated ingredient list, e.g. 'eggs,butter,cheese'",
     )
     p.add_argument("--model", default="gemini-2.5-flash")
+    p.add_argument("--target-dish", default=None, help="Specific dish you want to cook")
     p.add_argument("--json", action="store_true")
     return p.parse_args()
 
@@ -216,8 +263,12 @@ def main() -> None:
     names = [n.strip() for n in args.ingredients.split(",") if n.strip()]
     fridge = FridgeContents(ingredients=[Ingredient(name=n) for n in names])
 
-    console.print(f"[bold]Planning meals for:[/bold] {', '.join(names)}")
-    plan = plan_meals(fridge, model=args.model)
+    if args.target_dish:
+        console.print(f"[bold]Evaluating target dish:[/bold] {args.target_dish}")
+    else:
+        console.print(f"[bold]Planning meals for:[/bold] {', '.join(names)}")
+        
+    plan = plan_meals(fridge, target_dish=args.target_dish, model=args.model)
 
     if args.json:
         import json as _json
