@@ -105,7 +105,7 @@ def _load_image(source: Union[str, Path, bytes]) -> tuple[bytes, str]:
 def identify_ingredients(
     image_source: Union[str, Path, bytes],
     *,
-    model: str = "gemini-2.5-flash",
+    model: str = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash-lite"),
     client: genai.Client | None = None,
 ) -> FridgeContents:
     """

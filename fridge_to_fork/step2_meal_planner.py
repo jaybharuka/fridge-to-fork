@@ -173,7 +173,7 @@ def plan_meals(
     fridge: FridgeContents,
     *,
     target_dish: Optional[str] = None,
-    model: str = "gemini-2.5-flash",
+    model: str = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash-lite"),
     client: Optional[genai.Client] = None,
 ) -> MealPlan:
     """
