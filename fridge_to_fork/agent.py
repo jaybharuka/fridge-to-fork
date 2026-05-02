@@ -14,6 +14,7 @@ Requires OPENAI_API_KEY in .env
 """
 
 import argparse
+import asyncio
 import os
 import sys
 import time
@@ -82,7 +83,7 @@ def run_pipeline(
 
     # ── Step 3: Order routing ────────────────────────────────────────────────
     console.print("[bold]Step 3/3[/bold] — Routing order...")
-    result = route_order(plan, address, dry_run=dry_run)
+    result = asyncio.run(route_order(plan, address, dry_run=dry_run))
     if result:
         display_order_result(result)
 

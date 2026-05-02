@@ -38,18 +38,46 @@ def _fallback_meal_plan(
 ) -> MealPlan:
     """Return sensible defaults when Google API quota is exceeded."""
     if target_dish:
+        # Small heuristic mapping for a few common dishes to create a sensible shopping list
+        core_map = {
+            "chole": ["chickpeas (dried or canned)", "onion", "garlic", "ginger", "tomato", "spices (cumin, coriander, garam masala)", "oil"],
+            "bhature": ["all-purpose flour (maida)", "yeast or baking soda", "oil for frying"],
+            "omelette": ["eggs", "salt", "pepper", "oil or butter"],
+            "pancake": ["flour", "milk", "egg", "baking powder", "oil or butter"],
+            "sandwich": ["bread", "butter", "cheese or spread", "vegetables"],
+        }
+
+        low = target_dish.lower()
+        core = []
+        for k, v in core_map.items():
+            if k in low:
+                core = v
+                break
+
+        if not core:
+            # Generic fallback shopping list for an unknown target dish
+            core = ["flour", "oil", "salt", "spices", "one fresh vegetable"]
+
+        missing = [it for it in core if not any(it.split()[0].lower() in ing.name.lower() for ing in fridge.ingredients)]
+
         suggestions = [
             MealSuggestion(
                 name=target_dish,
-                description=f"A delicious {target_dish}.",
-                can_cook_now=False,
-                missing_ingredients=["Check recipe"],
+                description=f"A practical suggestion to make {target_dish}.",
+                can_cook_now=(len(missing) == 0),
+                missing_ingredients=missing or [],
                 cuisine="Various",
                 prep_time_minutes=30,
             )
         ]
-        decision = Decision.ORDER_GROCERIES
-        reasoning = f"Evaluate {target_dish} — order missing ingredients if needed."
+        decision = Decision.COOK if len(missing) == 0 else Decision.ORDER_GROCERIES
+        if len(missing) == 0:
+            reasoning = f"You appear to have the core ingredients to make {target_dish}."
+        else:
+            reasoning = (
+                f"You're missing {len(missing)} core items for {target_dish}. "
+                f"Suggested quick grocery items: {', '.join(missing[:6])}."
+            )
     else:
         has_eggs = any(ing.name.lower() in ["eggs", "egg"] for ing in fridge.ingredients)
         has_bread = any(ing.name.lower() in ["bread", "bread rolls", "flatbread"] for ing in fridge.ingredients)
@@ -76,12 +104,20 @@ def _fallback_meal_plan(
             ))
         if not suggestions:
             suggestions.append(MealSuggestion(
-                name="Order Food", description="Limited ingredients.",
-                can_cook_now=False, missing_ingredients=["Most"], cuisine="Any", prep_time_minutes=0,
+                name="Order Food",
+                description="You have limited usable ingredients — ordering a ready dish is recommended.",
+                can_cook_now=False,
+                missing_ingredients=["pantry staples: salt, oil, spices, flour"],
+                cuisine="Any",
+                prep_time_minutes=0,
             ))
-        
+
         decision = Decision.COOK if any(s.can_cook_now for s in suggestions) else Decision.ORDER_DISH
-        reasoning = "Showing basic suggestions from local fallback logic."
+        # Provide clearer reasoning so the UI can display something reviewer-friendly.
+        reasoning = (
+            "Local fallback: recommending a simple meal plan based on scanned items. "
+            "If you want precise recipes, enable the live model or add a few pantry staples."
+        )
     
     recommended = suggestions[0] if suggestions else None
     return MealPlan(suggestions=suggestions, decision=decision, recommended_meal=recommended, reasoning=reasoning)
@@ -214,61 +250,70 @@ def plan_meals(
     else:
         prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
 
-    try:
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-        )
-
-        raw_text = response.text.strip()
-        
-        # Check if response is an error (contains 'error' or 'RESOURCE_EXHAUSTED')
-        if "error" in raw_text.lower() or "resource_exhausted" in raw_text.lower():
-            console.print("[yellow]⚠ API error detected in response[/yellow]")
-            result = _fallback_meal_plan(fridge, target_dish)
-            _MEAL_PLAN_CACHE[cache_key] = result
-            return result
-        
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("```")[1]
-            if raw_text.startswith("json"):
-                raw_text = raw_text[4:]
-            raw_text = raw_text.strip()
-
-        payload = json.loads(raw_text)
-
-        suggestions = [
-            MealSuggestion(
-                name=s["name"],
-                description=s.get("description", ""),
-                can_cook_now=bool(s.get("can_cook_now", False)),
-                missing_ingredients=s.get("missing_ingredients", []),
-                cuisine=s.get("cuisine", ""),
-                prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+    # Try to call the model with a few retries to tolerate transient quota/timeouts.
+    max_retries = 3
+    backoff = 1.0
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
             )
-            for s in payload.get("suggestions", [])
-        ]
 
-        decision = Decision(payload.get("decision", Decision.COOK))
-        recommended_name = payload.get("recommended_meal", "")
-        recommended = next((s for s in suggestions if s.name == recommended_name), None)
-        if recommended is None and suggestions:
-            recommended = suggestions[0]
+            raw_text = (response.text or "").strip()
 
-        result = MealPlan(
-            suggestions=suggestions,
-            decision=decision,
-            recommended_meal=recommended,
-            reasoning=payload.get("reasoning", ""),
-        )
-        return result
-        
-    except Exception as e:
-        error_msg = str(e)
-        console.print(f"[yellow]⚠ API error (falling back to defaults):[/yellow] {type(e).__name__}")
-        # Always use fallback for any API error — quota, timeout, auth, etc.
-        result = _fallback_meal_plan(fridge, target_dish)
-        return result
+            # Check if response looks like an error
+            if "error" in raw_text.lower() or "resource_exhausted" in raw_text.lower():
+                console.print("[yellow]⚠ API error detected in response[/yellow]")
+                raise RuntimeError("API returned error-like payload")
+
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("```")[1]
+                if raw_text.startswith("json"):
+                    raw_text = raw_text[4:]
+                raw_text = raw_text.strip()
+
+            payload = json.loads(raw_text)
+
+            suggestions = [
+                MealSuggestion(
+                    name=s["name"],
+                    description=s.get("description", ""),
+                    can_cook_now=bool(s.get("can_cook_now", False)),
+                    missing_ingredients=s.get("missing_ingredients", []),
+                    cuisine=s.get("cuisine", ""),
+                    prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+                )
+                for s in payload.get("suggestions", [])
+            ]
+
+            decision = Decision(payload.get("decision", Decision.COOK))
+            recommended_name = payload.get("recommended_meal", "")
+            recommended = next((s for s in suggestions if s.name == recommended_name), None)
+            if recommended is None and suggestions:
+                recommended = suggestions[0]
+
+            result = MealPlan(
+                suggestions=suggestions,
+                decision=decision,
+                recommended_meal=recommended,
+                reasoning=payload.get("reasoning", ""),
+            )
+            return result
+
+        except Exception as e:
+            # On last attempt, fall back to local planner
+            console.print(f"[yellow]Attempt {attempt} failed:[/yellow] {type(e).__name__}: {e}")
+            if attempt == max_retries:
+                console.print(f"[yellow]⚠ API error (falling back to defaults):[/yellow] {type(e).__name__}")
+                result = _fallback_meal_plan(fridge, target_dish)
+                return result
+            else:
+                import time
+
+                time.sleep(backoff)
+                backoff *= 2
+                continue
 
 
 # ---------------------------------------------------------------------------
