@@ -6,6 +6,27 @@
 [Target Dish] + [Fridge Photo] → 🤖 Gemini Vision → 🥦 Ingredients → 🍳 AI Planner → 🛵 Swiggy Order Router
 ```
 
+## How It Works
+
+From idea to production — here's how to get started with the Swiggy MCP Challenge.
+
+**Step 1 — Apply**
+Tell us who you are and what you want to build.
+
+**Step 2 — Quick Review**
+We review your use case, security setup, and make sure it's a good fit.
+
+**Step 3 — Get Access**
+Receive your API keys, credentials, and documentation — you're ready to build.
+
+**Step 4 — Build & Ship**
+Build, iterate fast, and ship when it's ready.
+
+**Step 5 — Show Us What You Built**
+Send us a demo! Great projects get featured — and standout builders often join the team.
+
+---
+
 ## Deep Dive: What are we building?
 
 Fridge to Fork is a highly intelligent, **Target-Dish Centric AI Agent Pipeline** designed to bridge the gap between what you *want* to eat and what you *actually have* in your fridge. 

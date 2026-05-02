@@ -84,11 +84,12 @@
     .desc { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:14px; overflow-wrap:break-word; word-break:break-word; }
     .chips { display:flex; flex-wrap:wrap; gap:7px; }
     .chip { display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.07); border:1px solid var(--border); border-radius:50px; padding:6px 12px; font-size:12px; font-weight:500; }
-    .chip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .chip { display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.04); border-radius:999px; padding:8px 12px; font-size:13px; font-weight:600; }
+    .chip-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
     .dot-high { background:var(--green); }
     .dot-mid { background:var(--yellow); }
     .dot-low { background:var(--red); }
-    .chip-pct { color:var(--muted); font-size:11px; }
+    .chip-pct { color:var(--muted); font-size:11px; margin-left:6px; opacity:0.9 }
 
     /* Meal cards */
     .meals-scroll { display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -98,6 +99,8 @@
     .meal-name { font-size:14px; font-weight:700; margin-bottom:4px; overflow-wrap:break-word; word-break:break-word; }
     .meal-desc { font-size:11px; color:var(--muted); line-height:1.5; margin-bottom:8px; overflow-wrap:break-word; word-break:break-word; }
     .meal-meta { display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start; }
+    .meal-card.recommended { box-shadow: 0 8px 30px rgba(124,111,255,0.12); border-left:4px solid rgba(124,111,255,0.6); }
+    .meal-card .tag { font-size:11px; padding:5px 10px; border-radius:999px; }
     .tag { font-size:10px; font-weight:600; padding:3px 8px; border-radius:50px; min-width:0; word-break:break-word; }
     .tag-green { background:rgba(16,185,129,.2); color:#6ee7b7; }
     .tag-yellow { background:rgba(245,158,11,.2); color:#fcd34d; }
@@ -106,12 +109,16 @@
     .tag-purple { background:rgba(124,111,255,.2); color:#c4b5fd; }
 
     /* Decision banner */
-    .decision-banner { border-radius:16px; padding:16px; margin-top:14px; overflow-wrap:break-word; word-break:break-word; }
+    .decision-banner { border-radius:18px; padding:18px; margin-top:14px; overflow-wrap:break-word; word-break:break-word; display:flex; gap:12px; align-items:center; }
     .decision-banner.cook { background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05)); border:1px solid rgba(16,185,129,.3); }
     .decision-banner.order_dish { background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(239,68,68,.05)); border:1px solid rgba(239,68,68,.3); }
     .decision-banner.order_groceries { background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.05)); border:1px solid rgba(245,158,11,.3); }
-    .decision-title { font-size:16px; font-weight:800; margin-bottom:4px; overflow-wrap:break-word; word-break:break-word; }
-    .decision-reasoning { font-size:12px; color:var(--muted); line-height:1.6; overflow-wrap:break-word; word-break:break-word; }
+    .decision-icon { width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
+    .decision-title { font-size:16px; font-weight:800; margin-bottom:0; overflow-wrap:break-word; word-break:break-word; }
+    .decision-reasoning { font-size:13px; color:var(--muted); line-height:1.6; overflow-wrap:break-word; word-break:break-word; }
+    .decision-banner.cook .decision-icon{ background:linear-gradient(135deg,#10b981,#34d399); color:#042c21 }
+    .decision-banner.order_dish .decision-icon{ background:linear-gradient(135deg,#ef4444,#fb7185); color:#2b0a0a }
+    .decision-banner.order_groceries .decision-icon{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1a00 }
 
     /* Order card */
     .order-card { background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04)); border:1px solid rgba(16,185,129,.35); border-radius:var(--r); padding:18px; margin-top:14px; overflow-wrap:break-word; word-break:break-word; }

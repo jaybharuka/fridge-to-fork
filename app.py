@@ -161,7 +161,8 @@ async def scan(
 
             # ── Step 3: Order routing ───────────────────────────────────────
             yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
-            result = await route_order(plan, delivery_address, dry_run=True)
+            # Use the local MCP demo stubs so the UI can show a confirmed order card.
+            result = await route_order(plan, delivery_address, dry_run=False)
             yield _sse({
                 "type": "step3",
                 "decision": plan.decision.value,
