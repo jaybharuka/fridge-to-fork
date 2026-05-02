@@ -33,6 +33,7 @@ console = Console()
 def run_pipeline(
     image_source: str,
     *,
+    target_dish: str | None = None,
     delivery_address: str | None = None,
     dry_run: bool = False,
     vision_model: str = "gemini-2.5-flash",
@@ -69,9 +70,12 @@ def run_pipeline(
     console.print()
 
     # ── Step 2: Meal planning ────────────────────────────────────────────────
-    console.print("[bold]Step 2/3[/bold] — Planning meals with Claude...")
+    if target_dish:
+        console.print(f"[bold]Step 2/3[/bold] — Evaluating target dish: {target_dish}...")
+    else:
+        console.print("[bold]Step 2/3[/bold] — Planning meals with Claude...")
     t0 = time.perf_counter()
-    plan = plan_meals(fridge, model=planner_model)
+    plan = plan_meals(fridge, target_dish=target_dish, model=planner_model)
     console.print(f"  Done in {time.perf_counter() - t0:.1f}s.\n")
     display_meal_plan(plan)
     console.print()
@@ -105,6 +109,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Simulate MCP order calls (no real orders placed)",
     )
+    p.add_argument(
+        "--target-dish",
+        default=None,
+        help="Specific dish you want to cook",
+    )
     p.add_argument("--vision-model", default="gemini-2.5-flash", help="Gemini vision model")
     p.add_argument("--planner-model", default="gemini-2.5-flash", help="Gemini planner model")
     return p.parse_args()
@@ -120,6 +129,7 @@ def main() -> None:
 
     run_pipeline(
         args.image,
+        target_dish=args.target_dish,
         delivery_address=args.address,
         dry_run=args.dry_run,
         vision_model=args.vision_model,

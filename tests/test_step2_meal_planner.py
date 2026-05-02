@@ -85,12 +85,10 @@ def _make_fridge(*names: str) -> FridgeContents:
 
 
 def _mock_client(response_json: dict) -> MagicMock:
-    content_block = MagicMock()
-    content_block.text = json.dumps(response_json)
-    message = MagicMock()
-    message.content = [content_block]
     client = MagicMock()
-    client.messages.create.return_value = message
+    response = MagicMock()
+    response.text = json.dumps(response_json)
+    client.models.generate_content.return_value = response
     return client
 
 
@@ -144,12 +142,10 @@ def test_plan_meals_empty_fridge():
 
 def test_plan_meals_strips_markdown_fence():
     wrapped = "```json\n" + json.dumps(FULL_FRIDGE_RESPONSE) + "\n```"
-    content_block = MagicMock()
-    content_block.text = wrapped
-    message = MagicMock()
-    message.content = [content_block]
     client = MagicMock()
-    client.messages.create.return_value = message
+    response = MagicMock()
+    response.text = wrapped
+    client.models.generate_content.return_value = response
 
     plan = plan_meals(_make_fridge("eggs"), client=client)
     assert len(plan.suggestions) == 3
@@ -168,9 +164,9 @@ def test_plan_meals_fallback_recommended_meal():
 
 def test_plan_meals_uses_correct_model():
     client = _mock_client(FULL_FRIDGE_RESPONSE)
-    plan_meals(_make_fridge("eggs"), model="claude-haiku-4-5-20251001", client=client)
-    kwargs = client.messages.create.call_args.kwargs
-    assert kwargs["model"] == "claude-haiku-4-5-20251001"
+    plan_meals(_make_fridge("eggs"), model="gemini-2.0-flash", client=client)
+    kwargs = client.models.generate_content.call_args.kwargs
+    assert kwargs["model"] == "gemini-2.0-flash"
 
 
 def test_plan_meals_includes_ingredient_names_in_prompt():
@@ -178,8 +174,19 @@ def test_plan_meals_includes_ingredient_names_in_prompt():
     fridge = _make_fridge("spinach", "paneer", "cream")
     plan_meals(fridge, client=client)
 
-    kwargs = client.messages.create.call_args.kwargs
-    prompt_text = kwargs["messages"][0]["content"]
+    kwargs = client.models.generate_content.call_args.kwargs
+    prompt_text = kwargs["contents"]
     assert "spinach" in prompt_text
     assert "paneer" in prompt_text
     assert "cream" in prompt_text
+
+
+def test_plan_meals_with_target_dish():
+    client = _mock_client(FULL_FRIDGE_RESPONSE)
+    fridge = _make_fridge("eggs", "butter")
+    plan_meals(fridge, target_dish="Mushroom Risotto", client=client)
+
+    kwargs = client.models.generate_content.call_args.kwargs
+    prompt_text = kwargs["contents"]
+    assert "Mushroom Risotto" in prompt_text
+    assert "eggs" in prompt_text
