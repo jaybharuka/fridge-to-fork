@@ -85,7 +85,7 @@ def _fallback_meal_plan(
             ))
         
         decision = Decision.COOK if any(s.can_cook_now for s in suggestions) else Decision.ORDER_DISH
-        reasoning = "[API quota exceeded] Showing basic suggestions. Try again later."
+        reasoning = "Showing basic suggestions from local fallback logic."
     
     recommended = suggestions[0] if suggestions else None
     return MealPlan(suggestions=suggestions, decision=decision, recommended_meal=recommended, reasoning=reasoning)
