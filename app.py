@@ -26,6 +26,7 @@ load_dotenv()
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import plan_meals
 from fridge_to_fork.step3_order_router import route_order
+from fridge_to_fork.models import Decision, MealPlan
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
 
@@ -88,8 +89,20 @@ async def scan(
                 yield _sse({"type": "progress", "step": 2, "message": f"Evaluating '{target_dish}'…"})
             else:
                 yield _sse({"type": "progress", "step": 2, "message": "Planning your meals…"})
-                
-            plan = await asyncio.to_thread(plan_meals, fridge, target_dish=target_dish)
+            
+            try:
+                plan = await asyncio.to_thread(plan_meals, fridge, target_dish=target_dish)
+            except Exception as e:
+                # Fallback if meal planner crashes
+                import traceback
+                traceback.print_exc()
+                plan = MealPlan(
+                    suggestions=[],
+                    decision=Decision.COOK,
+                    recommended_meal=None,
+                    reasoning=f"[API Error] Unable to plan meals: {type(e).__name__}"
+                )
+            
             yield _sse({
                 "type": "step2",
                 "decision": plan.decision.value,
