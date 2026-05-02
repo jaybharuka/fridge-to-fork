@@ -230,6 +230,14 @@ def plan_meals(
         )
 
         raw_text = response.text.strip()
+        
+        # Check if response is an error (contains 'error' or 'RESOURCE_EXHAUSTED')
+        if "error" in raw_text.lower() or "resource_exhausted" in raw_text.lower():
+            console.print("[yellow]⚠ API error detected in response[/yellow]")
+            result = _fallback_meal_plan(fridge, target_dish)
+            _MEAL_PLAN_CACHE[cache_key] = result
+            return result
+        
         if raw_text.startswith("```"):
             raw_text = raw_text.split("```")[1]
             if raw_text.startswith("json"):
