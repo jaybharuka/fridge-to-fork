@@ -14,7 +14,6 @@ Run standalone:
 import argparse
 import json
 import os
-import time
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -28,9 +27,6 @@ from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggesti
 load_dotenv()
 
 console = Console()
-
-# Simple in-memory cache to avoid hitting API multiple times
-_MEAL_PLAN_CACHE = {}
 
 # ---------------------------------------------------------------------------
 # Fallback suggestions (when API quota is exceeded)
@@ -201,11 +197,6 @@ def plan_meals(
     
     Falls back to basic suggestions if API quota is exceeded.
     """
-    # Check cache first
-    cache_key = f"{frozenset((ing.name, ing.quantity) for ing in fridge.ingredients)}_{target_dish}"
-    if cache_key in _MEAL_PLAN_CACHE:
-        return _MEAL_PLAN_CACHE[cache_key]
-
     client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
     # Build ingredient list for the prompt
@@ -270,9 +261,6 @@ def plan_meals(
             recommended_meal=recommended,
             reasoning=payload.get("reasoning", ""),
         )
-        
-        # Cache the result
-        _MEAL_PLAN_CACHE[cache_key] = result
         return result
         
     except Exception as e:
@@ -280,7 +268,6 @@ def plan_meals(
         console.print(f"[yellow]⚠ API error (falling back to defaults):[/yellow] {type(e).__name__}")
         # Always use fallback for any API error — quota, timeout, auth, etc.
         result = _fallback_meal_plan(fridge, target_dish)
-        _MEAL_PLAN_CACHE[cache_key] = result
         return result
 
 
