@@ -126,6 +126,41 @@ def _fallback_meal_plan(
 # Prompts
 # ---------------------------------------------------------------------------
 
+_MISSING_INGREDIENT_RULES = """\
+IMPORTANT RULES FOR MISSING INGREDIENTS:
+
+1. PANTRY STAPLES — Never mark these as missing, assume the user has them:
+   Salt, sugar, black pepper, red chili powder, turmeric, cumin, coriander
+   powder, garam masala, mustard seeds, curry leaves, bay leaves, cooking oil
+   (any kind), ghee, butter, flour (maida/atta), rice, basic lentils (dal),
+   vinegar, soy sauce, baking soda, baking powder, water.
+
+2. NON-FRIDGE ITEMS — Never mark these as missing just because they aren't
+   in the fridge photo. These are commonly stored at room temperature:
+   Onions, garlic, ginger, potatoes, tomatoes, bananas, bread, dry pasta,
+   dry noodles, canned goods, packaged spices, tea, coffee.
+
+3. DECISION LOGIC — Apply this strictly:
+   - If the only "missing" items are pantry staples or non-fridge items
+     from the lists above → decision must be "cook", not "order_groceries"
+   - Only mark something as missing if it is a SPECIFIC ingredient that
+     is genuinely uncommon to have at home (e.g. arborio rice, saffron,
+     specific vegetables the dish is named after like bhindi/okra)
+   - For "order_groceries": only list items that are genuinely missing and
+     NOT on the pantry staples or non-fridge lists above
+   - The dish the user asked for is their TARGET — try hard to find a way
+     to cook it before deciding to order
+
+4. EXAMPLE — For "Bhindi Fry":
+   - Bhindi (okra) → check if in fridge. If not → missing (it's the main ingredient)
+   - Cooking oil → assume available (pantry staple) → NOT missing
+   - Salt → assume available (pantry staple) → NOT missing
+   - Onion → assume available (non-fridge item) → NOT missing
+   - Spices → assume available (pantry staples) → NOT missing
+   - Result: only missing item is bhindi itself → decision: order_groceries
+     (just order the bhindi), not order_dish
+"""
+
 _PROMPT_TEMPLATE = """\
 You are an expert chef and nutritionist helping a busy person decide what to eat.
 
@@ -144,6 +179,8 @@ Also recommend ONE best action:
 Prefer cooking when ≥70% of ingredients are present and missing items are few.
 Prefer ordering the dish when the user would need to buy 5+ ingredients.
 Prefer ordering groceries when the user needs just 1-3 ingredients.
+
+""" + _MISSING_INGREDIENT_RULES + """
 
 Return ONLY valid JSON (no markdown, no prose):
 {{
@@ -181,6 +218,8 @@ Recommend ONE best action:
 - "cook"             → if they have everything needed to make "{target_dish}"
 - "order_groceries"  → if they are missing a few ingredients and should order them via quick-commerce to cook it
 - "order_dish"       → if they are missing almost everything and should just order the finished dish from a restaurant
+
+""" + _MISSING_INGREDIENT_RULES + """
 
 Return ONLY valid JSON (no markdown, no prose) with a single suggestion representing the target dish:
 {{
