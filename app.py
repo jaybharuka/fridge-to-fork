@@ -300,6 +300,16 @@ async def scan(
             })
 
             # ── Step 3: Order routing ───────────────────────────────────────
+            needs_order = plan.decision in (Decision.ORDER_DISH, Decision.ORDER_GROCERIES)
+
+            if needs_order and not access_token:
+                yield _sse({
+                    "type": "auth_required",
+                    "message": "Connect your Swiggy account to place this order",
+                })
+                yield _sse({"type": "complete"})
+                return
+
             yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
             result = await route_order(
                 plan, delivery_address, dry_run=False, access_token=access_token
