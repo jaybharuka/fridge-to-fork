@@ -52,7 +52,7 @@
     .preview { display:none; margin-top:14px; border-radius:var(--r); overflow:hidden; position:relative; }
     .preview.show { display:block; }
     .preview img { width:100%; max-height:260px; object-fit:cover; display:block; }
-    .preview-grad { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,.65) 0%,transparent 55%); }
+    .preview-grad { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,.4) 0%,transparent 45%); }
     .preview-row { position:absolute; bottom:14px; left:14px; right:14px; display:flex; gap:8px; }
 
     /* Buttons */
@@ -64,24 +64,25 @@
     .btn-ghost { background:var(--surface); color:var(--text); border:1px solid var(--border); flex:1; font-size:13px; padding:10px 16px; }
 
     /* Steps */
-    .steps { display:none; margin-top:22px; gap:8px; flex-direction:column; }
+    .steps { display:none; margin-top:22px; gap:8px; flex-direction:column; position:relative; }
     .steps.show { display:flex; }
-    .step { display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:16px; background:var(--surface); border:1px solid var(--border); transition:.3s; }
+    .steps::before { content:''; position:absolute; top:0; bottom:0; left:33px; width:2px; background:rgba(255,255,255,.1); z-index:0; }
+    .step { position:relative; z-index:1; display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:16px; background:var(--surface); border:1px solid var(--border); transition:.3s; }
     .step.active { border-color:rgba(124,111,255,.5); background:rgba(124,111,255,.1); }
     .step.done { border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.07); }
     .step-num { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; background:rgba(255,255,255,.08); flex-shrink:0; transition:.3s; }
     .step.active .step-num { background:var(--accent); animation:pulse 1.4s ease-in-out infinite; }
-    .step.done .step-num { background:var(--green); }
+    .step.done .step-num { background:var(--green); box-shadow:0 0 12px rgba(74,222,128,.3); }
     @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(124,111,255,.6)} 50%{box-shadow:0 0 0 8px rgba(124,111,255,0)} }
     .step-label { font-size:13px; font-weight:600; }
     .step-sub { font-size:11px; color:var(--muted); margin-top:2px; }
 
     /* Cards */
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:18px; backdrop-filter:blur(10px); margin-top:14px; overflow-wrap:break-word; word-break:break-word; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:18px; backdrop-filter:blur(10px); margin-top:14px; overflow-wrap:break-word; word-break:normal; }
     .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
 
     /* Ingredients */
-    .desc { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:14px; overflow-wrap:break-word; word-break:break-word; }
+    .desc { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:14px; overflow-wrap:break-word; word-break:normal; }
     .chips { display:flex; flex-wrap:wrap; gap:7px; }
     .chip { display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.07); border:1px solid var(--border); border-radius:50px; padding:6px 12px; font-size:12px; font-weight:500; }
     .chip { display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.04); border-radius:999px; padding:8px 12px; font-size:13px; font-weight:600; }
@@ -92,45 +93,47 @@
     .chip-pct { color:var(--muted); font-size:11px; margin-left:6px; opacity:0.9 }
 
     /* Meal cards */
-    .meals-scroll { display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .meals-scroll { display:flex; gap:10px; overflow-x:auto; overflow-y:hidden; padding:0 1px 4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
     .meals-scroll::-webkit-scrollbar { display:none; }
-    .meal-card { min-width:200px; background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:14px; flex-shrink:0; overflow-wrap:break-word; word-break:break-word; }
+    .meal-card { min-width:200px; width:100%; max-width:100%; box-sizing:border-box; background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:14px; flex-shrink:0; overflow:hidden; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; }
     .meal-card.recommended { border-color:rgba(124,111,255,.5); background:rgba(124,111,255,.1); }
-    .meal-name { font-size:14px; font-weight:700; margin-bottom:4px; overflow-wrap:break-word; word-break:break-word; }
-    .meal-desc { font-size:11px; color:var(--muted); line-height:1.5; margin-bottom:8px; overflow-wrap:break-word; word-break:break-word; }
+    .meal-name { font-size:14px; font-weight:700; margin-bottom:4px; overflow-wrap:break-word; word-break:normal; min-width:0; }
+    .meal-desc { font-size:11px; color:var(--muted); line-height:1.5; margin-bottom:8px; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; min-width:0; }
     .meal-meta { display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start; }
     .meal-card.recommended { box-shadow: 0 8px 30px rgba(124,111,255,0.12); border-left:4px solid rgba(124,111,255,0.6); }
     .meal-card .tag { font-size:11px; padding:5px 10px; border-radius:999px; }
-    .tag { font-size:10px; font-weight:600; padding:3px 8px; border-radius:50px; min-width:0; word-break:break-word; }
+    .tag { font-size:10px; font-weight:600; padding:3px 8px; border-radius:50px; min-width:0; overflow-wrap:break-word; word-break:normal; }
     .tag-green { background:rgba(16,185,129,.2); color:#6ee7b7; }
     .tag-yellow { background:rgba(245,158,11,.2); color:#fcd34d; }
     .tag-red { background:rgba(239,68,68,.2); color:#fca5a5; }
     .tag-gray { background:rgba(255,255,255,.1); color:var(--muted); }
     .tag-purple { background:rgba(124,111,255,.2); color:#c4b5fd; }
+    .missing-tag { white-space:normal; word-wrap:break-word; overflow:hidden; width:100%; box-sizing:border-box; }
 
-    /* Decision banner */
-    .decision-banner { border-radius:18px; padding:18px; margin-top:14px; overflow-wrap:break-word; word-break:break-word; display:flex; gap:12px; align-items:center; }
+    /* Decision banner (action card) */
+    .decision-banner { border-radius:18px; padding:18px; margin-top:14px; display:flex; gap:16px; align-items:flex-start; }
     .decision-banner.cook { background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05)); border:1px solid rgba(16,185,129,.3); }
     .decision-banner.order_dish { background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(239,68,68,.05)); border:1px solid rgba(239,68,68,.3); }
     .decision-banner.order_groceries { background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.05)); border:1px solid rgba(245,158,11,.3); }
-    .decision-icon { width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
-    .decision-title { font-size:16px; font-weight:800; margin-bottom:0; overflow-wrap:break-word; word-break:break-word; }
-    .decision-reasoning { font-size:13px; color:var(--muted); line-height:1.6; overflow-wrap:break-word; word-break:break-word; }
+    .decision-icon { min-width:48px; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
+    .decision-text { flex:1; min-width:0; }
+    .decision-title { font-size:16px; font-weight:800; margin-bottom:4px; word-break:normal; overflow-wrap:break-word; white-space:normal; min-width:0; }
+    .decision-reasoning { font-size:13px; color:var(--muted); line-height:1.6; word-break:normal; overflow-wrap:break-word; white-space:normal; min-width:0; }
     .decision-banner.cook .decision-icon{ background:linear-gradient(135deg,#10b981,#34d399); color:#042c21 }
     .decision-banner.order_dish .decision-icon{ background:linear-gradient(135deg,#ef4444,#fb7185); color:#2b0a0a }
     .decision-banner.order_groceries .decision-icon{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1a00 }
 
     /* Order card */
-    .order-card { background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04)); border:1px solid rgba(16,185,129,.35); border-radius:var(--r); padding:18px; margin-top:14px; overflow-wrap:break-word; word-break:break-word; }
-    .order-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; overflow-wrap:break-word; word-break:break-word; }
+    .order-card { background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04)); border:1px solid rgba(16,185,129,.35); border-radius:var(--r); padding:18px; margin-top:14px; overflow-wrap:break-word; word-break:normal; }
+    .order-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; overflow-wrap:break-word; word-break:normal; }
     .order-badge { width:40px; height:40px; background:var(--green); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-    .order-title { font-size:15px; font-weight:700; overflow-wrap:break-word; word-break:break-word; }
-    .order-id { font-size:11px; color:var(--muted); overflow-wrap:break-word; word-break:break-word; }
+    .order-title { font-size:15px; font-weight:700; overflow-wrap:break-word; word-break:normal; }
+    .order-id { font-size:11px; color:var(--muted); overflow-wrap:break-word; word-break:normal; }
     .order-row { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-top:1px solid rgba(255,255,255,.06); gap:8px; flex-wrap:wrap; }
     .order-label { color:var(--muted); flex-shrink:0; }
 
     /* Error */
-    .error-card { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:var(--r); padding:18px; margin-top:14px; font-size:13px; color:#fca5a5; overflow-wrap:break-word; word-break:break-word; }
+    .error-card { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:var(--r); padding:18px; margin-top:14px; font-size:13px; color:#fca5a5; overflow-wrap:break-word; word-break:normal; }
 
     /* Results hidden by default */
     .results { display:none; }
@@ -142,6 +145,24 @@
 
     /* Section header */
     .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:20px 0 8px; display:flex; align-items:center; gap:6px; }
+
+    /* Auth pill (top-right) */
+    .auth-pill { position:fixed; top:14px; right:14px; z-index:20; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); padding:7px 12px; border-radius:50px; background:rgba(20,20,28,.75); border:1px solid var(--border); backdrop-filter:blur(10px); }
+    .auth-pill .dot { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
+    .auth-pill .dot-orange { width:7px; height:7px; border-radius:50%; background:#FF6B00; flex-shrink:0; }
+    .auth-pill a { color:inherit; text-decoration:none; font-weight:600; }
+    .auth-pill a.logout { color:var(--muted); text-decoration:underline; margin-left:2px; }
+    .auth-pill:not(.connected) { background:rgba(255,107,0,.15); border:1px solid rgba(255,107,0,.4); color:#FF6B00; }
+    .auth-pill:not(.connected) a.connect { color:#FF6B00; }
+
+    /* Inline auth-required card (Swiggy connect) */
+    .auth-required-card { text-align:center; background:rgba(255,107,0,.08); border:1px solid rgba(255,107,0,.3); }
+    .auth-required-card p { color:var(--muted); font-size:13px; margin-bottom:14px; }
+    .auth-required-icon { width:48px; height:48px; min-width:48px; border-radius:50%; background:rgba(255,107,0,.15); color:#FF6B00; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px; }
+    .auth-required-note { font-size:12px; color:#FF6B00; font-weight:600; margin-bottom:14px; }
+    .btn-swiggy { background:#FF6B00; color:#fff; text-decoration:none; margin-top:0; }
+    .btn-swiggy:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(255,107,0,.35); }
+    .btn-swiggy:active { transform:scale(.97); }
   </style>
 </head>
 <body>
@@ -158,6 +179,9 @@
       <h1>Fridge to Fork</h1>
       <p>Snap your fridge. Get meals. Order the rest.</p>
     </div>
+
+    <!-- Auth status pill -->
+    <div class="auth-pill" id="authPill"></div>
 
     <!-- Target Dish Input -->
     <div style="margin-bottom: 16px;">
@@ -235,6 +259,22 @@
   </div>
 
   <script>
+    async function checkAuth() {
+      const pill = document.getElementById('authPill');
+      try {
+        const res = await fetch('/auth/status');
+        const data = await res.json();
+        pill.className = 'auth-pill' + (data.authenticated ? ' connected' : '');
+        pill.innerHTML = data.authenticated
+          ? '<span class="dot"></span> Swiggy Connected <a class="logout" href="/auth/logout">Logout</a>'
+          : '<span class="dot-orange"></span><a class="connect" href="/auth/login">Connect Swiggy</a>';
+      } catch {
+        pill.className = 'auth-pill';
+        pill.innerHTML = '<span class="dot-orange"></span><a class="connect" href="/auth/login">Connect Swiggy</a>';
+      }
+    }
+    checkAuth();
+
     const fileInput = document.getElementById('fileInput');
     const uploadZone = document.getElementById('uploadZone');
     const preview = document.getElementById('preview');
@@ -297,8 +337,12 @@
       return pct >= 80 ? 'dot-high' : pct >= 60 ? 'dot-mid' : 'dot-low';
     }
 
-    function decisionLabel(d) {
-      return { cook: '🍳 Cook at Home', order_dish: '🛵 Order the Dish', order_groceries: '🛒 Order Missing Groceries' }[d] || d;
+    function decisionMeta(d) {
+      return {
+        cook: { icon: '🍳', label: 'Cook at Home' },
+        order_dish: { icon: '🛵', label: 'Order the Dish' },
+        order_groceries: { icon: '🛒', label: 'Order Missing Groceries' },
+      }[d] || { icon: '🍽️', label: d };
     }
 
     async function analyse() {
@@ -381,7 +425,7 @@
           const isRec = s.name === ev.recommended_meal;
           const readyTag = s.can_cook_now
             ? '<span class="tag tag-green">✓ Ready to cook</span>'
-            : `<span class="tag tag-yellow">⚠ Missing: ${s.missing_ingredients.join(', ')}</span>`;
+            : `<span class="tag tag-yellow missing-tag">⚠ Missing: ${s.missing_ingredients.join(', ')}</span>`;
           return `<div class="meal-card ${isRec ? 'recommended' : ''}">
             ${isRec ? '<div class="tag tag-purple" style="margin-bottom:6px">⭐ Recommended</div>' : ''}
             <div class="meal-name">${s.name}</div>
@@ -397,10 +441,14 @@
 
         const d = ev.decision;
         const colors = { cook: 'cook', order_dish: 'order_dish', order_groceries: 'order_groceries' };
+        const meta = decisionMeta(d);
         document.getElementById('decisionBanner').innerHTML =
           `<div class="decision-banner ${colors[d]}">
-            <div class="decision-title">${decisionLabel(d)}</div>
-            <div class="decision-reasoning">${ev.reasoning}</div>
+            <div class="decision-icon">${meta.icon}</div>
+            <div class="decision-text">
+              <div class="decision-title">${meta.label}</div>
+              <div class="decision-reasoning">${ev.reasoning}</div>
+            </div>
           </div>`;
         return;
       }
@@ -414,7 +462,7 @@
             `<div class="order-card">
               <div class="order-header">
                 <div class="order-badge">✓</div>
-                <div>
+                <div style="flex:1; min-width:0;">
                   <div class="order-title">Order Confirmed</div>
                   <div class="order-id">${ev.order_id}</div>
                 </div>
@@ -439,6 +487,19 @@
         document.getElementById('orderCard').innerHTML =
           `<div class="error-card">⚠️ ${ev.message}</div>`;
         resultsEl.classList.add('show');
+      }
+
+      if (ev.type === 'auth_required') {
+        setStep(3, '', 'Login required');
+        document.getElementById('orderCard').innerHTML =
+          `<div class="card auth-required-card">
+            <div class="auth-required-icon">🛵</div>
+            <p>${ev.message || 'To place this order, connect your Swiggy account'}</p>
+            <p class="auth-required-note">Swiggy login required to place this order</p>
+            <a class="btn btn-swiggy" href="/auth/login">Connect Swiggy</a>
+          </div>`;
+        resultsEl.classList.add('show');
+        checkAuth();
       }
     }
   </script>
