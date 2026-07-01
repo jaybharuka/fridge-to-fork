@@ -165,6 +165,7 @@ async def route_order(
     delivery_address: str,
     *,
     dry_run: bool = False,
+    access_token: str | None = None,
 ) -> OrderResult | None:
     """Dispatch to the correct Swiggy MCP based on the meal plan decision."""
     if plan.decision == Decision.COOK:

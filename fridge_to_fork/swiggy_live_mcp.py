@@ -50,10 +50,8 @@ def swiggy_food_search(query: str, delivery_address: str) -> dict[str, Any]:
     }
 
 @mcp.tool()
-def swiggy_food_place_order(restaurant_id: str, dish_id: str, delivery_address: str) -> dict[str, Any]:
-    """
-    Place an order on Swiggy Food. (Simulated for safety)
-    """
+def swiggy_food_place_order(restaurant_id: str, dish_id: str, delivery_address: str) -> dict:
+    """Place an order on Swiggy Food. Simulated pending official MCP credentials."""
     import uuid
     return {
         "status": "confirmed",
@@ -89,10 +87,8 @@ def instamart_search(query: str, delivery_address: str) -> dict[str, Any]:
     }
 
 @mcp.tool()
-def instamart_place_order(cart: list[dict[str, Any]], delivery_address: str) -> dict[str, Any]:
-    """
-    Place an order on Swiggy Instamart. (Simulated for safety)
-    """
+def instamart_place_order(cart: list, delivery_address: str) -> dict:
+    """Place an order on Swiggy Instamart. Simulated pending official MCP credentials."""
     import uuid
     return {
         "status": "confirmed",
