@@ -284,7 +284,10 @@ async def scan(
 
             try:
                 plan = await asyncio.to_thread(plan_meals, fridge, target_dish=target_dish)
-            except Exception:
+            except Exception as e:
+                import traceback
+                print(f"[STEP2 ERROR] plan_meals failed: {e}")
+                traceback.print_exc()
                 plan = _local_fallback_plan(fridge, target_dish)
 
             yield _sse({

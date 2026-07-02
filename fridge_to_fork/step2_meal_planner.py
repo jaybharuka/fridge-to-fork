@@ -303,7 +303,7 @@ def plan_meals(
 
             # Check if response looks like an error
             if "error" in raw_text.lower() or "resource_exhausted" in raw_text.lower():
-                console.print("[yellow]⚠ API error detected in response[/yellow]")
+                console.print("[yellow][WARNING] API error detected in response[/yellow]")
                 raise RuntimeError("API returned error-like payload")
 
             if raw_text.startswith("```"):
@@ -344,7 +344,7 @@ def plan_meals(
             # On last attempt, fall back to local planner
             console.print(f"[yellow]Attempt {attempt} failed:[/yellow] {type(e).__name__}: {e}")
             if attempt == max_retries:
-                console.print(f"[yellow]⚠ API error (falling back to defaults):[/yellow] {type(e).__name__}")
+                console.print(f"[yellow][WARNING] API error (falling back to defaults):[/yellow] {type(e).__name__}")
                 result = _fallback_meal_plan(fridge, target_dish)
                 return result
             else:
