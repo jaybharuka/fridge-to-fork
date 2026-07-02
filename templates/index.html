@@ -163,6 +163,41 @@
     .btn-swiggy { background:#FF6B00; color:#fff; text-decoration:none; margin-top:0; }
     .btn-swiggy:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(255,107,0,.35); }
     .btn-swiggy:active { transform:scale(.97); }
+
+    /* Choice card — user decides what happens in step 3 */
+    .choice-subtitle { font-size:12px; color:var(--muted); font-style:italic; line-height:1.5; margin:8px 0 14px; overflow-wrap:break-word; word-break:normal; }
+    .choice-buttons { display:flex; flex-direction:column; gap:10px; }
+    .choice-btn {
+      position:relative; display:flex; align-items:flex-start; gap:14px;
+      width:100%; text-align:left; padding:16px;
+      background:rgba(255,255,255,.04); border:1px solid var(--border); border-left:3px solid transparent;
+      border-radius:16px; cursor:pointer; font-family:inherit; color:var(--text); transition:.2s;
+    }
+    .choice-btn:hover:not(:disabled) { background:rgba(255,255,255,.07); transform:scale(1.01); }
+    .choice-btn:disabled:not(.loading) { opacity:.4; cursor:not-allowed; }
+    .choice-btn.loading { opacity:.7; cursor:not-allowed; }
+    .choice-btn.cook { border-left-color:#4ade80; }
+    .choice-btn.order_groceries { border-left-color:#60a5fa; }
+    .choice-btn.order_dish { border-left-color:#FF6B00; }
+    .choice-btn.recommended.cook { box-shadow:0 0 0 1px rgba(74,222,128,.25), 0 0 22px rgba(74,222,128,.15); }
+    .choice-btn.recommended.order_groceries { box-shadow:0 0 0 1px rgba(96,165,250,.25), 0 0 22px rgba(96,165,250,.15); }
+    .choice-btn.recommended.order_dish { box-shadow:0 0 0 1px rgba(255,107,0,.25), 0 0 22px rgba(255,107,0,.15); }
+    .choice-icon { width:44px; height:44px; min-width:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    .choice-btn.cook .choice-icon { background:rgba(74,222,128,.18); }
+    .choice-btn.order_groceries .choice-icon { background:rgba(96,165,250,.18); }
+    .choice-btn.order_dish .choice-icon { background:rgba(255,107,0,.18); }
+    .choice-text { flex:1; min-width:0; padding-right:70px; }
+    .choice-btn-title { font-size:14px; font-weight:700; margin-bottom:2px; overflow-wrap:break-word; word-break:normal; }
+    .choice-btn-sub { font-size:12px; color:var(--muted); overflow-wrap:break-word; word-break:normal; line-height:1.4; }
+    .choice-badge { position:absolute; top:12px; right:12px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:50px; }
+    .choice-btn.cook .choice-badge { background:rgba(74,222,128,.2); color:#4ade80; }
+    .choice-btn.order_groceries .choice-badge { background:rgba(96,165,250,.2); color:#60a5fa; }
+    .choice-btn.order_dish .choice-badge { background:rgba(255,107,0,.2); color:#FF6B00; }
+
+    /* Cook-confirmed success card */
+    .cook-confirmed-card { text-align:center; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.3); }
+    .cook-confirmed-icon { font-size:36px; margin-bottom:8px; }
+    .cook-confirmed-card .title { font-weight:700; }
   </style>
 </head>
 <body>
@@ -250,8 +285,8 @@
       <div class="section-label">🍳 Meal Suggestions</div>
       <div class="meals-scroll" id="mealCards"></div>
 
-      <!-- Decision -->
-      <div id="decisionBanner"></div>
+      <!-- User choice -->
+      <div id="choiceCard"></div>
 
       <!-- Order -->
       <div id="orderCard"></div>
@@ -337,12 +372,134 @@
       return pct >= 80 ? 'dot-high' : pct >= 60 ? 'dot-mid' : 'dot-low';
     }
 
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
     function decisionMeta(d) {
       return {
         cook: { icon: '🍳', label: 'Cook at Home' },
         order_dish: { icon: '🛵', label: 'Order the Dish' },
         order_groceries: { icon: '🛒', label: 'Order Missing Groceries' },
       }[d] || { icon: '🍽️', label: d };
+    }
+
+    async function readSSEStream(res, onEvent) {
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try { onEvent(JSON.parse(line.slice(6))); } catch {}
+        }
+      }
+    }
+
+    let currentMealName = null;
+    let currentMissingIngredients = [];
+
+    function renderChoiceCard(ev) {
+      const rec = ev.ai_recommendation;
+      const meta = decisionMeta(rec);
+      const missing = (ev.missing_ingredients || []).map(escapeHtml);
+      const mealName = escapeHtml(ev.recommended_meal || 'this dish');
+      const reasoning = escapeHtml(ev.reasoning || '');
+
+      const cookBtn = `
+        <button class="choice-btn cook ${rec === 'cook' ? 'recommended' : ''}" data-action="cook" onclick="chooseAction('cook', this)">
+          ${rec === 'cook' ? '<span class="choice-badge">Recommended</span>' : ''}
+          <div class="choice-icon">🍳</div>
+          <div class="choice-text">
+            <div class="choice-btn-title">Cook at Home</div>
+            <div class="choice-btn-sub">Use what you already have</div>
+          </div>
+        </button>`;
+
+      const groceriesBtn = missing.length ? `
+        <button class="choice-btn order_groceries ${rec === 'order_groceries' ? 'recommended' : ''}" data-action="order_groceries" onclick="chooseAction('order_groceries', this)">
+          ${rec === 'order_groceries' ? '<span class="choice-badge">Recommended</span>' : ''}
+          <div class="choice-icon">🛒</div>
+          <div class="choice-text">
+            <div class="choice-btn-title">Order Missing Items from Instamart</div>
+            <div class="choice-btn-sub">${missing.join(', ')}</div>
+          </div>
+        </button>` : '';
+
+      const dishBtn = `
+        <button class="choice-btn order_dish ${rec === 'order_dish' ? 'recommended' : ''}" data-action="order_dish" onclick="chooseAction('order_dish', this)">
+          ${rec === 'order_dish' ? '<span class="choice-badge">Recommended</span>' : ''}
+          <div class="choice-icon">🛵</div>
+          <div class="choice-text">
+            <div class="choice-btn-title">Order the Dish from Swiggy</div>
+            <div class="choice-btn-sub">Get ${mealName} delivered to your door</div>
+          </div>
+        </button>`;
+
+      document.getElementById('choiceCard').innerHTML =
+        `<div class="card choice-card">
+          <div class="card-title">🤔 What would you like to do?</div>
+          <div><span class="tag tag-purple">✨ AI suggests: ${meta.label}</span></div>
+          <p class="choice-subtitle">${reasoning}</p>
+          <div class="choice-buttons">
+            ${cookBtn}
+            ${groceriesBtn}
+            ${dishBtn}
+          </div>
+        </div>`;
+      document.getElementById('orderCard').innerHTML = '';
+    }
+
+    function resetChoiceButtons() {
+      document.querySelectorAll('.choice-btn').forEach(b => {
+        b.disabled = false;
+        b.classList.remove('loading');
+        const iconEl = b.querySelector('.choice-icon');
+        if (iconEl && iconEl.querySelector('.spin')) {
+          const action = b.dataset.action;
+          iconEl.innerHTML = action === 'cook' ? '🍳' : action === 'order_groceries' ? '🛒' : '🛵';
+        }
+      });
+    }
+
+    let orderInFlight = false;
+
+    async function chooseAction(action, btnEl) {
+      if (orderInFlight) return;
+      orderInFlight = true;
+
+      document.querySelectorAll('.choice-btn').forEach(b => { b.disabled = true; });
+      btnEl.classList.add('loading');
+      const iconEl = btnEl.querySelector('.choice-icon');
+      if (iconEl) iconEl.innerHTML = '<div class="spin"></div>';
+
+      document.getElementById('orderCard').innerHTML = '';
+      setStep(3, 'active', 'Routing your order…');
+
+      const form = new FormData();
+      form.append('action', action);
+      form.append('meal_name', currentMealName || '');
+      form.append('missing_ingredients', currentMissingIngredients.join(','));
+
+      try {
+        const res = await fetch('/api/order', { method: 'POST', body: form });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        await readSSEStream(res, handleEvent);
+      } catch (err) {
+        setStep(3, '', 'Error');
+        document.getElementById('orderCard').innerHTML =
+          `<div class="error-card">⚠️ ${escapeHtml(err.message)}</div>`;
+        resetChoiceButtons();
+      } finally {
+        orderInFlight = false;
+      }
     }
 
     async function analyse() {
@@ -356,8 +513,10 @@
       resultsEl.classList.remove('show');
       document.getElementById('ingredientChips').innerHTML = '';
       document.getElementById('mealCards').innerHTML = '';
-      document.getElementById('decisionBanner').innerHTML = '';
+      document.getElementById('choiceCard').innerHTML = '';
       document.getElementById('orderCard').innerHTML = '';
+      currentMealName = null;
+      currentMissingIngredients = [];
 
       const form = new FormData();
       form.append('file', selectedFile);
@@ -370,22 +529,7 @@
       try {
         const res = await fetch('/api/scan', { method: 'POST', body: form });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-        let buf = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          const lines = buf.split('\n');
-          buf = lines.pop();
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            try { handleEvent(JSON.parse(line.slice(6))); } catch {}
-          }
-        }
+        await readSSEStream(res, handleEvent);
       } catch (err) {
         document.getElementById('orderCard').innerHTML =
           `<div class="error-card">⚠️ ${err.message}</div>`;
@@ -423,32 +567,40 @@
 
         const cards = ev.suggestions.map(s => {
           const isRec = s.name === ev.recommended_meal;
+          const missingList = (s.missing_ingredients || []).map(escapeHtml).join(', ');
           const readyTag = s.can_cook_now
             ? '<span class="tag tag-green">✓ Ready to cook</span>'
-            : `<span class="tag tag-yellow missing-tag">⚠ Missing: ${s.missing_ingredients.join(', ')}</span>`;
+            : `<span class="tag tag-yellow missing-tag">⚠ Missing: ${missingList}</span>`;
           return `<div class="meal-card ${isRec ? 'recommended' : ''}">
-            ${isRec ? '<div class="tag tag-purple" style="margin-bottom:6px">⭐ Recommended</div>' : ''}
-            <div class="meal-name">${s.name}</div>
-            <div class="meal-desc">${s.description}</div>
+            ${isRec ? '<div style="background: rgba(99,102,241,0.3); margin: -14px -14px 10px -14px; padding: 6px 12px; border-radius: 8px 8px 0 0; font-size: 12px; font-weight: 600; color: #a5b4fc;">⭐ Recommended</div>' : ''}
+            <div class="meal-name">${escapeHtml(s.name)}</div>
+            <div class="meal-desc">${escapeHtml(s.description)}</div>
             <div class="meal-meta">
               ${readyTag}
               <span class="tag tag-gray">⏱ ${s.prep_time_minutes}m</span>
-              ${s.cuisine ? `<span class="tag tag-gray">${s.cuisine}</span>` : ''}
+              ${s.cuisine ? `<span class="tag tag-gray">${escapeHtml(s.cuisine)}</span>` : ''}
             </div>
           </div>`;
         }).join('');
         document.getElementById('mealCards').innerHTML = cards;
+        return;
+      }
 
-        const d = ev.decision;
-        const colors = { cook: 'cook', order_dish: 'order_dish', order_groceries: 'order_groceries' };
-        const meta = decisionMeta(d);
-        document.getElementById('decisionBanner').innerHTML =
-          `<div class="decision-banner ${colors[d]}">
-            <div class="decision-icon">${meta.icon}</div>
-            <div class="decision-text">
-              <div class="decision-title">${meta.label}</div>
-              <div class="decision-reasoning">${ev.reasoning}</div>
-            </div>
+      if (ev.type === 'awaiting_user_choice') {
+        currentMealName = ev.recommended_meal || '';
+        currentMissingIngredients = ev.missing_ingredients || [];
+        setStep(3, '', 'Waiting for your choice');
+        renderChoiceCard(ev);
+        resultsEl.classList.add('show');
+        return;
+      }
+
+      if (ev.type === 'cook_confirmed') {
+        setStep(3, 'done', 'Ready to cook!');
+        document.getElementById('orderCard').innerHTML =
+          `<div class="card cook-confirmed-card">
+            <div class="cook-confirmed-icon">🍳</div>
+            <div class="title">You have everything you need. Time to cook!</div>
           </div>`;
         return;
       }
@@ -464,11 +616,11 @@
                 <div class="order-badge">✓</div>
                 <div style="flex:1; min-width:0;">
                   <div class="order-title">Order Confirmed</div>
-                  <div class="order-id">${ev.order_id}</div>
+                  <div class="order-id">${escapeHtml(ev.order_id)}</div>
                 </div>
               </div>
-              <div class="order-row"><span class="order-label">Platform</span><span>${ev.platform}</span></div>
-              <div class="order-row"><span class="order-label">Items</span><span>${ev.items.join(', ')}</span></div>
+              <div class="order-row"><span class="order-label">Platform</span><span>${escapeHtml(ev.platform)}</span></div>
+              <div class="order-row"><span class="order-label">Items</span><span>${(ev.items || []).map(escapeHtml).join(', ')}</span></div>
               <div class="order-row"><span class="order-label">ETA</span><span>~${ev.eta_minutes} min</span></div>
             </div>`;
         } else if (ev.decision === 'cook') {
@@ -485,8 +637,9 @@
       if (ev.type === 'error') {
         [1,2,3].forEach(i => { if(document.getElementById('s'+i).classList.contains('active')) setStep(i,'','Error'); });
         document.getElementById('orderCard').innerHTML =
-          `<div class="error-card">⚠️ ${ev.message}</div>`;
+          `<div class="error-card">⚠️ ${escapeHtml(ev.message)}</div>`;
         resultsEl.classList.add('show');
+        resetChoiceButtons();
       }
 
       if (ev.type === 'auth_required') {
@@ -494,12 +647,13 @@
         document.getElementById('orderCard').innerHTML =
           `<div class="card auth-required-card">
             <div class="auth-required-icon">🛵</div>
-            <p>${ev.message || 'To place this order, connect your Swiggy account'}</p>
+            <p>${escapeHtml(ev.message || 'To place this order, connect your Swiggy account')}</p>
             <p class="auth-required-note">Swiggy login required to place this order</p>
             <a class="btn btn-swiggy" href="/auth/login">Connect Swiggy</a>
           </div>`;
         resultsEl.classList.add('show');
         checkAuth();
+        resetChoiceButtons();
       }
     }
   </script>
