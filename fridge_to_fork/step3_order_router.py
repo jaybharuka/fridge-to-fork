@@ -5,21 +5,22 @@ Routes the meal plan to the correct Swiggy MCP:
   • Swiggy Food MCP   → order a ready-made dish (order_dish)
   • Swiggy Instamart  → order missing ingredients (order_groceries)
 
-Uses the official `mcp` Python SDK to communicate via stdio with the local
-`swiggy_live_mcp.py` server, which fetches real data from Swiggy APIs.
+Uses the official `mcp` Python SDK's streamable-HTTP client transport to
+talk directly to Swiggy's hosted MCP servers, authenticating with the
+Bearer access_token obtained via the app's OAuth 2.1 (PKCE) login flow.
 """
 
 import argparse
 import asyncio
 import json
 import os
-import sys
-from pathlib import Path
 from typing import Any
 
+import httpx
 from dotenv import load_dotenv
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+from mcp.shared.exceptions import McpError
 from rich.console import Console
 from rich.panel import Panel
 
@@ -29,135 +30,174 @@ load_dotenv()
 
 console = Console()
 
-# Path to our local live MCP server
-SERVER_PATH = str(Path(__file__).parent / "swiggy_live_mcp.py")
+# Official Swiggy MCP server endpoints
+FOOD_MCP_URL = "https://mcp.swiggy.com/food"
+INSTAMART_MCP_URL = "https://mcp.swiggy.com/im"
+
+# JSON-RPC error code Swiggy's MCP servers use for an expired/invalid token
+AUTH_ERROR_CODE = -32001
+
+AUTH_REQUIRED = "auth_required"
+
+
+async def get_mcp_session(server_url: str, access_token: str):
+    """Build the streamable-HTTP MCP client context manager for `server_url`."""
+    headers = {"Authorization": f"Bearer {access_token}"}
+    return streamablehttp_client(server_url, headers=headers)
+
+
+def _is_auth_error(exc: Exception) -> bool:
+    """True if `exc` represents an MCP 401 / JSON-RPC -32001 auth failure."""
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 401:
+        return True
+    if isinstance(exc, McpError) and exc.error.code == AUTH_ERROR_CODE:
+        return True
+    return False
 
 
 async def order_dish_from_swiggy(
     meal_name: str,
     delivery_address: str,
-    session: ClientSession,
+    access_token: str | None,
     *,
     dry_run: bool = False,
 ) -> OrderResult:
     """Search Swiggy Food for 'meal_name' and place the top result."""
-    
-    # Step 1: search for the dish
-    search_result = await session.call_tool("swiggy_food_search", {
-        "query": meal_name,
-        "delivery_address": delivery_address,
-    })
-    
-    # Parse the text response from the tool
-    data = json.loads(search_result.content[0].text)
-    
-    if "error" in data:
-        return OrderResult(success=False, platform="swiggy_food", error=data["error"])
-        
-    restaurants = data.get("restaurants", [])
-    if not restaurants:
-        return OrderResult(
-            success=False,
-            platform="swiggy_food",
-            error=f"No restaurants found for '{meal_name}' on Swiggy.",
-        )
-
-    # Pick first result
-    restaurant = restaurants[0]
-    dish = restaurant.get("top_dish", {})
-    
     if dry_run:
         return OrderResult(
             success=True,
             order_id="DRY-RUN",
             platform="swiggy_food",
-            items=[f"{dish.get('name')} from {restaurant.get('name')} (₹{dish.get('price')})"],
+            items=[meal_name],
             estimated_minutes=35,
         )
 
-    # Step 2: place the order
-    order_result = await session.call_tool("swiggy_food_place_order", {
-        "restaurant_id": restaurant["id"],
-        "dish_id": dish["id"],
-        "delivery_address": delivery_address,
-    })
-    
-    order_data = json.loads(order_result.content[0].text)
+    if not access_token:
+        return OrderResult(success=False, platform="swiggy_food", error=AUTH_REQUIRED)
 
-    return OrderResult(
-        success=order_data.get("status") == "confirmed",
-        order_id=order_data.get("order_id"),
-        platform="swiggy_food",
-        items=[f"{dish.get('name')} from {restaurant.get('name')} (₹{dish.get('price')})"],
-        estimated_minutes=order_data.get("eta_minutes"),
-        error=order_data.get("error"),
-    )
+    try:
+        async with await get_mcp_session(FOOD_MCP_URL, access_token) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+
+                # Step 1: search for the dish
+                search_result = await session.call_tool("swiggy_food_search", {
+                    "query": meal_name,
+                    "delivery_address": delivery_address,
+                })
+                data = json.loads(search_result.content[0].text)
+
+                if "error" in data:
+                    return OrderResult(success=False, platform="swiggy_food", error=data["error"])
+
+                restaurants = data.get("restaurants", [])
+                if not restaurants:
+                    return OrderResult(
+                        success=False,
+                        platform="swiggy_food",
+                        error=f"No restaurants found for '{meal_name}' on Swiggy.",
+                    )
+
+                # Pick first result
+                restaurant = restaurants[0]
+                dish = restaurant.get("top_dish", {})
+
+                # Step 2: place the order
+                order_result = await session.call_tool("swiggy_food_place_order", {
+                    "restaurant_id": restaurant["id"],
+                    "dish_id": dish["id"],
+                    "delivery_address": delivery_address,
+                })
+                order_data = json.loads(order_result.content[0].text)
+
+                return OrderResult(
+                    success=order_data.get("status") == "confirmed",
+                    order_id=order_data.get("order_id"),
+                    platform="swiggy_food",
+                    items=[f"{dish.get('name')} from {restaurant.get('name')} (₹{dish.get('price')})"],
+                    estimated_minutes=order_data.get("eta_minutes"),
+                    error=order_data.get("error"),
+                )
+    except Exception as exc:
+        if _is_auth_error(exc):
+            return OrderResult(success=False, platform="swiggy_food", error=AUTH_REQUIRED)
+        raise
 
 
 async def order_groceries_from_instamart(
     items: list[str],
     delivery_address: str,
-    session: ClientSession,
+    access_token: str | None,
     *,
     dry_run: bool = False,
 ) -> OrderResult:
     """Search Swiggy Instamart for each item and place a consolidated order."""
-    
-    cart_items = []
-    unavailable = []
-    receipt_items = []
-
-    for item in items:
-        search_result = await session.call_tool("instamart_search", {
-            "query": item,
-            "delivery_address": delivery_address,
-        })
-        data = json.loads(search_result.content[0].text)
-        products = data.get("products", [])
-        
-        if products:
-            prod = products[0]
-            cart_items.append({
-                "product_id": prod["id"],
-                "quantity": 1,
-            })
-            receipt_items.append(f"{prod['name']} (₹{prod['price']})")
-        else:
-            unavailable.append(item)
-
-    if not cart_items:
-        return OrderResult(
-            success=False,
-            platform="swiggy_instamart",
-            error=f"None of the items found on Instamart: {unavailable}",
-        )
-
     if dry_run:
         return OrderResult(
             success=True,
             order_id="DRY-RUN",
             platform="swiggy_instamart",
-            items=receipt_items,
+            items=items,
             estimated_minutes=15,
         )
 
-    order_result = await session.call_tool("instamart_place_order", {
-        "cart": cart_items,
-        "delivery_address": delivery_address,
-    })
-    
-    order_data = json.loads(order_result.content[0].text)
+    if not access_token:
+        return OrderResult(success=False, platform="swiggy_instamart", error=AUTH_REQUIRED)
 
-    return OrderResult(
-        success=order_data.get("status") == "confirmed",
-        order_id=order_data.get("order_id"),
-        platform="swiggy_instamart",
-        items=receipt_items,
-        estimated_minutes=order_data.get("eta_minutes"),
-        error=(
-            f"Unavailable: {unavailable}" if unavailable else order_data.get("error")
-        ),
-    )
+    try:
+        async with await get_mcp_session(INSTAMART_MCP_URL, access_token) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+
+                cart_items = []
+                unavailable = []
+                receipt_items = []
+
+                for item in items:
+                    search_result = await session.call_tool("instamart_search", {
+                        "query": item,
+                        "delivery_address": delivery_address,
+                    })
+                    data = json.loads(search_result.content[0].text)
+                    products = data.get("products", [])
+
+                    if products:
+                        prod = products[0]
+                        cart_items.append({
+                            "product_id": prod["id"],
+                            "quantity": 1,
+                        })
+                        receipt_items.append(f"{prod['name']} (₹{prod['price']})")
+                    else:
+                        unavailable.append(item)
+
+                if not cart_items:
+                    return OrderResult(
+                        success=False,
+                        platform="swiggy_instamart",
+                        error=f"None of the items found on Instamart: {unavailable}",
+                    )
+
+                order_result = await session.call_tool("instamart_place_order", {
+                    "cart": cart_items,
+                    "delivery_address": delivery_address,
+                })
+                order_data = json.loads(order_result.content[0].text)
+
+                return OrderResult(
+                    success=order_data.get("status") == "confirmed",
+                    order_id=order_data.get("order_id"),
+                    platform="swiggy_instamart",
+                    items=receipt_items,
+                    estimated_minutes=order_data.get("eta_minutes"),
+                    error=(
+                        f"Unavailable: {unavailable}" if unavailable else order_data.get("error")
+                    ),
+                )
+    except Exception as exc:
+        if _is_auth_error(exc):
+            return OrderResult(success=False, platform="swiggy_instamart", error=AUTH_REQUIRED)
+        raise
 
 
 async def route_order(
@@ -176,28 +216,15 @@ async def route_order(
 
     if plan.decision == Decision.ORDER_DISH:
         console.print(f"[bold]Ordering '{meal_name}' from Swiggy Food...[/bold]")
-    elif plan.decision == Decision.ORDER_GROCERIES:
+        return await order_dish_from_swiggy(meal_name, delivery_address, access_token, dry_run=dry_run)
+
+    if plan.decision == Decision.ORDER_GROCERIES:
         missing = plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
         if not missing:
             console.print("[yellow]order_groceries chosen but no missing ingredients — cooking instead.[/yellow]")
             return None
         console.print(f"[bold]Ordering groceries from Swiggy Instamart:[/bold] {missing}")
-
-    # Start MCP connection and execute routing
-    server_params = StdioServerParameters(
-        command=sys.executable,
-        args=[SERVER_PATH],
-        env=None
-    )
-    
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            
-            if plan.decision == Decision.ORDER_DISH:
-                return await order_dish_from_swiggy(meal_name, delivery_address, session, dry_run=dry_run)
-            elif plan.decision == Decision.ORDER_GROCERIES:
-                return await order_groceries_from_instamart(missing, delivery_address, session, dry_run=dry_run)
+        return await order_groceries_from_instamart(missing, delivery_address, access_token, dry_run=dry_run)
 
     return None
 
@@ -227,7 +254,7 @@ def display_order_result(result: OrderResult) -> None:
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Place an order via Swiggy Live MCP.")
+    p = argparse.ArgumentParser(description="Place an order via Swiggy MCP.")
     p.add_argument(
         "--decision",
         choices=["order_dish", "order_groceries"],
@@ -235,6 +262,7 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--items", required=True, help="Comma-separated items / dish name")
     p.add_argument("--address", default=os.environ.get("DELIVERY_ADDRESS", "Test Address"))
+    p.add_argument("--access-token", default=None, help="Swiggy Bearer access token")
     p.add_argument("--dry-run", action="store_true", default=False, help="Simulate order placement")
     p.add_argument("--json", action="store_true")
     return p.parse_args()
@@ -243,9 +271,9 @@ def _parse_args() -> argparse.Namespace:
 async def main_async() -> None:
     args = _parse_args()
     items = [i.strip() for i in args.items.split(",") if i.strip()]
-    
+
     # Fake MealPlan to test routing standalone
-    from .models import Ingredient, MealPlan, MealSuggestion
+    from .models import MealSuggestion
     fake_meal = MealSuggestion(
         name=items[0] if args.decision == "order_dish" else "Fake Meal",
         description="Fake", can_cook_now=False,
@@ -259,7 +287,9 @@ async def main_async() -> None:
         reasoning="Test"
     )
 
-    result = await route_order(plan, args.address, dry_run=args.dry_run)
+    result = await route_order(
+        plan, args.address, dry_run=args.dry_run, access_token=args.access_token
+    )
     if not result:
         return
 
