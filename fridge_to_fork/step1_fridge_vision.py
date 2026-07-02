@@ -12,6 +12,7 @@ import argparse
 import io
 import json
 import os
+import time
 from pathlib import Path
 from typing import Union
 
@@ -28,6 +29,29 @@ from .models import FridgeContents, Ingredient
 load_dotenv()
 
 console = Console()
+
+
+def _dedupe(models: list[str | None]) -> list[str]:
+    """Remove falsy/duplicate entries while preserving order."""
+    seen = set()
+    result = []
+    for m in models:
+        if m and m not in seen:
+            seen.add(m)
+            result.append(m)
+    return result
+
+
+# Models tried in order until one succeeds. Each Gemini model has its own
+# separate free-tier daily quota, so exhausting one doesn't mean they're
+# all exhausted.
+VISION_MODEL_FALLBACK_CHAIN = _dedupe([
+    os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash"),
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+])
 
 
 def _fallback_fridge_contents() -> FridgeContents:
@@ -102,39 +126,15 @@ def _load_image(source: Union[str, Path, bytes]) -> tuple[bytes, str]:
 # Core vision function
 # ---------------------------------------------------------------------------
 
-def identify_ingredients(
-    image_source: Union[str, Path, bytes],
-    *,
-    model: str = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash-lite"),
-    client: genai.Client | None = None,
+def _call_vision_model_with_retry(
+    client: genai.Client, model: str, image_part: types.Part
 ) -> FridgeContents:
     """
-    Analyse a fridge image and return structured FridgeContents.
-
-    Parameters
-    ----------
-    image_source:
-        File path (str/Path), public image URL (str), or raw image bytes.
-    model:
-        Gemini model to use. Defaults to gemini-2.0-flash (free tier, fast vision).
-    client:
-        Optional pre-built Gemini client (useful for testing / DI).
-
-    Returns
-    -------
-    FridgeContents with a list of Ingredient objects.
-
-    Retries transient API errors (quota/overload) up to 3 times with
-    exponential backoff before falling back to a placeholder inventory.
+    Call `model` up to 3 times with exponential backoff, for transient
+    errors (503/network blips). Raises the last exception if all
+    attempts fail — the caller decides whether that means "try the next
+    model in the fallback chain" or "give up".
     """
-    try:
-        client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-        raw_bytes, media_type = _load_image(image_source)
-        image_part = types.Part.from_bytes(data=raw_bytes, mime_type=media_type)
-    except Exception as e:
-        console.print(f"[yellow][WARNING] Could not prepare image for vision analysis: {type(e).__name__}: {e}[/yellow]")
-        return _fallback_fridge_contents()
-
     max_retries = 3
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
@@ -170,15 +170,65 @@ def identify_ingredients(
             )
 
         except Exception as e:
-            console.print(f"[yellow][WARNING] Vision attempt {attempt} failed: {type(e).__name__}: {e}[/yellow]")
+            console.print(f"[yellow][WARNING] {model} attempt {attempt} failed: {type(e).__name__}: {e}[/yellow]")
             if attempt == max_retries:
-                console.print("[yellow][WARNING] Vision API error (falling back to defaults)[/yellow]")
-                return _fallback_fridge_contents()
-            import time
-
+                raise
             time.sleep(backoff)
             backoff *= 2
 
+    raise RuntimeError(f"{model} failed after {max_retries} attempts")  # unreachable safeguard
+
+
+def identify_ingredients(
+    image_source: Union[str, Path, bytes],
+    *,
+    model: str | None = None,
+    client: genai.Client | None = None,
+) -> FridgeContents:
+    """
+    Analyse a fridge image and return structured FridgeContents.
+
+    Parameters
+    ----------
+    image_source:
+        File path (str/Path), public image URL (str), or raw image bytes.
+    model:
+        Optional Gemini model override. If omitted, tries each model in
+        VISION_MODEL_FALLBACK_CHAIN in order until one succeeds.
+    client:
+        Optional pre-built Gemini client (useful for testing / DI).
+
+    Returns
+    -------
+    FridgeContents with a list of Ingredient objects.
+
+    Retries transient API errors (quota/overload) up to 3 times with
+    exponential backoff per model. If a model's quota is exhausted (or it
+    keeps failing after retries), moves on to the next model in the
+    fallback chain before giving up and returning a placeholder inventory.
+    """
+    try:
+        client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        raw_bytes, media_type = _load_image(image_source)
+        image_part = types.Part.from_bytes(data=raw_bytes, mime_type=media_type)
+    except Exception as e:
+        console.print(f"[yellow][WARNING] Could not prepare image for vision analysis: {type(e).__name__}: {e}[/yellow]")
+        return _fallback_fridge_contents()
+
+    chain = _dedupe([model, *VISION_MODEL_FALLBACK_CHAIN]) if model else VISION_MODEL_FALLBACK_CHAIN
+
+    for chain_model in chain:
+        try:
+            result = _call_vision_model_with_retry(client, chain_model, image_part)
+            console.print(f"[green][OK] Vision succeeded with model: {chain_model}[/green]")
+            return result
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
+            else:
+                console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
+
+    console.print("[yellow][WARNING] All Gemini vision models quota exhausted, using fallback[/yellow]")
     return _fallback_fridge_contents()
 
 
