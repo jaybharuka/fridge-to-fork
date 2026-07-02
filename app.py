@@ -29,7 +29,10 @@ load_dotenv()
 
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import plan_meals
-from fridge_to_fork.step3_order_router import route_order
+from fridge_to_fork.step3_order_router import (
+    order_dish_from_swiggy,
+    order_groceries_from_instamart,
+)
 from fridge_to_fork.models import Decision, MealPlan, MealSuggestion
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
@@ -243,8 +246,6 @@ async def scan(
 ):
     img_bytes = await file.read()
     suffix = Path(file.filename or "image.jpg").suffix or ".jpg"
-    delivery_address = os.environ.get("DELIVERY_ADDRESS", "Mumbai, India")
-    access_token: str | None = request.session.get("access_token")
 
     async def stream():
         tmp_path = None
@@ -308,40 +309,15 @@ async def scan(
                 ],
             })
 
-            # ── Step 3: Order routing ───────────────────────────────────────
-            needs_order = plan.decision in (Decision.ORDER_DISH, Decision.ORDER_GROCERIES)
-
-            if needs_order and not access_token:
-                yield _sse({
-                    "type": "auth_required",
-                    "message": "Connect your Swiggy account to place this order",
-                })
-                yield _sse({"type": "complete"})
-                return
-
-            yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
-            result = await route_order(
-                plan, delivery_address, dry_run=False, access_token=access_token
-            )
-
-            if result and result.error == "auth_required":
-                yield _sse({
-                    "type": "auth_required",
-                    "message": "Connect your Swiggy account to place this order",
-                })
-                yield _sse({"type": "complete"})
-                return
-
-            # 401 from a real MCP call will raise an httpx.HTTPStatusError;
-            # catch it here and tell the frontend to re-authenticate.
+            # ── Step 3: hand the decision to the user ───────────────────────
             yield _sse({
-                "type": "step3",
-                "decision": plan.decision.value,
-                "placed": bool(result and result.success),
-                "order_id": result.order_id if result else None,
-                "platform": result.platform if result else None,
-                "items": result.items if result else [],
-                "eta_minutes": result.estimated_minutes if result else None,
+                "type": "awaiting_user_choice",
+                "ai_recommendation": plan.decision.value,
+                "reasoning": plan.reasoning,
+                "recommended_meal": plan.recommended_meal.name if plan.recommended_meal else None,
+                "missing_ingredients": (
+                    plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
+                ),
             })
 
             yield _sse({"type": "complete"})
@@ -375,13 +351,13 @@ async def scan(
                     ],
                 })
                 yield _sse({
-                    "type": "step3",
-                    "decision": plan.decision.value,
-                    "placed": False,
-                    "order_id": None,
-                    "platform": None,
-                    "items": [],
-                    "eta_minutes": None,
+                    "type": "awaiting_user_choice",
+                    "ai_recommendation": plan.decision.value,
+                    "reasoning": plan.reasoning,
+                    "recommended_meal": plan.recommended_meal.name if plan.recommended_meal else None,
+                    "missing_ingredients": (
+                        plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
+                    ),
                 })
                 yield _sse({"type": "complete"})
             else:
@@ -392,6 +368,94 @@ async def scan(
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Order endpoint — fires only after the user picks an action
+# ---------------------------------------------------------------------------
+
+@app.post("/api/order")
+async def place_order(
+    request: Request,
+    action: str = Form(...),  # "cook" | "order_groceries" | "order_dish"
+    meal_name: str = Form(...),
+    missing_ingredients: str = Form(""),  # comma-separated
+):
+    delivery_address = os.environ.get("DELIVERY_ADDRESS", "Mumbai, India")
+    access_token: str | None = request.session.get("access_token")
+
+    async def stream():
+        try:
+            if action == "cook":
+                yield _sse({
+                    "type": "cook_confirmed",
+                    "message": "Great! Here is what to cook.",
+                })
+                yield _sse({"type": "complete"})
+                return
+
+            if action not in ("order_groceries", "order_dish"):
+                yield _sse({"type": "error", "message": f"Unknown action: {action}"})
+                yield _sse({"type": "complete"})
+                return
+
+            if not access_token:
+                yield _sse({
+                    "type": "auth_required",
+                    "message": "Connect your Swiggy account to place this order",
+                })
+                yield _sse({"type": "complete"})
+                return
+
+            yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
+
+            if action == "order_groceries":
+                items = [i.strip() for i in missing_ingredients.split(",") if i.strip()]
+                result = await order_groceries_from_instamart(items, delivery_address, access_token)
+            else:
+                result = await order_dish_from_swiggy(meal_name, delivery_address, access_token)
+
+            if result and result.error == "auth_required":
+                yield _sse({
+                    "type": "auth_required",
+                    "message": "Connect your Swiggy account to place this order",
+                })
+                yield _sse({"type": "complete"})
+                return
+
+            yield _sse({
+                "type": "step3",
+                "decision": action,
+                "placed": bool(result and result.success),
+                "order_id": result.order_id if result else None,
+                "platform": result.platform if result else None,
+                "items": result.items if result else [],
+                "eta_minutes": result.estimated_minutes if result else None,
+            })
+
+            yield _sse({"type": "complete"})
+
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 401:
+                request.session.pop("access_token", None)
+                request.session.pop("expires_at", None)
+                yield _sse({"type": "auth_required", "message": "Session expired, reconnect Swiggy"})
+            else:
+                yield _sse({"type": "error", "message": f"Order service error: {exc.response.status_code}"})
+            yield _sse({"type": "complete"})
+
+        except Exception as e:
+            import traceback
+            print(f"[ORDER ERROR] place_order failed: {e}")
+            traceback.print_exc()
+            yield _sse({"type": "error", "message": "Unable to place order."})
+            yield _sse({"type": "complete"})
 
     return StreamingResponse(
         stream(),
