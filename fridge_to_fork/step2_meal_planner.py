@@ -14,6 +14,7 @@ Run standalone:
 import argparse
 import json
 import os
+import time
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -27,6 +28,29 @@ from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggesti
 load_dotenv()
 
 console = Console()
+
+
+def _dedupe(models: list[str | None]) -> list[str]:
+    """Remove falsy/duplicate entries while preserving order."""
+    seen = set()
+    result = []
+    for m in models:
+        if m and m not in seen:
+            seen.add(m)
+            result.append(m)
+    return result
+
+
+# Models tried in order until one succeeds. Each Gemini model has its own
+# separate free-tier daily quota, so exhausting one doesn't mean they're
+# all exhausted.
+TEXT_MODEL_FALLBACK_CHAIN = _dedupe([
+    os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash"),
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+])
 
 # ---------------------------------------------------------------------------
 # Fallback suggestions (when API quota is exceeded)
@@ -244,52 +268,13 @@ Return ONLY valid JSON (no markdown, no prose) with a single suggestion represen
 # Core planner function
 # ---------------------------------------------------------------------------
 
-def plan_meals(
-    fridge: FridgeContents,
-    *,
-    target_dish: Optional[str] = None,
-    model: str = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash-lite"),
-    client: Optional[genai.Client] = None,
-) -> MealPlan:
+def _call_text_model_with_retry(client: genai.Client, model: str, prompt: str) -> MealPlan:
     """
-    Suggest meals and decide cook-vs-order given fridge contents.
-    If target_dish is provided, evaluate that specific dish instead of suggesting random meals.
-
-    Parameters
-    ----------
-    fridge:
-        Output of step1 identify_ingredients().
-    target_dish:
-        Optional specific dish the user wants to make.
-    model:
-        Gemini model. gemini-2.5-flash is fast and free-tier friendly.
-    client:
-        Optional pre-built Gemini client.
-
-    Returns
-    -------
-    MealPlan with suggestions, a Decision, and the recommended meal.
-    
-    Falls back to basic suggestions if API quota is exceeded.
+    Call `model` up to 3 times with exponential backoff, for transient
+    errors (503/network blips). Raises the last exception if all
+    attempts fail — the caller decides whether that means "try the next
+    model in the fallback chain" or "give up".
     """
-    client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
-
-    # Build ingredient list for the prompt
-    ingredient_list = "\n".join(
-        f"- {ing.name}" + (f" ({ing.quantity})" if ing.quantity else "")
-        for ing in fridge.ingredients
-    )
-    if not ingredient_list:
-        ingredient_list = "(no ingredients detected)"
-
-    if target_dish:
-        prompt = _TARGET_DISH_PROMPT.format(
-            ingredient_list=ingredient_list, target_dish=target_dish
-        )
-    else:
-        prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
-
-    # Try to call the model with a few retries to tolerate transient quota/timeouts.
     max_retries = 3
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
@@ -303,7 +288,7 @@ def plan_meals(
 
             # Check if response looks like an error
             if "error" in raw_text.lower() or "resource_exhausted" in raw_text.lower():
-                console.print("[yellow][WARNING] API error detected in response[/yellow]")
+                console.print(f"[yellow][WARNING] {model} API error detected in response[/yellow]")
                 raise RuntimeError("API returned error-like payload")
 
             if raw_text.startswith("```"):
@@ -332,27 +317,87 @@ def plan_meals(
             if recommended is None and suggestions:
                 recommended = suggestions[0]
 
-            result = MealPlan(
+            return MealPlan(
                 suggestions=suggestions,
                 decision=decision,
                 recommended_meal=recommended,
                 reasoning=payload.get("reasoning", ""),
             )
-            return result
 
         except Exception as e:
-            # On last attempt, fall back to local planner
-            console.print(f"[yellow]Attempt {attempt} failed:[/yellow] {type(e).__name__}: {e}")
+            console.print(f"[yellow]{model} attempt {attempt} failed:[/yellow] {type(e).__name__}: {e}")
             if attempt == max_retries:
-                console.print(f"[yellow][WARNING] API error (falling back to defaults):[/yellow] {type(e).__name__}")
-                result = _fallback_meal_plan(fridge, target_dish)
-                return result
-            else:
-                import time
+                raise
+            time.sleep(backoff)
+            backoff *= 2
 
-                time.sleep(backoff)
-                backoff *= 2
-                continue
+    raise RuntimeError(f"{model} failed after {max_retries} attempts")  # unreachable safeguard
+
+
+def plan_meals(
+    fridge: FridgeContents,
+    *,
+    target_dish: Optional[str] = None,
+    model: str | None = None,
+    client: Optional[genai.Client] = None,
+) -> MealPlan:
+    """
+    Suggest meals and decide cook-vs-order given fridge contents.
+    If target_dish is provided, evaluate that specific dish instead of suggesting random meals.
+
+    Parameters
+    ----------
+    fridge:
+        Output of step1 identify_ingredients().
+    target_dish:
+        Optional specific dish the user wants to make.
+    model:
+        Optional Gemini model override. If omitted, tries each model in
+        TEXT_MODEL_FALLBACK_CHAIN in order until one succeeds.
+    client:
+        Optional pre-built Gemini client.
+
+    Returns
+    -------
+    MealPlan with suggestions, a Decision, and the recommended meal.
+
+    Retries transient API errors (quota/overload) up to 3 times with
+    exponential backoff per model. If a model's quota is exhausted (or it
+    keeps failing after retries), moves on to the next model in the
+    fallback chain before giving up and returning a local fallback plan.
+    """
+    client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+
+    # Build ingredient list for the prompt
+    ingredient_list = "\n".join(
+        f"- {ing.name}" + (f" ({ing.quantity})" if ing.quantity else "")
+        for ing in fridge.ingredients
+    )
+    if not ingredient_list:
+        ingredient_list = "(no ingredients detected)"
+
+    if target_dish:
+        prompt = _TARGET_DISH_PROMPT.format(
+            ingredient_list=ingredient_list, target_dish=target_dish
+        )
+    else:
+        prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
+
+    chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
+
+    for chain_model in chain:
+        try:
+            result = _call_text_model_with_retry(client, chain_model, prompt)
+            console.print(f"[green][OK] Meal planning succeeded with model: {chain_model}[/green]")
+            return result
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
+            else:
+                console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
+
+    console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
+    return _fallback_meal_plan(fridge, target_dish)
 
 
 # ---------------------------------------------------------------------------
