@@ -123,45 +123,63 @@ def identify_ingredients(
     Returns
     -------
     FridgeContents with a list of Ingredient objects.
+
+    Retries transient API errors (quota/overload) up to 3 times with
+    exponential backoff before falling back to a placeholder inventory.
     """
     try:
         client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-
         raw_bytes, media_type = _load_image(image_source)
-
         image_part = types.Part.from_bytes(data=raw_bytes, mime_type=media_type)
-
-        response = client.models.generate_content(
-            model=model,
-            contents=[image_part, _PROMPT],
-        )
-
-        raw_text = response.text.strip()
-
-        # Strip markdown fences if the model wraps the JSON
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("```")[1]
-            if raw_text.startswith("json"):
-                raw_text = raw_text[4:]
-            raw_text = raw_text.strip()
-
-        payload = json.loads(raw_text)
-
-        ingredients = [
-            Ingredient(
-                name=item["name"],
-                quantity=item.get("quantity"),
-                confidence=float(item.get("confidence", 1.0)),
-            )
-            for item in payload.get("ingredients", [])
-        ]
-
-        return FridgeContents(
-            ingredients=ingredients,
-            raw_description=payload.get("raw_description", ""),
-        )
-    except Exception:
+    except Exception as e:
+        console.print(f"[yellow][WARNING] Could not prepare image for vision analysis: {type(e).__name__}: {e}[/yellow]")
         return _fallback_fridge_contents()
+
+    max_retries = 3
+    backoff = 1.0
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=[image_part, _PROMPT],
+            )
+
+            raw_text = response.text.strip()
+
+            # Strip markdown fences if the model wraps the JSON
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("```")[1]
+                if raw_text.startswith("json"):
+                    raw_text = raw_text[4:]
+                raw_text = raw_text.strip()
+
+            payload = json.loads(raw_text)
+
+            ingredients = [
+                Ingredient(
+                    name=item["name"],
+                    quantity=item.get("quantity"),
+                    confidence=float(item.get("confidence", 1.0)),
+                )
+                for item in payload.get("ingredients", [])
+            ]
+
+            return FridgeContents(
+                ingredients=ingredients,
+                raw_description=payload.get("raw_description", ""),
+            )
+
+        except Exception as e:
+            console.print(f"[yellow][WARNING] Vision attempt {attempt} failed: {type(e).__name__}: {e}[/yellow]")
+            if attempt == max_retries:
+                console.print("[yellow][WARNING] Vision API error (falling back to defaults)[/yellow]")
+                return _fallback_fridge_contents()
+            import time
+
+            time.sleep(backoff)
+            backoff *= 2
+
+    return _fallback_fridge_contents()
 
 
 # ---------------------------------------------------------------------------
