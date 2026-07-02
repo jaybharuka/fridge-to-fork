@@ -28,7 +28,7 @@ from starlette.middleware.sessions import SessionMiddleware
 load_dotenv()
 
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
-from fridge_to_fork.step2_meal_planner import plan_meals
+from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals
 from fridge_to_fork.step3_order_router import (
     order_dish_from_swiggy,
     order_groceries_from_instamart,
@@ -320,6 +320,14 @@ async def scan(
                 ),
             })
 
+            # ── Top-up suggestions — best-effort upsell, never blocks the choice above ──
+            if plan.recommended_meal is not None:
+                top_up_suggestions = await asyncio.to_thread(
+                    generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
+                )
+                if top_up_suggestions:
+                    yield _sse({"type": "top_up", "suggestions": top_up_suggestions})
+
             yield _sse({"type": "complete"})
 
         except httpx.HTTPStatusError as exc:
@@ -359,6 +367,14 @@ async def scan(
                         plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
                     ),
                 })
+
+                if plan.recommended_meal is not None:
+                    top_up_suggestions = await asyncio.to_thread(
+                        generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
+                    )
+                    if top_up_suggestions:
+                        yield _sse({"type": "top_up", "suggestions": top_up_suggestions})
+
                 yield _sse({"type": "complete"})
             else:
                 yield _sse({"type": "error", "message": "Unable to complete analysis."})
