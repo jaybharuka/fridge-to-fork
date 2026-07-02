@@ -256,7 +256,13 @@ async def scan(
 
             # ── Step 1: Vision ──────────────────────────────────────────────
             yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
-            fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
+            try:
+                fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
+            except Exception as e:
+                import traceback
+                print(f"[STEP1 ERROR] identify_ingredients failed: {e}")
+                traceback.print_exc()
+                raise  # re-raise so the outer handler catches it
             yield _sse({
                 "type": "step1",
                 "raw_description": fridge.raw_description,
@@ -314,6 +320,14 @@ async def scan(
             result = await route_order(
                 plan, delivery_address, dry_run=False, access_token=access_token
             )
+
+            if result and result.error == "auth_required":
+                yield _sse({
+                    "type": "auth_required",
+                    "message": "Connect your Swiggy account to place this order",
+                })
+                yield _sse({"type": "complete"})
+                return
 
             # 401 from a real MCP call will raise an httpx.HTTPStatusError;
             # catch it here and tell the frontend to re-authenticate.
