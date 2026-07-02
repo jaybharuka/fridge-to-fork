@@ -49,7 +49,7 @@ TEXT_MODEL_FALLBACK_CHAIN = _dedupe([
     "gemini-2.5-flash-lite",
     "gemini-flash-latest",
     "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
+    "gemini-flash-lite-latest",
 ])
 
 # ---------------------------------------------------------------------------
