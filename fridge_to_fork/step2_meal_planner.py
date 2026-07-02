@@ -150,6 +150,26 @@ def _fallback_meal_plan(
 # Prompts
 # ---------------------------------------------------------------------------
 
+_CRITICAL_PANTRY_RULE = """\
+CRITICAL RULE — read this first:
+The following items are ALWAYS assumed to be available in any Indian
+household. NEVER list them as missing ingredients, under any
+circumstances:
+- Oils and fats: cooking oil, vegetable oil, mustard oil, ghee, butter
+- Salt and basic spices: salt, sugar, black pepper, red chili powder,
+  turmeric (haldi), cumin (jeera), coriander powder, garam masala,
+  mustard seeds, curry leaves, bay leaves, cardamom, cloves, cinnamon
+- Pantry staples: flour (maida/atta), rice, dal, water, baking soda,
+  baking powder, vinegar, soy sauce, tomato ketchup
+- Non-fridge vegetables: onions, garlic, ginger, potatoes, tomatoes,
+  green chilies
+- Bread and grains: bread, roti, dry pasta, dry noodles
+- Tea and coffee
+
+If ALL missing items for a dish fall into the above categories, the
+decision MUST be "cook" not "order_groceries".
+"""
+
 _MISSING_INGREDIENT_RULES = """\
 IMPORTANT RULES FOR MISSING INGREDIENTS:
 
@@ -185,7 +205,7 @@ IMPORTANT RULES FOR MISSING INGREDIENTS:
      (just order the bhindi), not order_dish
 """
 
-_PROMPT_TEMPLATE = """\
+_PROMPT_TEMPLATE = _CRITICAL_PANTRY_RULE + """
 You are an expert chef and nutritionist helping a busy person decide what to eat.
 
 Available ingredients:
@@ -225,7 +245,7 @@ Return ONLY valid JSON (no markdown, no prose):
 """
 
 
-_TARGET_DISH_PROMPT = """\
+_TARGET_DISH_PROMPT = _CRITICAL_PANTRY_RULE + """
 You are an expert chef and nutritionist helping a busy person.
 
 The user explicitly wants to eat: "{target_dish}"
@@ -398,6 +418,130 @@ def plan_meals(
 
     console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
     return _fallback_meal_plan(fridge, target_dish)
+
+
+# ---------------------------------------------------------------------------
+# Top-up suggestions — small upsell items shown alongside the meal plan
+# ---------------------------------------------------------------------------
+
+_TOP_UP_PROMPT = """\
+You are a smart shopping assistant for Swiggy, India's leading food
+delivery platform.
+
+The user is planning to make: {meal_name}
+Their fridge contains: {ingredient_list}
+AI decision: {decision}
+
+Suggest exactly 3 smart "upgrade" items that would genuinely improve
+this meal. These should be small, affordable, impulse purchases.
+
+RULES:
+- If decision is "cook" or "order_groceries": suggest items from
+  Swiggy Instamart (fresh ingredients, condiments, toppings that
+  elevate the dish)
+- If decision is "order_dish": suggest complementary items from
+  Swiggy Food (side dishes, drinks, desserts that pair well)
+- Each suggestion must be specific and relevant to {meal_name}
+- Price should be realistic for Indian market (₹30-₹200 range)
+- At least one suggestion should be under ₹60 (low friction)
+- Never suggest something the user already has in their fridge
+
+Return ONLY a valid JSON array with exactly 3 objects:
+[
+  {{
+    "name": "Fresh Strawberries",
+    "reason": "Makes your French Toast feel like a cafe breakfast",
+    "estimated_price": 49,
+    "source": "instamart",
+    "emoji": "🍓"
+  }},
+  ...
+]
+source must be either "instamart" or "swiggy_food".
+Do not include any text outside the JSON array.
+"""
+
+
+def _parse_top_up_response(raw_text: str) -> list[dict]:
+    raw_text = (raw_text or "").strip()
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("```")[1]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+
+    items = json.loads(raw_text)
+    if not isinstance(items, list):
+        return []
+
+    valid_sources = {"instamart", "swiggy_food"}
+    suggestions = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        source = item.get("source")
+        if source not in valid_sources:
+            continue
+        name = item.get("name", "")
+        if not name:
+            continue
+        try:
+            price = int(float(item.get("estimated_price", 0)))
+        except (TypeError, ValueError):
+            continue
+        suggestions.append({
+            "name": name,
+            "reason": item.get("reason", ""),
+            "estimated_price": price,
+            "source": source,
+            "emoji": item.get("emoji", "✨"),
+        })
+    return suggestions[:3]
+
+
+def generate_top_up_suggestions(
+    fridge: FridgeContents,
+    meal: MealSuggestion,
+    decision: Decision,
+    model: str | None = None,
+) -> list[dict]:
+    """
+    Suggest 3 small upsell items (Instamart or Swiggy Food) that would
+    elevate the given meal. Best-effort only — any failure (API error,
+    malformed JSON, exhausted quota on every model, etc.) returns an
+    empty list rather than raising, since this is a nice-to-have upsell
+    card and must never block the main flow.
+    """
+    try:
+        client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+    except Exception as e:
+        console.print(f"[yellow][WARNING] generate_top_up_suggestions failed to init client: {type(e).__name__}: {e}[/yellow]")
+        return []
+
+    ingredient_list = ", ".join(ing.name for ing in fridge.ingredients) or "(nothing detected)"
+    prompt = _TOP_UP_PROMPT.format(
+        meal_name=meal.name if meal else "this meal",
+        ingredient_list=ingredient_list,
+        decision=decision.value,
+    )
+
+    chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
+
+    for chain_model in chain:
+        try:
+            response = client.models.generate_content(model=chain_model, contents=prompt)
+            suggestions = _parse_top_up_response(response.text)
+            if suggestions:
+                console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model}[/green]")
+                return suggestions
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model for top-up...[/yellow]")
+            else:
+                console.print(f"[yellow][WARNING] {chain_model} top-up failed with: {e}, trying next...[/yellow]")
+
+    console.print("[yellow][WARNING] All Gemini models failed for top-up suggestions, skipping[/yellow]")
+    return []
 
 
 # ---------------------------------------------------------------------------

@@ -168,7 +168,8 @@
     .choice-subtitle { font-size:12px; color:var(--muted); font-style:italic; line-height:1.5; margin:8px 0 14px; overflow-wrap:break-word; word-break:normal; }
     .choice-buttons { display:flex; flex-direction:column; gap:10px; }
     .choice-btn {
-      position:relative; display:flex; align-items:flex-start; gap:14px;
+      overflow:visible;
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
       width:100%; text-align:left; padding:16px;
       background:rgba(255,255,255,.04); border:1px solid var(--border); border-left:3px solid transparent;
       border-radius:16px; cursor:pointer; font-family:inherit; color:var(--text); transition:.2s;
@@ -182,14 +183,18 @@
     .choice-btn.recommended.cook { box-shadow:0 0 0 1px rgba(74,222,128,.25), 0 0 22px rgba(74,222,128,.15); }
     .choice-btn.recommended.order_groceries { box-shadow:0 0 0 1px rgba(96,165,250,.25), 0 0 22px rgba(96,165,250,.15); }
     .choice-btn.recommended.order_dish { box-shadow:0 0 0 1px rgba(255,107,0,.25), 0 0 22px rgba(255,107,0,.15); }
+    .choice-btn-main { display:flex; align-items:center; gap:14px; min-width:0; flex:1; }
     .choice-icon { width:44px; height:44px; min-width:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
     .choice-btn.cook .choice-icon { background:rgba(74,222,128,.18); }
     .choice-btn.order_groceries .choice-icon { background:rgba(96,165,250,.18); }
     .choice-btn.order_dish .choice-icon { background:rgba(255,107,0,.18); }
-    .choice-text { flex:1; min-width:0; padding-right:70px; }
+    .choice-text { flex:1; min-width:0; }
     .choice-btn-title { font-size:14px; font-weight:700; margin-bottom:2px; overflow-wrap:break-word; word-break:normal; }
     .choice-btn-sub { font-size:12px; color:var(--muted); overflow-wrap:break-word; word-break:normal; line-height:1.4; }
-    .choice-badge { position:absolute; top:12px; right:12px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:50px; }
+    .choice-badge {
+      white-space:nowrap; flex-shrink:0;
+      font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:50px;
+    }
     .choice-btn.cook .choice-badge { background:rgba(74,222,128,.2); color:#4ade80; }
     .choice-btn.order_groceries .choice-badge { background:rgba(96,165,250,.2); color:#60a5fa; }
     .choice-btn.order_dish .choice-badge { background:rgba(255,107,0,.2); color:#FF6B00; }
@@ -198,6 +203,42 @@
     .cook-confirmed-card { text-align:center; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.3); }
     .cook-confirmed-icon { font-size:36px; margin-bottom:8px; }
     .cook-confirmed-card .title { font-weight:700; }
+
+    /* Top-up card */
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .top-up-card { opacity:0; animation:fadeInUp .4s ease forwards; }
+    .top-up-subtitle { font-size:12px; color:var(--muted); margin-bottom:10px; }
+    .top-up-row {
+      display:flex; align-items:center; gap:12px; padding:12px 0;
+      opacity:0; animation:fadeInUp .4s ease forwards;
+    }
+    .top-up-row:not(:last-child) { border-bottom:1px solid rgba(255,255,255,.06); }
+    .top-up-icon { width:40px; height:40px; min-width:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .top-up-icon.instamart { background:rgba(74,222,128,.15); border:1px solid rgba(74,222,128,.3); }
+    .top-up-icon.swiggy_food { background:rgba(255,107,0,.15); border:1px solid rgba(255,107,0,.3); }
+    .top-up-info { flex:1; min-width:0; }
+    .top-up-name { color:#fff; font-weight:600; font-size:14px; overflow-wrap:break-word; word-break:normal; }
+    .top-up-reason { color:var(--muted); font-size:12px; margin-top:2px; overflow-wrap:break-word; word-break:normal; }
+    .top-up-right { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+    .top-up-price { color:#fff; font-weight:600; font-size:14px; white-space:nowrap; }
+    .top-up-source { font-size:10px; white-space:nowrap; }
+    .top-up-source.instamart { color:#4ade80; }
+    .top-up-source.swiggy_food { color:#FF6B00; }
+    .top-up-add {
+      display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px;
+      background:transparent; cursor:pointer; font-family:inherit; font-weight:600; white-space:nowrap;
+    }
+    .top-up-add.instamart { border:1px solid #4ade80; color:#4ade80; }
+    .top-up-add.swiggy_food { border:1px solid #FF6B00; color:#FF6B00; }
+
+    /* Toast */
+    .toast {
+      position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+      background:rgba(20,20,28,.95); border:1px solid var(--border); color:var(--text);
+      padding:12px 18px; border-radius:50px; font-size:13px; z-index:50; opacity:0;
+      transition:.3s; pointer-events:none; backdrop-filter:blur(10px); max-width:90%; text-align:center;
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
@@ -288,10 +329,15 @@
       <!-- User choice -->
       <div id="choiceCard"></div>
 
+      <!-- Top up -->
+      <div id="topUpSection"></div>
+
       <!-- Order -->
       <div id="orderCard"></div>
     </div>
   </div>
+
+  <div class="toast" id="toast"></div>
 
   <script>
     async function checkAuth() {
@@ -378,6 +424,15 @@
       ));
     }
 
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
     function decisionMeta(d) {
       return {
         cook: { icon: '🍳', label: 'Cook at Home' },
@@ -415,32 +470,38 @@
 
       const cookBtn = `
         <button class="choice-btn cook ${rec === 'cook' ? 'recommended' : ''}" data-action="cook" onclick="chooseAction('cook', this)">
-          ${rec === 'cook' ? '<span class="choice-badge">Recommended</span>' : ''}
-          <div class="choice-icon">🍳</div>
-          <div class="choice-text">
-            <div class="choice-btn-title">Cook at Home</div>
-            <div class="choice-btn-sub">Use what you already have</div>
+          <div class="choice-btn-main">
+            <div class="choice-icon">🍳</div>
+            <div class="choice-text">
+              <div class="choice-btn-title">Cook at Home</div>
+              <div class="choice-btn-sub">Use what you already have</div>
+            </div>
           </div>
+          ${rec === 'cook' ? '<span class="choice-badge">Recommended</span>' : ''}
         </button>`;
 
       const groceriesBtn = missing.length ? `
         <button class="choice-btn order_groceries ${rec === 'order_groceries' ? 'recommended' : ''}" data-action="order_groceries" onclick="chooseAction('order_groceries', this)">
-          ${rec === 'order_groceries' ? '<span class="choice-badge">Recommended</span>' : ''}
-          <div class="choice-icon">🛒</div>
-          <div class="choice-text">
-            <div class="choice-btn-title">Order Missing Items from Instamart</div>
-            <div class="choice-btn-sub">${missing.join(', ')}</div>
+          <div class="choice-btn-main">
+            <div class="choice-icon">🛒</div>
+            <div class="choice-text">
+              <div class="choice-btn-title">Order Missing Items from Instamart</div>
+              <div class="choice-btn-sub">${missing.join(', ')}</div>
+            </div>
           </div>
+          ${rec === 'order_groceries' ? '<span class="choice-badge">Recommended</span>' : ''}
         </button>` : '';
 
       const dishBtn = `
         <button class="choice-btn order_dish ${rec === 'order_dish' ? 'recommended' : ''}" data-action="order_dish" onclick="chooseAction('order_dish', this)">
-          ${rec === 'order_dish' ? '<span class="choice-badge">Recommended</span>' : ''}
-          <div class="choice-icon">🛵</div>
-          <div class="choice-text">
-            <div class="choice-btn-title">Order the Dish from Swiggy</div>
-            <div class="choice-btn-sub">Get ${mealName} delivered to your door</div>
+          <div class="choice-btn-main">
+            <div class="choice-icon">🛵</div>
+            <div class="choice-text">
+              <div class="choice-btn-title">Order the Dish from Swiggy</div>
+              <div class="choice-btn-sub">Get ${mealName} delivered to your door</div>
+            </div>
           </div>
+          ${rec === 'order_dish' ? '<span class="choice-badge">Recommended</span>' : ''}
         </button>`;
 
       document.getElementById('choiceCard').innerHTML =
@@ -514,6 +575,7 @@
       document.getElementById('ingredientChips').innerHTML = '';
       document.getElementById('mealCards').innerHTML = '';
       document.getElementById('choiceCard').innerHTML = '';
+      document.getElementById('topUpSection').innerHTML = '';
       document.getElementById('orderCard').innerHTML = '';
       currentMealName = null;
       currentMissingIngredients = [];
@@ -592,6 +654,37 @@
         setStep(3, '', 'Waiting for your choice');
         renderChoiceCard(ev);
         resultsEl.classList.add('show');
+        return;
+      }
+
+      if (ev.type === 'top_up') {
+        const suggestions = ev.suggestions || [];
+        if (!suggestions.length) return;
+
+        const rows = suggestions.map((s, i) => {
+          const source = s.source === 'swiggy_food' ? 'swiggy_food' : 'instamart';
+          const sourceLabel = source === 'swiggy_food' ? 'Swiggy Food' : 'Instamart';
+          return `
+            <div class="top-up-row" style="animation-delay:${i * 100}ms">
+              <div class="top-up-icon ${source}">${escapeHtml(s.emoji || '✨')}</div>
+              <div class="top-up-info">
+                <div class="top-up-name">${escapeHtml(s.name)}</div>
+                <div class="top-up-reason">${escapeHtml(s.reason)}</div>
+              </div>
+              <div class="top-up-right">
+                <div class="top-up-price">₹${escapeHtml(s.estimated_price)}</div>
+                <div class="top-up-source ${source}">${sourceLabel}</div>
+                <button class="top-up-add ${source}" onclick="showToast('Coming soon — connect Swiggy to add items instantly')">Add →</button>
+              </div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('topUpSection').innerHTML =
+          `<div class="section-label">✨ Top Up Your Meal</div>
+          <div class="card top-up-card">
+            <p class="top-up-subtitle">Small additions that make a big difference</p>
+            ${rows}
+          </div>`;
         return;
       }
 
