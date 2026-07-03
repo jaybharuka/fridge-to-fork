@@ -30,6 +30,9 @@ FOOD_MCP_URL = os.environ.get(
 INSTAMART_MCP_URL = os.environ.get(
     "SWIGGY_INSTAMART_MCP_URL", "https://mcp.swiggy.com/im"
 )
+DINEOUT_MCP_URL = os.environ.get(
+    "SWIGGY_DINEOUT_MCP_URL", "https://mcp.swiggy.com/dineout"
+)
 AGENT_MODEL = os.environ.get("SWIGGY_AGENT_MODEL", "gemini-2.5-flash")
 
 
@@ -111,18 +114,24 @@ async def run_swiggy_agent(
                 headers=auth_headers,
             )
         ),
+        MCPToolset(
+            connection_params=StreamableHTTPConnectionParams(
+                url=DINEOUT_MCP_URL,
+                headers=auth_headers,
+            )
+        ),
     ]
 
     agent = Agent(
         name="swiggy_ordering_agent",
         model=AGENT_MODEL,
         instruction=(
-            "You are a smart food and grocery ordering assistant integrated "
-            "with Swiggy's platform. You have access to both Swiggy Food "
-            "(restaurant delivery) and Swiggy Instamart (grocery delivery) tools. "
+            "You are a smart food assistant integrated with Swiggy's full platform. "
+            "You have access to Swiggy Food (restaurant delivery), Swiggy Instamart "
+            "(grocery delivery), and Swiggy Dineout (table reservations) tools. "
             "Choose the right platform and tools based on the user's request. "
-            "Always confirm what you ordered and provide the order ID and ETA. "
-            "Use COD as the default payment method. Be efficient."
+            "Always confirm what you ordered or booked and provide the confirmation "
+            "ID and ETA or time. Use COD as the default payment method for orders."
         ),
         tools=tools,
     )
