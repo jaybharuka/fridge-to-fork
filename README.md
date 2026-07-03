@@ -44,12 +44,14 @@ Based on the Planner's decision, the Order Router hands off to a real **Google A
 
 **Step 3 is a Google ADK agent, not procedural routing.** `swiggy_agent.py` builds a `google.adk.agents.Agent` backed by Gemini and wires it to Swiggy's MCP servers via `MCPToolset` + `StreamableHTTPConnectionParams`. Rather than the app calling specific named tools in a fixed order, the meal-plan decision is translated into a natural-language instruction (e.g. *"order 'Butter Chicken' from Swiggy Food, delivered to ..."*), and the agent autonomously decides which of Swiggy's available tools to call and in what order to fulfill it.
 
-- **Two independent MCP servers** are wired, one per domain:
-  - `SWIGGY_FOOD_MCP_URL` (default `https://mcp.swiggy.com/food`) — used when the decision is `order_dish`
-  - `SWIGGY_INSTAMART_MCP_URL` (default `https://mcp.swiggy.com/im`) — used when the decision is `order_groceries`
+- **All three independent MCP servers are wired simultaneously**, so the agent can freely choose the right platform and tool for the request rather than being restricted to whichever domain the app's own decision logic picked:
+  - `SWIGGY_FOOD_MCP_URL` (default `https://mcp.swiggy.com/food`) — restaurant delivery
+  - `SWIGGY_INSTAMART_MCP_URL` (default `https://mcp.swiggy.com/im`) — grocery delivery
+  - `SWIGGY_DINEOUT_MCP_URL` (default `https://mcp.swiggy.com/dineout`) — table reservations
 - **Auth:** the app performs the OAuth 2.1 + PKCE flow itself (`app.py`'s `/auth/login` → `/auth/callback`, real code_verifier/S256 challenge, no static API key). The resulting Bearer access token is forwarded straight into `MCPToolset`'s `StreamableHTTPConnectionParams(headers=...)` — Google ADK has no built-in OAuth hook, so this Bearer-header pattern is the correct integration point for ADK specifically.
 - **`step3_order_router.py`** now only adapts existing call sites (`order_dish_from_swiggy`, `order_groceries_from_instamart`, `route_order`) onto the agent, preserving their signatures so `app.py` and the CLI needed no changes.
-- **401 / expired token:** a 5-day access token is the whole session (no refresh token in Swiggy MCP v1.0) — on auth failure the app surfaces an `auth_required` event so the user reconnects via `/auth/login`.
+- **401 / expired token:** a 5-day access token is the whole session (no refresh token in Swiggy MCP v1.0). `swiggy_agent.py` detects auth failures (both raised exceptions and agent-reported text mentioning `401`/`32001`/`unauthorized`/`token expired`) and returns `auth_required` either way.
+- **Auth retry pattern:** on 401, the app surfaces an `auth_required` event to the user, who re-authenticates via `/auth/login`. Silent background retry is not possible in a web app OAuth flow — this is an intentional UX decision, not a missing feature.
 
 ---
 
@@ -181,6 +183,7 @@ orders without calling Swiggy for real.
 | `GOOGLE_API_KEY` | ✅ Yes | Google Gemini API key (from AI Studio) |
 | `SWIGGY_INSTAMART_MCP_URL` | Optional | Instamart MCP endpoint (default: `https://mcp.swiggy.com/im`) |
 | `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default: `https://mcp.swiggy.com/food`) |
+| `SWIGGY_DINEOUT_MCP_URL` | Optional | Swiggy Dineout MCP endpoint (default: `https://mcp.swiggy.com/dineout`) |
 | `SWIGGY_AGENT_MODEL` | Optional | Gemini model the ADK agent uses for tool selection (default: `gemini-2.5-flash`) |
 | `SWIGGY_CLIENT_ID` | For real orders | OAuth 2.1 client ID issued by Swiggy for the PKCE login flow |
 | `APP_BASE_URL` | For real orders | Base URL this app is reachable at, used to build the OAuth redirect_uri |
