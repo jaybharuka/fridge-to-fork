@@ -27,6 +27,16 @@ from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
 
+
+def _ascii_safe(value) -> str:
+    """
+    ASCII-only string repr for logging arbitrary LLM output (emoji, etc.)
+    to stdout — printing raw Unicode crashes on Windows consoles (cp1252)
+    or gets silently corrupted when stdout is a redirected/non-TTY stream.
+    """
+    return str(value).encode("ascii", errors="backslashreplace").decode("ascii")
+
+
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals
 from fridge_to_fork.step3_order_router import (
@@ -108,7 +118,7 @@ def _local_fallback_plan(fridge, target_dish: str | None = None) -> MealPlan:
             suggestions=[suggestion],
             decision=Decision.ORDER_GROCERIES,
             recommended_meal=suggestion,
-            reasoning="Temporary fallback while generating a meal plan.",
+            reasoning="Based on what's in your fridge right now.",
         )
 
     ingredient_names = [ingredient.name.lower() for ingredient in fridge.ingredients]
@@ -135,7 +145,7 @@ def _local_fallback_plan(fridge, target_dish: str | None = None) -> MealPlan:
         suggestions=[suggestion],
         decision=Decision.COOK,
         recommended_meal=suggestion,
-        reasoning="Temporary fallback while generating a meal plan.",
+        reasoning="Based on what's in your fridge right now.",
     )
 
 
@@ -325,6 +335,7 @@ async def scan(
                 top_up_suggestions = await asyncio.to_thread(
                     generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
                 )
+                print(f"[TOP_UP] Generated {len(top_up_suggestions)} suggestions: {_ascii_safe(top_up_suggestions)}")
                 if top_up_suggestions:
                     yield _sse({"type": "top_up", "suggestions": top_up_suggestions})
 
@@ -372,6 +383,7 @@ async def scan(
                     top_up_suggestions = await asyncio.to_thread(
                         generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
                     )
+                    print(f"[TOP_UP] Generated {len(top_up_suggestions)} suggestions: {_ascii_safe(top_up_suggestions)}")
                     if top_up_suggestions:
                         yield _sse({"type": "top_up", "suggestions": top_up_suggestions})
 
