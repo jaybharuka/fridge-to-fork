@@ -40,19 +40,19 @@ def _build_instruction(plan: MealPlan, delivery_address: str) -> str:
 
     if plan.decision == Decision.ORDER_DISH:
         return (
-            f"The user wants to order '{meal_name}' from Swiggy Food for delivery to: "
-            f"{delivery_address}. "
-            f"Search for this dish, find the best restaurant, add it to cart, "
-            f"and place the order. Use COD as payment method. "
-            f"Report the order ID and estimated delivery time when done."
+            f"You have access to Swiggy Food and Instamart tools. "
+            f"The user wants to order '{meal_name}' as a ready-made dish from "
+            f"a restaurant. Use Swiggy Food tools to search for this dish, "
+            f"find the best restaurant, and place a delivery order to: {delivery_address}. "
+            f"Report the order ID and ETA."
         )
     elif plan.decision == Decision.ORDER_GROCERIES:
         items_str = ", ".join(missing) if missing else "the missing ingredients"
         return (
-            f"The user wants to cook '{meal_name}' but needs these ingredients "
-            f"from Swiggy Instamart: {items_str}. "
-            f"Deliver to: {delivery_address}. "
-            f"Search for each item, add to cart, and checkout. "
+            f"You have access to Swiggy Food and Instamart tools. "
+            f"The user wants to cook '{meal_name}' and needs these ingredients: "
+            f"{items_str}. Use Swiggy Instamart tools to search for each item, "
+            f"add to cart, and checkout for delivery to: {delivery_address}. "
             f"Report what was ordered and the estimated delivery time."
         )
     else:
@@ -94,38 +94,35 @@ async def run_swiggy_agent(
             error="auth_required",
         )
 
+    platform = "swiggy_food" if plan.decision == Decision.ORDER_DISH else "swiggy_instamart"
+
     auth_headers = {"Authorization": f"Bearer {access_token}"}
 
-    tools = []
-
-    if plan.decision == Decision.ORDER_DISH:
-        tools.append(
-            MCPToolset(
-                connection_params=StreamableHTTPConnectionParams(
-                    url=FOOD_MCP_URL,
-                    headers=auth_headers,
-                )
+    tools = [
+        MCPToolset(
+            connection_params=StreamableHTTPConnectionParams(
+                url=FOOD_MCP_URL,
+                headers=auth_headers,
             )
-        )
-    elif plan.decision == Decision.ORDER_GROCERIES:
-        tools.append(
-            MCPToolset(
-                connection_params=StreamableHTTPConnectionParams(
-                    url=INSTAMART_MCP_URL,
-                    headers=auth_headers,
-                )
+        ),
+        MCPToolset(
+            connection_params=StreamableHTTPConnectionParams(
+                url=INSTAMART_MCP_URL,
+                headers=auth_headers,
             )
-        )
+        ),
+    ]
 
     agent = Agent(
         name="swiggy_ordering_agent",
         model=AGENT_MODEL,
         instruction=(
-            "You are a smart food ordering assistant integrated with Swiggy's "
-            "platform. You help users order food from Swiggy Food or groceries "
-            "from Swiggy Instamart. Always confirm what you ordered and provide "
-            "the order ID and ETA. Use COD as the default payment method. "
-            "Be efficient — complete the task in as few tool calls as possible."
+            "You are a smart food and grocery ordering assistant integrated "
+            "with Swiggy's platform. You have access to both Swiggy Food "
+            "(restaurant delivery) and Swiggy Instamart (grocery delivery) tools. "
+            "Choose the right platform and tools based on the user's request. "
+            "Always confirm what you ordered and provide the order ID and ETA. "
+            "Use COD as the default payment method. Be efficient."
         ),
         tools=tools,
     )
@@ -150,15 +147,29 @@ async def run_swiggy_agent(
 
     final_response = ""
 
-    async for event in runner.run_async(
-        user_id="user",
-        session_id=session.id,
-        new_message=message,
-    ):
-        if event.is_final_response() and event.content:
-            for part in event.content.parts:
-                if part.text:
-                    final_response += part.text
+    try:
+        async for event in runner.run_async(
+            user_id="user",
+            session_id=session.id,
+            new_message=message,
+        ):
+            if event.is_final_response() and event.content:
+                for part in event.content.parts:
+                    if part.text:
+                        final_response += part.text
+    except Exception as e:
+        err_str = str(e).lower()
+        if any(x in err_str for x in ["401", "32001", "unauthorized", "unauthenticated", "token"]):
+            return OrderResult(
+                success=False,
+                platform=platform,
+                error="auth_required",
+            )
+        return OrderResult(
+            success=False,
+            platform=platform,
+            error=f"Agent error: {str(e)[:200]}",
+        )
 
     order_match = re.search(
         r'(SWG-[A-Z0-9\-]+|IM-[A-Z0-9\-]+|order[_\s]?id[:\s]+([A-Z0-9\-]+))',
@@ -171,9 +182,17 @@ async def run_swiggy_agent(
 
     meal_name = plan.recommended_meal.name if plan.recommended_meal else "meal"
     missing = plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
-    platform = "swiggy_food" if plan.decision == Decision.ORDER_DISH else "swiggy_instamart"
 
     success = bool(order_id) or "confirmed" in final_response.lower() or "placed" in final_response.lower()
+
+    if not success:
+        resp_lower = final_response.lower()
+        if any(x in resp_lower for x in ["401", "unauthorized", "unauthenticated", "token expired"]):
+            return OrderResult(
+                success=False,
+                platform=platform,
+                error="auth_required",
+            )
 
     return OrderResult(
         success=success,
