@@ -30,6 +30,16 @@ load_dotenv()
 console = Console()
 
 
+def _ascii_safe(value) -> str:
+    """
+    ASCII-only string repr for logging arbitrary LLM output (emoji, etc.)
+    to stdout. Both plain print() and rich's Console() have proven
+    unreliable with wide/multi-codepoint Unicode when stdout is a
+    redirected (non-TTY) stream rather than a real console.
+    """
+    return str(value).encode("ascii", errors="backslashreplace").decode("ascii")
+
+
 def _dedupe(models: list[str | None]) -> list[str]:
     """Remove falsy/duplicate entries while preserving order."""
     seen = set()
@@ -137,11 +147,7 @@ def _fallback_meal_plan(
             ))
 
         decision = Decision.COOK if any(s.can_cook_now for s in suggestions) else Decision.ORDER_DISH
-        # Provide clearer reasoning so the UI can display something reviewer-friendly.
-        reasoning = (
-            "Local fallback: recommending a simple meal plan based on scanned items. "
-            "If you want precise recipes, enable the live model or add a few pantry staples."
-        )
+        reasoning = "Based on what's in your fridge right now."
     
     recommended = suggestions[0] if suggestions else None
     return MealPlan(suggestions=suggestions, decision=decision, recommended_meal=recommended, reasoning=reasoning)
@@ -528,9 +534,11 @@ def generate_top_up_suggestions(
     chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
 
     for chain_model in chain:
+        print(f"[TOP_UP] Attempting with model: {chain_model}")
         try:
             response = client.models.generate_content(model=chain_model, contents=prompt)
             suggestions = _parse_top_up_response(response.text)
+            print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
             if suggestions:
                 console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model}[/green]")
                 return suggestions

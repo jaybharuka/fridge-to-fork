@@ -461,12 +461,21 @@
     let currentMealName = null;
     let currentMissingIngredients = [];
 
+    function isInternalReasoning(text) {
+      if (!text) return true;
+      const blocked = ['fallback', 'local fallback', 'enable the live model', 'temporary'];
+      const lower = text.toLowerCase();
+      return blocked.some(b => lower.includes(b));
+    }
+
     function renderChoiceCard(ev) {
       const rec = ev.ai_recommendation;
       const meta = decisionMeta(rec);
       const missing = (ev.missing_ingredients || []).map(escapeHtml);
       const mealName = escapeHtml(ev.recommended_meal || 'this dish');
-      const reasoning = escapeHtml(ev.reasoning || '');
+      const rawReasoning = ev.reasoning || '';
+      const showReasoning = rawReasoning && !isInternalReasoning(rawReasoning);
+      const reasoning = escapeHtml(rawReasoning);
 
       const cookBtn = `
         <button class="choice-btn cook ${rec === 'cook' ? 'recommended' : ''}" data-action="cook" onclick="chooseAction('cook', this)">
@@ -508,7 +517,7 @@
         `<div class="card choice-card">
           <div class="card-title">🤔 What would you like to do?</div>
           <div><span class="tag tag-purple">✨ AI suggests: ${meta.label}</span></div>
-          <p class="choice-subtitle">${reasoning}</p>
+          ${showReasoning ? `<p class="choice-subtitle">${reasoning}</p>` : ''}
           <div class="choice-buttons">
             ${cookBtn}
             ${groceriesBtn}
