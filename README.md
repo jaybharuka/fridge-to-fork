@@ -35,8 +35,21 @@ It explicitly evaluates:
 
 *(Fallback: If you don't provide a target dish, the AI intelligently suggests 3-5 meals based entirely on what is already in your fridge).*
 
-#### 3. 🛵 Step 3: Order Router (`step3_order_router.py`)
-Based on the Planner's decision, the Order Router delegates the execution to **Swiggy's Model Context Protocol (MCP)** endpoints via JSON-RPC 2.0. It acts as the bridge between the AI's intent and the real-world e-commerce platform.
+#### 3. 🛵 Step 3: Order Router (`step3_order_router.py` + `swiggy_agent.py`)
+Based on the Planner's decision, the Order Router hands off to a real **Google ADK agent** (`swiggy_agent.py`) rather than following a hardcoded tool-call sequence. See [Architecture](#-architecture) below for details.
+
+---
+
+## 🏗 Architecture
+
+**Step 3 is a Google ADK agent, not procedural routing.** `swiggy_agent.py` builds a `google.adk.agents.Agent` backed by Gemini and wires it to Swiggy's MCP servers via `MCPToolset` + `StreamableHTTPConnectionParams`. Rather than the app calling specific named tools in a fixed order, the meal-plan decision is translated into a natural-language instruction (e.g. *"order 'Butter Chicken' from Swiggy Food, delivered to ..."*), and the agent autonomously decides which of Swiggy's available tools to call and in what order to fulfill it.
+
+- **Two independent MCP servers** are wired, one per domain:
+  - `SWIGGY_FOOD_MCP_URL` (default `https://mcp.swiggy.com/food`) — used when the decision is `order_dish`
+  - `SWIGGY_INSTAMART_MCP_URL` (default `https://mcp.swiggy.com/im`) — used when the decision is `order_groceries`
+- **Auth:** the app performs the OAuth 2.1 + PKCE flow itself (`app.py`'s `/auth/login` → `/auth/callback`, real code_verifier/S256 challenge, no static API key). The resulting Bearer access token is forwarded straight into `MCPToolset`'s `StreamableHTTPConnectionParams(headers=...)` — Google ADK has no built-in OAuth hook, so this Bearer-header pattern is the correct integration point for ADK specifically.
+- **`step3_order_router.py`** now only adapts existing call sites (`order_dish_from_swiggy`, `order_groceries_from_instamart`, `route_order`) onto the agent, preserving their signatures so `app.py` and the CLI needed no changes.
+- **401 / expired token:** a 5-day access token is the whole session (no refresh token in Swiggy MCP v1.0) — on auth failure the app surfaces an `auth_required` event so the user reconnects via `/auth/login`.
 
 ---
 
@@ -47,7 +60,8 @@ Based on the Planner's decision, the Order Router delegates the execution to **S
 | **AI Orchestration** | Google GenAI SDK (`gemini-2.5-flash`) |
 | **Backend API** | [FastAPI](https://fastapi.tiangolo.com) with Server-Sent Events (SSE) streaming |
 | **Mobile UI** | Vanilla HTML/CSS/JS (Dark mode, glassmorphism, camera capture) |
-| **E-Commerce Integration** | Swiggy Food & Instamart MCP (JSON-RPC 2.0 Stubs) |
+| **Agent Framework** | Google ADK (`Agent` + `MCPToolset`) for autonomous Swiggy tool selection |
+| **E-Commerce Integration** | Swiggy Food & Instamart MCP (streamable HTTP, OAuth 2.1 + PKCE) |
 
 ---
 
@@ -149,14 +163,14 @@ fridge-to-fork/
 
 ## 🔌 Swiggy MCP Integration
 
-`step3_order_router._call_mcp()` is the single seam for MCP communication.
-It sends JSON-RPC 2.0 `tools/call` requests to the Swiggy MCP endpoints.
+`swiggy_agent.py` connects to Swiggy's real hosted MCP servers over standard
+streamable HTTP (`google.adk.tools.mcp_tool.mcp_toolset.MCPToolset` +
+`StreamableHTTPConnectionParams`) — no stub servers, no hand-rolled JSON-RPC.
+The agent discovers whichever tools each server exposes at connection time
+rather than the app hardcoding specific tool names.
 
-Replace the stub URLs with the official Swiggy MCP SDK endpoints once published.
-Until then, use `--dry-run` to simulate orders.
-
-*   **Swiggy Food tools:** `swiggy_food_search`, `swiggy_food_place_order`  
-*   **Swiggy Instamart tools:** `instamart_search`, `instamart_place_order`
+Use `--dry-run` (CLI) or an unauthenticated session (web UI) to simulate
+orders without calling Swiggy for real.
 
 ---
 
@@ -165,6 +179,9 @@ Until then, use `--dry-run` to simulate orders.
 | Variable | Required | Description |
 |---|---|---|
 | `GOOGLE_API_KEY` | ✅ Yes | Google Gemini API key (from AI Studio) |
-| `SWIGGY_INSTAMART_MCP_URL` | Optional | Instamart MCP endpoint (default: `localhost:8001`) |
-| `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default: `localhost:8002`) |
+| `SWIGGY_INSTAMART_MCP_URL` | Optional | Instamart MCP endpoint (default: `https://mcp.swiggy.com/im`) |
+| `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default: `https://mcp.swiggy.com/food`) |
+| `SWIGGY_AGENT_MODEL` | Optional | Gemini model the ADK agent uses for tool selection (default: `gemini-2.5-flash`) |
+| `SWIGGY_CLIENT_ID` | For real orders | OAuth 2.1 client ID issued by Swiggy for the PKCE login flow |
+| `APP_BASE_URL` | For real orders | Base URL this app is reachable at, used to build the OAuth redirect_uri |
 | `DELIVERY_ADDRESS` | Optional | Default delivery address for orders |
