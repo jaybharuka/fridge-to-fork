@@ -3,343 +3,373 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="theme-color" content="#0F0F0F" />
   <title>Fridge to Fork</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <style>
     :root {
-      --bg: #0a0a0f;
-      --surface: rgba(255,255,255,0.05);
-      --border: rgba(255,255,255,0.08);
-      --accent: #7c6fff;
-      --green: #10b981;
-      --yellow: #f59e0b;
-      --red: #ef4444;
-      --text: #f0f0f0;
-      --muted: rgba(255,255,255,0.45);
-      --r: 20px;
+      --swiggy-orange: #FC8019;
+      --swiggy-orange-dark: #E16A10;
+      --swiggy-orange-light: #FFF3EB;
+      --swiggy-bg: #0F0F0F;
+      --swiggy-surface: #1C1C1C;
+      --swiggy-surface-2: #242424;
+      --swiggy-border: #2E2E2E;
+      --swiggy-text: #FFFFFF;
+      --swiggy-text-2: #A8A8A8;
+      --swiggy-text-3: #6B6B6B;
+      --swiggy-green: #48C479;
+      --swiggy-blue: #4E9FE5;
+      --swiggy-red: #E74C3C;
+    } 
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; min-width:0; }
+    body {
+      font-family:'Inter',sans-serif; font-size:14px; line-height:1.5; font-weight:400;
+      background:var(--swiggy-bg); color:var(--swiggy-text); min-height:100vh; overflow-x:hidden;
     }
-    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
-
-    /* Animated background orbs */
-    .orbs { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
-    .orb { position:absolute; border-radius:50%; filter:blur(80px); opacity:.12; animation:float 10s ease-in-out infinite; }
-    .o1 { width:500px; height:500px; background:#6c63ff; top:-150px; left:-150px; }
-    .o2 { width:350px; height:350px; background:#00c6ff; bottom:10%; right:-100px; animation-delay:-4s; }
-    .o3 { width:250px; height:250px; background:#10b981; top:45%; left:10%; animation-delay:-7s; }
-    @keyframes float { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-25px) scale(1.06)} }
+    i[data-lucide] { display:inline-block; width:18px; height:18px; }
+    svg.lucide { width:1em; height:1em; }
 
     /* Layout */
-    .wrap { position:relative; z-index:1; max-width:480px; margin:0 auto; padding:20px 16px 80px; }
+    .page { max-width:480px; margin:0 auto; min-height:100vh; }
+    .wrap { padding:16px 16px 80px; }
+
+    @media (min-width:481px) {
+      .page { max-width:440px; box-shadow:0 0 60px rgba(0,0,0,.5); border-left:1px solid var(--swiggy-border); border-right:1px solid var(--swiggy-border); }
+      .desktop-hint { display:inline-block !important; }
+    }
 
     /* Header */
-    .hd { text-align:center; padding:36px 0 28px; }
-    .hd-icon { font-size:52px; display:block; margin-bottom:10px; filter:drop-shadow(0 0 18px rgba(108,99,255,.6)); }
-    .hd h1 { font-size:26px; font-weight:800; background:linear-gradient(135deg,#fff 0%,#a78bfa 50%,#60a5fa 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    .hd p { color:var(--muted); font-size:13px; margin-top:5px; }
+    .app-header { position:sticky; top:0; z-index:30; height:56px; background:rgba(15,15,15,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--swiggy-border); }
+    .app-header-inner { max-width:480px; margin:0 auto; height:100%; padding:0 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .brand { display:flex; align-items:center; gap:8px; color:var(--swiggy-orange); font-weight:700; font-size:16px; white-space:nowrap; }
+    .brand i { color:var(--swiggy-orange); width:20px; height:20px; }
+    .desktop-hint { display:none; font-size:11px; color:var(--swiggy-text-3); font-weight:500; }
 
-    /* Upload */
-    .upload { background:var(--surface); border:2px dashed var(--border); border-radius:var(--r); padding:36px 20px; text-align:center; cursor:pointer; transition:.3s; backdrop-filter:blur(10px); position:relative; overflow:hidden; }
-    .upload input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
-    .upload:hover,.upload.drag { border-color:var(--accent); background:rgba(124,111,255,.08); }
-    .upload-ico { font-size:44px; display:block; margin-bottom:10px; }
-    .upload h3 { font-size:17px; font-weight:700; margin-bottom:4px; }
-    .upload p { color:var(--muted); font-size:12px; }
+    .auth-pill { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; transition:.15s ease; }
+    .auth-pill:not(.connected) { border:1px solid var(--swiggy-orange); color:var(--swiggy-orange); background:transparent; }
+    .auth-pill.connected { background:var(--swiggy-green); color:#fff; border:1px solid var(--swiggy-green); }
+    .auth-pill a { color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .auth-pill i { width:13px; height:13px; }
+    .auth-pill .logout-link { margin-left:6px; text-decoration:underline; opacity:.85; font-weight:500; }
 
-    /* Preview */
-    .preview { display:none; margin-top:14px; border-radius:var(--r); overflow:hidden; position:relative; }
+    /* Input */
+    .input-section { padding:16px 0 12px; }
+    .input-label { display:block; font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--swiggy-text-2); margin-bottom:8px; }
+    .dish-input {
+      width:100%; height:46px; padding:0 16px; font-size:16px; font-family:inherit; font-weight:400;
+      background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:12px;
+      color:var(--swiggy-text); outline:none; transition:.15s ease;
+    }
+    .dish-input:focus { border-color:var(--swiggy-orange); box-shadow:0 0 0 3px rgba(252,128,25,.15); }
+    .dish-input::placeholder { color:var(--swiggy-text-3); }
+
+    /* Fridge capture */
+    .upload-zone {
+      position:relative; width:100%; aspect-ratio:16/9; border-radius:16px;
+      border:2px dashed var(--swiggy-border); background:var(--swiggy-surface);
+      display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.2s ease; overflow:hidden;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color:var(--swiggy-orange); background:rgba(252,128,25,.05); }
+    .upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .upload-empty { text-align:center; color:var(--swiggy-text-2); pointer-events:none; }
+    .upload-empty i { color:var(--swiggy-orange); width:36px; height:36px; }
+    .upload-empty p { font-size:13px; margin-top:10px; }
+
+    .preview { display:none; position:relative; width:100%; aspect-ratio:16/9; border-radius:16px; overflow:hidden; }
     .preview.show { display:block; }
-    .preview img { width:100%; max-height:260px; object-fit:cover; display:block; }
-    .preview-grad { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,.4) 0%,transparent 45%); }
-    .preview-row { position:absolute; bottom:14px; left:14px; right:14px; display:flex; gap:8px; }
+    .preview img { width:100%; height:100%; object-fit:cover; display:block; }
+    .preview-grad { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.75) 0%, transparent 50%); }
+    .preview-row { position:absolute; bottom:12px; left:12px; right:12px; display:flex; gap:8px; }
+    .ghost-btn {
+      flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+      background:rgba(0,0,0,.55); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.2);
+      color:#fff; font-size:13px; font-weight:600; padding:10px 14px; border-radius:10px; cursor:pointer; font-family:inherit;
+    }
+    .ghost-btn i { width:15px; height:15px; }
 
-    /* Buttons */
-    .btn { display:flex; align-items:center; justify-content:center; gap:7px; padding:14px 22px; border-radius:50px; font-size:15px; font-weight:700; cursor:pointer; border:none; width:100%; transition:.25s; font-family:inherit; }
-    .btn-primary { background:linear-gradient(135deg,#7c6fff,#3a7bd5); color:#fff; box-shadow:0 8px 24px rgba(108,99,255,.35); margin-top:14px; }
-    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(108,99,255,.45); }
-    .btn-primary:active { transform:scale(.97); }
-    .btn-primary:disabled { opacity:.55; cursor:not-allowed; transform:none; }
-    .btn-ghost { background:var(--surface); color:var(--text); border:1px solid var(--border); flex:1; font-size:13px; padding:10px 16px; }
+    /* Analyse button */
+    .analyse-btn {
+      width:100%; height:52px; border-radius:14px; margin-top:14px;
+      background:var(--swiggy-orange); color:#fff; border:none; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      font-size:16px; font-weight:700; font-family:inherit; transition:.15s ease;
+    }
+    .analyse-btn:hover:not(:disabled) { background:var(--swiggy-orange-dark); }
+    .analyse-btn:active:not(:disabled) { transform:scale(.98); }
+    .analyse-btn:disabled { opacity:.6; cursor:not-allowed; }
 
-    /* Steps */
-    .steps { display:none; margin-top:22px; gap:8px; flex-direction:column; position:relative; }
-    .steps.show { display:flex; }
-    .steps::before { content:''; position:absolute; top:0; bottom:0; left:33px; width:2px; background:rgba(255,255,255,.1); z-index:0; }
-    .step { position:relative; z-index:1; display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:16px; background:var(--surface); border:1px solid var(--border); transition:.3s; }
-    .step.active { border-color:rgba(124,111,255,.5); background:rgba(124,111,255,.1); }
-    .step.done { border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.07); }
-    .step-num { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; background:rgba(255,255,255,.08); flex-shrink:0; transition:.3s; }
-    .step.active .step-num { background:var(--accent); animation:pulse 1.4s ease-in-out infinite; }
-    .step.done .step-num { background:var(--green); box-shadow:0 0 12px rgba(74,222,128,.3); }
-    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(124,111,255,.6)} 50%{box-shadow:0 0 0 8px rgba(124,111,255,0)} }
-    .step-label { font-size:13px; font-weight:600; }
-    .step-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+    /* Pipeline steps */
+    .steps { display:none; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:16px; }
+    .steps.show { display:grid; }
+    .step {
+      position:relative; background:var(--swiggy-surface); border-radius:10px; padding:8px 6px;
+      display:flex; flex-direction:column; align-items:center; gap:4px; justify-content:center;
+      min-height:64px; text-align:center; overflow:hidden;
+    }
+    .step:not(:first-child)::before { content:''; position:absolute; top:20px; left:-8px; width:8px; height:2px; background:var(--swiggy-border); }
+    .step.done + .step::before, .step.active + .step::before { background:var(--swiggy-orange); }
+    .step-num-wrap {
+      width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      background:var(--swiggy-surface-2); color:var(--swiggy-text-3); transition:.2s ease;
+    }
+    .step-num-wrap i { width:14px; height:14px; }
+    .step.active .step-num-wrap { background:var(--swiggy-orange); color:#fff; animation:pulseOrange 1.4s ease-in-out infinite; }
+    .step.done .step-num-wrap { background:transparent; color:var(--swiggy-green); }
+    .step.done .step-num-wrap i { animation:popIn .3s ease; width:20px; height:20px; }
+    @keyframes pulseOrange { 0%,100%{box-shadow:0 0 0 0 rgba(252,128,25,.5)} 50%{box-shadow:0 0 0 6px rgba(252,128,25,0)} }
+    @keyframes popIn { 0%{transform:scale(0)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
+    .step-label-sm { font-size:10px; font-weight:600; color:var(--swiggy-text-2); text-transform:uppercase; letter-spacing:.03em; }
+    .step-sub-sm { font-size:9px; color:var(--swiggy-text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+
+    /* Section labels */
+    .section-label { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--swiggy-text-2); margin:20px 0 8px; }
+    .section-label i { width:14px; height:14px; color:var(--swiggy-orange); flex-shrink:0; }
+    .section-label .spacer { flex:1; }
 
     /* Cards */
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:18px; backdrop-filter:blur(10px); margin-top:14px; overflow-wrap:break-word; word-break:normal; }
-    .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:16px; padding:16px; overflow-wrap:break-word; word-break:normal; opacity:0; animation:fadeInUp .35s ease forwards; }
 
     /* Ingredients */
-    .desc { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:14px; overflow-wrap:break-word; word-break:normal; }
-    .chips { display:flex; flex-wrap:wrap; gap:7px; }
-    .chip { display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.07); border:1px solid var(--border); border-radius:50px; padding:6px 12px; font-size:12px; font-weight:500; }
-    .chip { display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.04); border-radius:999px; padding:8px 12px; font-size:13px; font-weight:600; }
-    .chip-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
-    .dot-high { background:var(--green); }
-    .dot-mid { background:var(--yellow); }
-    .dot-low { background:var(--red); }
-    .chip-pct { color:var(--muted); font-size:11px; margin-left:6px; opacity:0.9 }
+    .desc { font-size:13px; color:var(--swiggy-text-2); font-style:italic; line-height:1.6; margin-bottom:12px; overflow-wrap:break-word; word-break:normal; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:20px; font-size:12px; font-weight:600; opacity:0; animation:fadeInUp .3s ease forwards; }
+    .chip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .chip.high { background:rgba(72,196,121,.12); border:1px solid rgba(72,196,121,.3); color:var(--swiggy-text); }
+    .chip.high .chip-dot { background:var(--swiggy-green); }
+    .chip.mid { background:rgba(252,128,25,.1); border:1px solid rgba(252,128,25,.25); color:var(--swiggy-text); }
+    .chip.mid .chip-dot { background:var(--swiggy-orange); }
+    .chip.low { background:rgba(255,255,255,.04); border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); }
+    .chip.low .chip-dot { background:var(--swiggy-text-3); }
+    .chip-pct { color:var(--swiggy-text-3); font-size:11px; }
 
     /* Meal cards */
-    .meals-scroll { display:flex; gap:10px; overflow-x:auto; overflow-y:hidden; padding:0 1px 4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
-    .meals-scroll::-webkit-scrollbar { display:none; }
-    .meal-card { min-width:200px; width:100%; max-width:100%; box-sizing:border-box; background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:14px; flex-shrink:0; overflow:hidden; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; }
-    .meal-card.recommended { border-color:rgba(124,111,255,.5); background:rgba(124,111,255,.1); }
-    .meal-name { font-size:14px; font-weight:700; margin-bottom:4px; overflow-wrap:break-word; word-break:normal; min-width:0; }
-    .meal-desc { font-size:11px; color:var(--muted); line-height:1.5; margin-bottom:8px; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; min-width:0; }
-    .meal-meta { display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start; }
-    .meal-card.recommended { box-shadow: 0 8px 30px rgba(124,111,255,0.12); border-left:4px solid rgba(124,111,255,0.6); }
-    .meal-card .tag { font-size:11px; padding:5px 10px; border-radius:999px; }
-    .tag { font-size:10px; font-weight:600; padding:3px 8px; border-radius:50px; min-width:0; overflow-wrap:break-word; word-break:normal; }
-    .tag-green { background:rgba(16,185,129,.2); color:#6ee7b7; }
-    .tag-yellow { background:rgba(245,158,11,.2); color:#fcd34d; }
-    .tag-red { background:rgba(239,68,68,.2); color:#fca5a5; }
-    .tag-gray { background:rgba(255,255,255,.1); color:var(--muted); }
-    .tag-purple { background:rgba(124,111,255,.2); color:#c4b5fd; }
-    .missing-tag { white-space:normal; word-wrap:break-word; overflow:hidden; width:100%; box-sizing:border-box; }
+    #mealCards { display:flex; flex-direction:column; gap:10px; }
+    .meal-card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:16px; overflow:hidden; opacity:0; animation:fadeInUp .35s ease forwards; }
+    .meal-header-bar { background:var(--swiggy-orange); color:#fff; height:36px; display:flex; align-items:center; gap:6px; padding:0 14px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+    .meal-header-bar i { width:14px; height:14px; }
+    .meal-body { padding:14px; }
+    .meal-name { font-size:17px; font-weight:700; color:var(--swiggy-text); overflow-wrap:break-word; word-break:normal; }
+    .meal-desc {
+      font-size:12px; color:var(--swiggy-text-2); margin:4px 0; line-height:1.5;
+      display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+      overflow-wrap:break-word; word-break:normal; white-space:normal;
+    }
+    .missing-bar {
+      display:flex; align-items:flex-start; gap:6px; background:rgba(252,128,25,.1); border:1px solid rgba(252,128,25,.25);
+      border-radius:8px; padding:8px 10px; font-size:12px; color:var(--swiggy-orange); margin:8px 0;
+      white-space:normal; word-wrap:break-word; overflow:hidden; overflow-wrap:break-word;
+    }
+    .missing-bar i { width:14px; height:14px; flex-shrink:0; margin-top:1px; }
+    .meal-tags-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .meal-tag { display:inline-flex; align-items:center; gap:4px; background:var(--swiggy-surface-2); color:var(--swiggy-text-3); font-size:10px; border-radius:20px; padding:4px 10px; }
+    .meal-tag i { width:11px; height:11px; }
+    .meal-tag.ready { color:var(--swiggy-green); }
+    .meal-tag.ready i { color:var(--swiggy-green); }
 
-    /* Decision banner (action card) */
-    .decision-banner { border-radius:18px; padding:18px; margin-top:14px; display:flex; gap:16px; align-items:flex-start; }
-    .decision-banner.cook { background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05)); border:1px solid rgba(16,185,129,.3); }
-    .decision-banner.order_dish { background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(239,68,68,.05)); border:1px solid rgba(239,68,68,.3); }
-    .decision-banner.order_groceries { background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.05)); border:1px solid rgba(245,158,11,.3); }
-    .decision-icon { min-width:48px; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
-    .decision-text { flex:1; min-width:0; }
-    .decision-title { font-size:16px; font-weight:800; margin-bottom:4px; word-break:normal; overflow-wrap:break-word; white-space:normal; min-width:0; }
-    .decision-reasoning { font-size:13px; color:var(--muted); line-height:1.6; word-break:normal; overflow-wrap:break-word; white-space:normal; min-width:0; }
-    .decision-banner.cook .decision-icon{ background:linear-gradient(135deg,#10b981,#34d399); color:#042c21 }
-    .decision-banner.order_dish .decision-icon{ background:linear-gradient(135deg,#ef4444,#fb7185); color:#2b0a0a }
-    .decision-banner.order_groceries .decision-icon{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1a00 }
+    /* Choice card */
+    .choice-header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .choice-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--swiggy-text-3); }
+    .ai-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(252,128,25,.1); border:1px solid rgba(252,128,25,.3); color:var(--swiggy-orange); border-radius:20px; padding:5px 12px; font-size:11px; font-weight:600; }
+    .ai-badge i { width:12px; height:12px; }
+    .choice-subtitle { font-size:12px; color:var(--swiggy-text-2); font-style:italic; line-height:1.5; margin:10px 0 12px; overflow-wrap:break-word; word-break:normal; }
+    .choice-buttons { display:flex; flex-direction:column; gap:8px; }
+    .choice-btn {
+      display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+      background:var(--swiggy-surface-2); border:none; border-left:3px solid transparent; border-radius:14px; padding:14px;
+      cursor:pointer; font-family:inherit; color:var(--swiggy-text); transition:all .15s ease; overflow:visible;
+    }
+    .choice-btn:hover:not(:disabled) { filter:brightness(1.15); transform:translateX(2px); }
+    .choice-btn:disabled:not(.loading) { opacity:.4; cursor:not-allowed; }
+    .choice-btn.loading { opacity:.7; cursor:not-allowed; }
+    .choice-btn.cook { border-left-color:var(--swiggy-green); }
+    .choice-btn.order_groceries { border-left-color:var(--swiggy-blue); }
+    .choice-btn.order_dish { border-left-color:var(--swiggy-orange); }
+    .choice-icon-circle { width:40px; height:40px; min-width:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .choice-btn.cook .choice-icon-circle { background:rgba(72,196,121,.15); color:var(--swiggy-green); }
+    .choice-btn.order_groceries .choice-icon-circle { background:rgba(78,159,229,.15); color:var(--swiggy-blue); }
+    .choice-btn.order_dish .choice-icon-circle { background:rgba(252,128,25,.15); color:var(--swiggy-orange); }
+    .choice-text { flex:1; min-width:0; }
+    .choice-btn-title { font-size:14px; font-weight:600; color:#fff; overflow-wrap:break-word; word-break:normal; }
+    .choice-btn-sub { font-size:12px; color:var(--swiggy-text-2); margin-top:2px; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; }
+    .best-choice-badge { flex-shrink:0; white-space:nowrap; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-radius:20px; }
+    .choice-btn.cook .best-choice-badge { background:rgba(72,196,121,.2); color:var(--swiggy-green); }
+    .choice-btn.order_groceries .best-choice-badge { background:rgba(78,159,229,.2); color:var(--swiggy-blue); }
+    .choice-btn.order_dish .best-choice-badge { background:rgba(252,128,25,.2); color:var(--swiggy-orange); }
 
-    /* Order card */
-    .order-card { background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04)); border:1px solid rgba(16,185,129,.35); border-radius:var(--r); padding:18px; margin-top:14px; overflow-wrap:break-word; word-break:normal; }
-    .order-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; overflow-wrap:break-word; word-break:normal; }
-    .order-badge { width:40px; height:40px; background:var(--green); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-    .order-title { font-size:15px; font-weight:700; overflow-wrap:break-word; word-break:normal; }
-    .order-id { font-size:11px; color:var(--muted); overflow-wrap:break-word; word-break:normal; }
-    .order-row { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-top:1px solid rgba(255,255,255,.06); gap:8px; flex-wrap:wrap; }
-    .order-label { color:var(--muted); flex-shrink:0; }
+    /* Top up */
+    .topup-header-row { margin:20px 0 4px; }
+    .topup-header-row .spacer { flex:1; }
+    .topup-powered { font-size:10px; color:var(--swiggy-text-3); text-transform:none; letter-spacing:0; font-weight:500; }
+    .topup-subtitle { font-size:12px; color:var(--swiggy-text-2); margin-bottom:10px; }
+    .topup-card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:14px; overflow:hidden; opacity:0; animation:fadeInUp .4s ease forwards; }
+    .topup-row { display:flex; align-items:center; gap:12px; padding:12px 16px; opacity:0; animation:fadeInUp .4s ease forwards; }
+    .topup-row:not(:last-child) { border-bottom:1px solid var(--swiggy-border); }
+    .topup-icon { width:40px; height:40px; min-width:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .topup-icon.instamart { background:rgba(72,196,121,.15); color:var(--swiggy-green); }
+    .topup-icon.swiggy_food { background:rgba(252,128,25,.15); color:var(--swiggy-orange); }
+    .topup-info { flex:1; min-width:0; }
+    .topup-name { font-size:13px; font-weight:600; color:#fff; overflow-wrap:break-word; word-break:normal; }
+    .topup-reason { font-size:11px; color:var(--swiggy-text-2); margin-top:2px; overflow-wrap:break-word; word-break:normal; }
+    .topup-right { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+    .topup-price { font-size:14px; font-weight:700; color:#fff; white-space:nowrap; }
+    .topup-source { font-size:10px; white-space:nowrap; }
+    .topup-source.instamart { color:var(--swiggy-green); }
+    .topup-source.swiggy_food { color:var(--swiggy-orange); }
+    .topup-add { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:20px; font-size:10px; font-weight:600; background:transparent; cursor:pointer; font-family:inherit; white-space:nowrap; }
+    .topup-add i { width:11px; height:11px; }
+    .topup-add.instamart { border:1px solid var(--swiggy-green); color:var(--swiggy-green); }
+    .topup-add.swiggy_food { border:1px solid var(--swiggy-orange); color:var(--swiggy-orange); }
 
-    /* Error */
-    .error-card { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:var(--r); padding:18px; margin-top:14px; font-size:13px; color:#fca5a5; overflow-wrap:break-word; word-break:normal; }
+    /* Auth required card */
+    .auth-card { background:rgba(252,128,25,.06); border:1px solid rgba(252,128,25,.2); border-radius:16px; padding:20px; text-align:center; }
+    .auth-card-icon { width:56px; height:56px; border-radius:50%; background:rgba(252,128,25,.15); color:var(--swiggy-orange); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; }
+    .auth-card-icon i { width:26px; height:26px; }
+    .auth-card-title { font-weight:700; font-size:15px; color:#fff; }
+    .auth-card-sub { font-size:12px; color:var(--swiggy-text-2); margin-top:6px; margin-bottom:16px; overflow-wrap:break-word; word-break:normal; }
+    .auth-cta { width:100%; height:48px; border-radius:14px; background:var(--swiggy-orange); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; font-size:14px; border:none; cursor:pointer; transition:.15s ease; }
+    .auth-cta:hover { background:var(--swiggy-orange-dark); }
+    .auth-cta i { width:16px; height:16px; }
 
-    /* Results hidden by default */
+    /* Order confirmed card */
+    .order-card { background:rgba(72,196,121,.06); border:1px solid rgba(72,196,121,.3); border-radius:16px; padding:20px; }
+    .order-icon-wrap { text-align:center; margin-bottom:8px; }
+    .order-icon-wrap i { width:40px; height:40px; color:var(--swiggy-green); }
+    .order-title { text-align:center; color:var(--swiggy-green); font-size:18px; font-weight:700; }
+    .order-id { text-align:center; font-family:'Courier New',monospace; color:var(--swiggy-text-2); font-size:12px; margin-top:4px; overflow-wrap:break-word; word-break:break-all; }
+    .order-details { margin-top:14px; }
+    .order-row { display:flex; justify-content:space-between; gap:8px; font-size:13px; padding:6px 0; border-top:1px solid rgba(255,255,255,.06); flex-wrap:wrap; }
+    .order-row:first-child { border-top:none; }
+    .order-label { color:var(--swiggy-text-3); flex-shrink:0; }
+    .order-value { color:#fff; text-align:right; min-width:0; overflow-wrap:break-word; word-break:normal; }
+    .order-value.eta { color:var(--swiggy-orange); font-weight:700; }
+
+    /* Cook confirmed card */
+    .cook-card { background:rgba(72,196,121,.06); border:1px solid rgba(72,196,121,.3); border-radius:16px; padding:20px; text-align:center; }
+    .cook-card i { width:40px; height:40px; color:var(--swiggy-green); margin-bottom:8px; }
+    .cook-card .title { color:var(--swiggy-green); font-weight:700; font-size:16px; }
+    .cook-card .sub { color:var(--swiggy-text-2); font-size:12px; margin-top:4px; }
+
+    /* Error card */
+    .error-card { background:rgba(231,76,60,.1); border:1px solid rgba(231,76,60,.3); border-radius:16px; padding:16px; font-size:13px; color:var(--swiggy-red); overflow-wrap:break-word; word-break:normal; display:flex; align-items:flex-start; gap:8px; }
+    .error-card i { width:16px; height:16px; flex-shrink:0; margin-top:1px; }
+
+    /* Results */
     .results { display:none; }
     .results.show { display:block; }
 
     /* Spinner */
     .spin { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
     @keyframes spin { to{transform:rotate(360deg)} }
-
-    /* Section header */
-    .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:20px 0 8px; display:flex; align-items:center; gap:6px; }
-
-    /* Auth pill (top-right) */
-    .auth-pill { position:fixed; top:14px; right:14px; z-index:20; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); padding:7px 12px; border-radius:50px; background:rgba(20,20,28,.75); border:1px solid var(--border); backdrop-filter:blur(10px); }
-    .auth-pill .dot { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
-    .auth-pill .dot-orange { width:7px; height:7px; border-radius:50%; background:#FF6B00; flex-shrink:0; }
-    .auth-pill a { color:inherit; text-decoration:none; font-weight:600; }
-    .auth-pill a.logout { color:var(--muted); text-decoration:underline; margin-left:2px; }
-    .auth-pill:not(.connected) { background:rgba(255,107,0,.15); border:1px solid rgba(255,107,0,.4); color:#FF6B00; }
-    .auth-pill:not(.connected) a.connect { color:#FF6B00; }
-
-    /* Inline auth-required card (Swiggy connect) */
-    .auth-required-card { text-align:center; background:rgba(255,107,0,.08); border:1px solid rgba(255,107,0,.3); }
-    .auth-required-card p { color:var(--muted); font-size:13px; margin-bottom:14px; }
-    .auth-required-icon { width:48px; height:48px; min-width:48px; border-radius:50%; background:rgba(255,107,0,.15); color:#FF6B00; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px; }
-    .auth-required-note { font-size:12px; color:#FF6B00; font-weight:600; margin-bottom:14px; }
-    .btn-swiggy { background:#FF6B00; color:#fff; text-decoration:none; margin-top:0; }
-    .btn-swiggy:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(255,107,0,.35); }
-    .btn-swiggy:active { transform:scale(.97); }
-
-    /* Choice card — user decides what happens in step 3 */
-    .choice-subtitle { font-size:12px; color:var(--muted); font-style:italic; line-height:1.5; margin:8px 0 14px; overflow-wrap:break-word; word-break:normal; }
-    .choice-buttons { display:flex; flex-direction:column; gap:10px; }
-    .choice-btn {
-      overflow:visible;
-      display:flex; align-items:center; justify-content:space-between; gap:8px;
-      width:100%; text-align:left; padding:16px;
-      background:rgba(255,255,255,.04); border:1px solid var(--border); border-left:3px solid transparent;
-      border-radius:16px; cursor:pointer; font-family:inherit; color:var(--text); transition:.2s;
-    }
-    .choice-btn:hover:not(:disabled) { background:rgba(255,255,255,.07); transform:scale(1.01); }
-    .choice-btn:disabled:not(.loading) { opacity:.4; cursor:not-allowed; }
-    .choice-btn.loading { opacity:.7; cursor:not-allowed; }
-    .choice-btn.cook { border-left-color:#4ade80; }
-    .choice-btn.order_groceries { border-left-color:#60a5fa; }
-    .choice-btn.order_dish { border-left-color:#FF6B00; }
-    .choice-btn.recommended.cook { box-shadow:0 0 0 1px rgba(74,222,128,.25), 0 0 22px rgba(74,222,128,.15); }
-    .choice-btn.recommended.order_groceries { box-shadow:0 0 0 1px rgba(96,165,250,.25), 0 0 22px rgba(96,165,250,.15); }
-    .choice-btn.recommended.order_dish { box-shadow:0 0 0 1px rgba(255,107,0,.25), 0 0 22px rgba(255,107,0,.15); }
-    .choice-btn-main { display:flex; align-items:center; gap:14px; min-width:0; flex:1; }
-    .choice-icon { width:44px; height:44px; min-width:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
-    .choice-btn.cook .choice-icon { background:rgba(74,222,128,.18); }
-    .choice-btn.order_groceries .choice-icon { background:rgba(96,165,250,.18); }
-    .choice-btn.order_dish .choice-icon { background:rgba(255,107,0,.18); }
-    .choice-text { flex:1; min-width:0; }
-    .choice-btn-title { font-size:14px; font-weight:700; margin-bottom:2px; overflow-wrap:break-word; word-break:normal; }
-    .choice-btn-sub { font-size:12px; color:var(--muted); overflow-wrap:break-word; word-break:normal; line-height:1.4; }
-    .choice-badge {
-      white-space:nowrap; flex-shrink:0;
-      font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:50px;
-    }
-    .choice-btn.cook .choice-badge { background:rgba(74,222,128,.2); color:#4ade80; }
-    .choice-btn.order_groceries .choice-badge { background:rgba(96,165,250,.2); color:#60a5fa; }
-    .choice-btn.order_dish .choice-badge { background:rgba(255,107,0,.2); color:#FF6B00; }
-
-    /* Cook-confirmed success card */
-    .cook-confirmed-card { text-align:center; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.3); }
-    .cook-confirmed-icon { font-size:36px; margin-bottom:8px; }
-    .cook-confirmed-card .title { font-weight:700; }
-
-    /* Top-up card */
-    @keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    .top-up-card { opacity:0; animation:fadeInUp .4s ease forwards; }
-    .top-up-subtitle { font-size:12px; color:var(--muted); margin-bottom:10px; }
-    .top-up-row {
-      display:flex; align-items:center; gap:12px; padding:12px 0;
-      opacity:0; animation:fadeInUp .4s ease forwards;
-    }
-    .top-up-row:not(:last-child) { border-bottom:1px solid rgba(255,255,255,.06); }
-    .top-up-icon { width:40px; height:40px; min-width:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-    .top-up-icon.instamart { background:rgba(74,222,128,.15); border:1px solid rgba(74,222,128,.3); }
-    .top-up-icon.swiggy_food { background:rgba(255,107,0,.15); border:1px solid rgba(255,107,0,.3); }
-    .top-up-info { flex:1; min-width:0; }
-    .top-up-name { color:#fff; font-weight:600; font-size:14px; overflow-wrap:break-word; word-break:normal; }
-    .top-up-reason { color:var(--muted); font-size:12px; margin-top:2px; overflow-wrap:break-word; word-break:normal; }
-    .top-up-right { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
-    .top-up-price { color:#fff; font-weight:600; font-size:14px; white-space:nowrap; }
-    .top-up-source { font-size:10px; white-space:nowrap; }
-    .top-up-source.instamart { color:#4ade80; }
-    .top-up-source.swiggy_food { color:#FF6B00; }
-    .top-up-add {
-      display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px;
-      background:transparent; cursor:pointer; font-family:inherit; font-weight:600; white-space:nowrap;
-    }
-    .top-up-add.instamart { border:1px solid #4ade80; color:#4ade80; }
-    .top-up-add.swiggy_food { border:1px solid #FF6B00; color:#FF6B00; }
+    @keyframes fadeInUp { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
 
     /* Toast */
     .toast {
       position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
-      background:rgba(20,20,28,.95); border:1px solid var(--border); color:var(--text);
-      padding:12px 18px; border-radius:50px; font-size:13px; z-index:50; opacity:0;
-      transition:.3s; pointer-events:none; backdrop-filter:blur(10px); max-width:90%; text-align:center;
+      background:var(--swiggy-surface-2); border:1px solid var(--swiggy-border); color:#fff;
+      padding:12px 18px; border-radius:12px; font-size:13px; z-index:50; opacity:0;
+      transition:.3s ease; pointer-events:none; max-width:90%; text-align:center;
     }
     .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    }
   </style>
 </head>
 <body>
-  <div class="orbs">
-    <div class="orb o1"></div>
-    <div class="orb o2"></div>
-    <div class="orb o3"></div>
-  </div>
-
-  <div class="wrap">
-    <!-- Header -->
-    <div class="hd">
-      <span class="hd-icon">🍴</span>
-      <h1>Fridge to Fork</h1>
-      <p>Snap your fridge. Get meals. Order the rest.</p>
-    </div>
-
-    <!-- Auth status pill -->
-    <div class="auth-pill" id="authPill"></div>
-
-    <!-- Target Dish Input -->
-    <div style="margin-bottom: 16px;">
-      <input type="text" id="targetDish" placeholder="What do you want to eat? (optional)" style="width: 100%; padding: 14px 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 15px; font-family: inherit; outline: none; transition: .3s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" />
-    </div>
-
-    <!-- Upload -->
-    <div class="upload" id="uploadZone">
-      <input type="file" id="fileInput" accept="image/*" capture="environment" />
-      <span class="upload-ico">📷</span>
-      <h3>Take a Photo of Your Fridge</h3>
-      <p>Or tap to upload from gallery</p>
-    </div>
-
-    <!-- Preview -->
-    <div class="preview" id="preview">
-      <img id="previewImg" src="" alt="Fridge preview" />
-      <div class="preview-grad"></div>
-      <div class="preview-row">
-        <button class="btn btn-ghost" onclick="resetUI()">🔄 Retake</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">📁 Gallery</button>
+  <div class="page">
+    <header class="app-header">
+      <div class="app-header-inner">
+        <div class="brand"><i data-lucide="utensils"></i><span>Fridge to Fork</span></div>
+        <span class="desktop-hint">Best on mobile</span>
+        <div class="auth-pill" id="authPill"></div>
       </div>
-    </div>
+    </header>
 
-    <!-- Analyse button -->
-    <button class="btn btn-primary" id="analyseBtn" onclick="analyse()" style="display:none">
-      <span id="btnIcon">✨</span>
-      <span id="btnText">Analyse Fridge</span>
-    </button>
+    <div class="wrap">
+      <!-- Target Dish Input -->
+      <div class="input-section">
+        <label class="input-label" for="targetDish">What do you want to eat?</label>
+        <input type="text" id="targetDish" class="dish-input" placeholder="e.g. Biryani, Pasta, Dal Makhani..." />
+      </div>
 
-    <!-- Progress steps -->
-    <div class="steps" id="steps">
-      <div class="step" id="s1">
-        <div class="step-num" id="n1">1</div>
-        <div>
-          <div class="step-label">Vision Scan</div>
-          <div class="step-sub" id="sub1">Waiting…</div>
+      <!-- Upload -->
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/*" capture="environment" />
+        <div class="upload-empty">
+          <i data-lucide="camera"></i>
+          <p>Tap to photograph your fridge</p>
         </div>
       </div>
-      <div class="step" id="s2">
-        <div class="step-num" id="n2">2</div>
-        <div>
-          <div class="step-label">Meal Planner</div>
-          <div class="step-sub" id="sub2">Waiting…</div>
+
+      <!-- Preview -->
+      <div class="preview" id="preview">
+        <img id="previewImg" src="" alt="Fridge preview" />
+        <div class="preview-grad"></div>
+        <div class="preview-row">
+          <button class="ghost-btn" onclick="resetUI()"><i data-lucide="camera"></i> Retake</button>
+          <button class="ghost-btn" onclick="document.getElementById('fileInput').click()"><i data-lucide="image"></i> Gallery</button>
         </div>
       </div>
-      <div class="step" id="s3">
-        <div class="step-num" id="n3">3</div>
-        <div>
-          <div class="step-label">Order Router</div>
-          <div class="step-sub" id="sub3">Waiting…</div>
+
+      <!-- Analyse button -->
+      <button class="analyse-btn" id="analyseBtn" onclick="analyse()" style="display:none">
+        <span id="btnIcon"><i data-lucide="sparkles"></i></span>
+        <span id="btnText">Analyse Fridge</span>
+      </button>
+
+      <!-- Progress steps -->
+      <div class="steps" id="steps">
+        <div class="step" id="s1">
+          <div class="step-num-wrap" id="n1"></div>
+          <div class="step-label-sm">Vision</div>
+          <div class="step-sub-sm" id="sub1">Waiting</div>
+        </div>
+        <div class="step" id="s2">
+          <div class="step-num-wrap" id="n2"></div>
+          <div class="step-label-sm">Planner</div>
+          <div class="step-sub-sm" id="sub2">Waiting</div>
+        </div>
+        <div class="step" id="s3">
+          <div class="step-num-wrap" id="n3"></div>
+          <div class="step-label-sm">Order</div>
+          <div class="step-sub-sm" id="sub3">Waiting</div>
         </div>
       </div>
-    </div>
 
-    <!-- Results -->
-    <div class="results" id="results">
-      <!-- Ingredients -->
-      <div class="section-label">🥦 Detected Ingredients</div>
-      <div class="card">
-        <p class="desc" id="fridgeDesc"></p>
-        <div class="chips" id="ingredientChips"></div>
+      <!-- Results -->
+      <div class="results" id="results">
+        <!-- Ingredients -->
+        <div class="section-label"><i data-lucide="list"></i> What's in your fridge</div>
+        <div class="card">
+          <p class="desc" id="fridgeDesc"></p>
+          <div class="chips" id="ingredientChips"></div>
+        </div>
+
+        <!-- Meals -->
+        <div class="section-label"><i data-lucide="star"></i> Meal Suggestions</div>
+        <div id="mealCards"></div>
+
+        <!-- User choice -->
+        <div id="choiceCard"></div>
+
+        <!-- Top up -->
+        <div id="topUpSection"></div>
+
+        <!-- Order -->
+        <div id="orderCard"></div>
       </div>
-
-      <!-- Meals -->
-      <div class="section-label">🍳 Meal Suggestions</div>
-      <div class="meals-scroll" id="mealCards"></div>
-
-      <!-- User choice -->
-      <div id="choiceCard"></div>
-
-      <!-- Top up -->
-      <div id="topUpSection"></div>
-
-      <!-- Order -->
-      <div id="orderCard"></div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
   <script>
+    const stepIcons = { 1: 'scan-eye', 2: 'chef-hat', 3: 'truck' };
+
     async function checkAuth() {
       const pill = document.getElementById('authPill');
       try {
@@ -347,12 +377,13 @@
         const data = await res.json();
         pill.className = 'auth-pill' + (data.authenticated ? ' connected' : '');
         pill.innerHTML = data.authenticated
-          ? '<span class="dot"></span> Swiggy Connected <a class="logout" href="/auth/logout">Logout</a>'
-          : '<span class="dot-orange"></span><a class="connect" href="/auth/login">Connect Swiggy</a>';
+          ? '<i data-lucide="check-circle"></i> Connected <a class="logout-link" href="/auth/logout">Logout</a>'
+          : '<a href="/auth/login"><i data-lucide="link"></i> Connect Swiggy</a>';
       } catch {
         pill.className = 'auth-pill';
-        pill.innerHTML = '<span class="dot-orange"></span><a class="connect" href="/auth/login">Connect Swiggy</a>';
+        pill.innerHTML = '<a href="/auth/login"><i data-lucide="link"></i> Connect Swiggy</a>';
       }
+      try { lucide.createIcons(); } catch {}
     }
     checkAuth();
 
@@ -398,11 +429,7 @@
       analyseBtn.style.display = 'none';
       stepsEl.classList.remove('show');
       resultsEl.classList.remove('show');
-      [1,2,3].forEach(i => {
-        document.getElementById('s'+i).className = 'step';
-        document.getElementById('n'+i).innerHTML = i;
-        document.getElementById('sub'+i).textContent = 'Waiting…';
-      });
+      [1,2,3].forEach(i => setStep(i, '', 'Waiting'));
     }
 
     function setStep(n, status, msg) {
@@ -410,12 +437,15 @@
       const num = document.getElementById('n'+n);
       const sub = document.getElementById('sub'+n);
       s.className = 'step ' + status;
-      num.innerHTML = status === 'done' ? '✓' : status === 'active' ? '<div class="spin"></div>' : n;
+      num.innerHTML = status === 'done'
+        ? '<i data-lucide="circle-check"></i>'
+        : `<i data-lucide="${stepIcons[n]}"></i>`;
+      try { lucide.createIcons(); } catch {}
       if (msg) sub.textContent = msg;
     }
 
     function confClass(pct) {
-      return pct >= 80 ? 'dot-high' : pct >= 60 ? 'dot-mid' : 'dot-low';
+      return pct >= 80 ? 'high' : pct >= 60 ? 'mid' : 'low';
     }
 
     function escapeHtml(s) {
@@ -430,16 +460,10 @@
       toast.textContent = msg;
       toast.classList.add('show');
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
-    function decisionMeta(d) {
-      return {
-        cook: { icon: '🍳', label: 'Cook at Home' },
-        order_dish: { icon: '🛵', label: 'Order the Dish' },
-        order_groceries: { icon: '🛒', label: 'Order Missing Groceries' },
-      }[d] || { icon: '🍽️', label: d };
-    }
+    const decisionLabels = { cook: 'Cook at home', order_dish: 'Order the dish', order_groceries: 'Order missing items' };
 
     async function readSSEStream(res, onEvent) {
       const reader = res.body.getReader();
@@ -470,7 +494,7 @@
 
     function renderChoiceCard(ev) {
       const rec = ev.ai_recommendation;
-      const meta = decisionMeta(rec);
+      const label = decisionLabels[rec] || rec;
       const missing = (ev.missing_ingredients || []).map(escapeHtml);
       const mealName = escapeHtml(ev.recommended_meal || 'this dish');
       const rawReasoning = ev.reasoning || '';
@@ -479,44 +503,38 @@
 
       const cookBtn = `
         <button class="choice-btn cook ${rec === 'cook' ? 'recommended' : ''}" data-action="cook" onclick="chooseAction('cook', this)">
-          <div class="choice-btn-main">
-            <div class="choice-icon">🍳</div>
-            <div class="choice-text">
-              <div class="choice-btn-title">Cook at Home</div>
-              <div class="choice-btn-sub">Use what you already have</div>
-            </div>
+          <div class="choice-icon-circle"><i data-lucide="flame"></i></div>
+          <div class="choice-text">
+            <div class="choice-btn-title">Cook at home</div>
+            <div class="choice-btn-sub">Use what you already have</div>
           </div>
-          ${rec === 'cook' ? '<span class="choice-badge">Recommended</span>' : ''}
+          ${rec === 'cook' ? '<span class="best-choice-badge">Best choice</span>' : ''}
         </button>`;
 
       const groceriesBtn = missing.length ? `
         <button class="choice-btn order_groceries ${rec === 'order_groceries' ? 'recommended' : ''}" data-action="order_groceries" onclick="chooseAction('order_groceries', this)">
-          <div class="choice-btn-main">
-            <div class="choice-icon">🛒</div>
-            <div class="choice-text">
-              <div class="choice-btn-title">Order Missing Items from Instamart</div>
-              <div class="choice-btn-sub">${missing.join(', ')}</div>
-            </div>
+          <div class="choice-icon-circle"><i data-lucide="shopping-cart"></i></div>
+          <div class="choice-text">
+            <div class="choice-btn-title">Order missing items</div>
+            <div class="choice-btn-sub">${missing.join(', ')}</div>
           </div>
-          ${rec === 'order_groceries' ? '<span class="choice-badge">Recommended</span>' : ''}
+          ${rec === 'order_groceries' ? '<span class="best-choice-badge">Best choice</span>' : ''}
         </button>` : '';
 
       const dishBtn = `
         <button class="choice-btn order_dish ${rec === 'order_dish' ? 'recommended' : ''}" data-action="order_dish" onclick="chooseAction('order_dish', this)">
-          <div class="choice-btn-main">
-            <div class="choice-icon">🛵</div>
-            <div class="choice-text">
-              <div class="choice-btn-title">Order the Dish from Swiggy</div>
-              <div class="choice-btn-sub">Get ${mealName} delivered to your door</div>
-            </div>
+          <div class="choice-icon-circle"><i data-lucide="bike"></i></div>
+          <div class="choice-text">
+            <div class="choice-btn-title">Order the dish</div>
+            <div class="choice-btn-sub">Get ${mealName} delivered</div>
           </div>
-          ${rec === 'order_dish' ? '<span class="choice-badge">Recommended</span>' : ''}
+          ${rec === 'order_dish' ? '<span class="best-choice-badge">Best choice</span>' : ''}
         </button>`;
 
       document.getElementById('choiceCard').innerHTML =
         `<div class="card choice-card">
-          <div class="card-title">🤔 What would you like to do?</div>
-          <div><span class="tag tag-purple">✨ AI suggests: ${meta.label}</span></div>
+          <div class="choice-header-row"><span class="choice-label">Your call</span></div>
+          <div class="ai-badge"><i data-lucide="sparkles"></i> AI suggests: ${escapeHtml(label)}</div>
           ${showReasoning ? `<p class="choice-subtitle">${reasoning}</p>` : ''}
           <div class="choice-buttons">
             ${cookBtn}
@@ -525,18 +543,21 @@
           </div>
         </div>`;
       document.getElementById('orderCard').innerHTML = '';
+      try { lucide.createIcons(); } catch {}
     }
 
     function resetChoiceButtons() {
       document.querySelectorAll('.choice-btn').forEach(b => {
         b.disabled = false;
         b.classList.remove('loading');
-        const iconEl = b.querySelector('.choice-icon');
+        const iconEl = b.querySelector('.choice-icon-circle');
         if (iconEl && iconEl.querySelector('.spin')) {
           const action = b.dataset.action;
-          iconEl.innerHTML = action === 'cook' ? '🍳' : action === 'order_groceries' ? '🛒' : '🛵';
+          const iconName = action === 'cook' ? 'flame' : action === 'order_groceries' ? 'shopping-cart' : 'bike';
+          iconEl.innerHTML = `<i data-lucide="${iconName}"></i>`;
         }
       });
+      try { lucide.createIcons(); } catch {}
     }
 
     let orderInFlight = false;
@@ -547,7 +568,7 @@
 
       document.querySelectorAll('.choice-btn').forEach(b => { b.disabled = true; });
       btnEl.classList.add('loading');
-      const iconEl = btnEl.querySelector('.choice-icon');
+      const iconEl = btnEl.querySelector('.choice-icon-circle');
       if (iconEl) iconEl.innerHTML = '<div class="spin"></div>';
 
       document.getElementById('orderCard').innerHTML = '';
@@ -565,7 +586,8 @@
       } catch (err) {
         setStep(3, '', 'Error');
         document.getElementById('orderCard').innerHTML =
-          `<div class="error-card">⚠️ ${escapeHtml(err.message)}</div>`;
+          `<div class="error-card"><i data-lucide="triangle-alert"></i><span>${escapeHtml(err.message)}</span></div>`;
+        try { lucide.createIcons(); } catch {}
         resetChoiceButtons();
       } finally {
         orderInFlight = false;
@@ -591,7 +613,7 @@
 
       const form = new FormData();
       form.append('file', selectedFile);
-      
+
       const targetDish = document.getElementById('targetDish').value.trim();
       if (targetDish) {
         form.append('target_dish', targetDish);
@@ -603,12 +625,14 @@
         await readSSEStream(res, handleEvent);
       } catch (err) {
         document.getElementById('orderCard').innerHTML =
-          `<div class="error-card">⚠️ ${err.message}</div>`;
+          `<div class="error-card"><i data-lucide="triangle-alert"></i><span>${escapeHtml(err.message)}</span></div>`;
+        try { lucide.createIcons(); } catch {}
         resultsEl.classList.add('show');
       } finally {
         analyseBtn.disabled = false;
-        document.getElementById('btnIcon').textContent = '✨';
+        document.getElementById('btnIcon').innerHTML = '<i data-lucide="sparkles"></i>';
         document.getElementById('btnText').textContent = 'Analyse Again';
+        try { lucide.createIcons(); } catch {}
       }
     }
 
@@ -621,15 +645,16 @@
       if (ev.type === 'step1') {
         setStep(1, 'done', `${ev.ingredients.length} ingredients found`);
         document.getElementById('fridgeDesc').textContent = ev.raw_description;
-        const chips = ev.ingredients.map(i =>
-          `<div class="chip">
-            <div class="chip-dot ${confClass(i.confidence)}"></div>
-            ${i.name}
+        const chips = ev.ingredients.map((i, idx) =>
+          `<div class="chip ${confClass(i.confidence)}" style="animation-delay:${idx * 30}ms">
+            <div class="chip-dot"></div>
+            ${escapeHtml(i.name)}
             <span class="chip-pct">${i.confidence}%</span>
           </div>`
         ).join('');
         document.getElementById('ingredientChips').innerHTML = chips;
         resultsEl.classList.add('show');
+        try { lucide.createIcons(); } catch {}
         return;
       }
 
@@ -639,21 +664,28 @@
         const cards = ev.suggestions.map(s => {
           const isRec = s.name === ev.recommended_meal;
           const missingList = (s.missing_ingredients || []).map(escapeHtml).join(', ');
+          const missingBar = (!s.can_cook_now && missingList)
+            ? `<div class="missing-bar"><i data-lucide="triangle-alert"></i><span>Missing: ${missingList}</span></div>`
+            : '';
           const readyTag = s.can_cook_now
-            ? '<span class="tag tag-green">✓ Ready to cook</span>'
-            : `<span class="tag tag-yellow missing-tag">⚠ Missing: ${missingList}</span>`;
-          return `<div class="meal-card ${isRec ? 'recommended' : ''}">
-            ${isRec ? '<div style="background: rgba(99,102,241,0.3); margin: -14px -14px 10px -14px; padding: 6px 12px; border-radius: 8px 8px 0 0; font-size: 12px; font-weight: 600; color: #a5b4fc;">⭐ Recommended</div>' : ''}
-            <div class="meal-name">${escapeHtml(s.name)}</div>
-            <div class="meal-desc">${escapeHtml(s.description)}</div>
-            <div class="meal-meta">
-              ${readyTag}
-              <span class="tag tag-gray">⏱ ${s.prep_time_minutes}m</span>
-              ${s.cuisine ? `<span class="tag tag-gray">${escapeHtml(s.cuisine)}</span>` : ''}
+            ? '<span class="meal-tag ready"><i data-lucide="circle-check"></i> Ready to cook</span>'
+            : '';
+          return `<div class="meal-card">
+            ${isRec ? '<div class="meal-header-bar"><i data-lucide="star"></i> Recommended</div>' : ''}
+            <div class="meal-body">
+              <div class="meal-name">${escapeHtml(s.name)}</div>
+              <div class="meal-desc">${escapeHtml(s.description)}</div>
+              ${missingBar}
+              <div class="meal-tags-row">
+                ${readyTag}
+                <span class="meal-tag"><i data-lucide="clock"></i> ${s.prep_time_minutes}m</span>
+                ${s.cuisine ? `<span class="meal-tag"><i data-lucide="globe"></i> ${escapeHtml(s.cuisine)}</span>` : ''}
+              </div>
             </div>
           </div>`;
         }).join('');
         document.getElementById('mealCards').innerHTML = cards;
+        try { lucide.createIcons(); } catch {}
         return;
       }
 
@@ -673,91 +705,100 @@
         const rows = suggestions.map((s, i) => {
           const source = s.source === 'swiggy_food' ? 'swiggy_food' : 'instamart';
           const sourceLabel = source === 'swiggy_food' ? 'Swiggy Food' : 'Instamart';
+          const iconName = source === 'swiggy_food' ? 'bike' : 'shopping-cart';
           return `
-            <div class="top-up-row" style="animation-delay:${i * 100}ms">
-              <div class="top-up-icon ${source}">${escapeHtml(s.emoji || '✨')}</div>
-              <div class="top-up-info">
-                <div class="top-up-name">${escapeHtml(s.name)}</div>
-                <div class="top-up-reason">${escapeHtml(s.reason)}</div>
+            <div class="topup-row" style="animation-delay:${i * 80}ms">
+              <div class="topup-icon ${source}"><i data-lucide="${iconName}"></i></div>
+              <div class="topup-info">
+                <div class="topup-name">${escapeHtml(s.name)}</div>
+                <div class="topup-reason">${escapeHtml(s.reason)}</div>
               </div>
-              <div class="top-up-right">
-                <div class="top-up-price">₹${escapeHtml(s.estimated_price)}</div>
-                <div class="top-up-source ${source}">${sourceLabel}</div>
-                <button class="top-up-add ${source}" onclick="showToast('Coming soon — connect Swiggy to add items instantly')">Add →</button>
+              <div class="topup-right">
+                <div class="topup-price">₹${escapeHtml(s.estimated_price)}</div>
+                <div class="topup-source ${source}">${sourceLabel}</div>
+                <button class="topup-add ${source}" onclick="showToast('Coming soon — connect Swiggy to order instantly')">
+                  <i data-lucide="plus-circle"></i> Add
+                </button>
               </div>
             </div>`;
         }).join('');
 
         document.getElementById('topUpSection').innerHTML =
-          `<div class="section-label">✨ Top Up Your Meal</div>
-          <div class="card top-up-card">
-            <p class="top-up-subtitle">Small additions that make a big difference</p>
-            ${rows}
-          </div>`;
+          `<div class="section-label topup-header-row"><i data-lucide="zap"></i> Top up your meal <span class="spacer"></span><span class="topup-powered">Powered by Instamart</span></div>
+          <p class="topup-subtitle">Small additions, big upgrade</p>
+          <div class="topup-card">${rows}</div>`;
+        try { lucide.createIcons(); } catch {}
         return;
       }
 
       if (ev.type === 'cook_confirmed') {
         setStep(3, 'done', 'Ready to cook!');
         document.getElementById('orderCard').innerHTML =
-          `<div class="card cook-confirmed-card">
-            <div class="cook-confirmed-icon">🍳</div>
-            <div class="title">You have everything you need. Time to cook!</div>
+          `<div class="cook-card">
+            <i data-lucide="flame"></i>
+            <div class="title">You're all set!</div>
+            <div class="sub">All ingredients are ready in your kitchen.</div>
           </div>`;
+        try { lucide.createIcons(); } catch {}
         return;
       }
 
       if (ev.type === 'step3') {
-        const label = ev.decision === 'cook' ? 'No order needed — you can cook now!' : `Order placed via ${ev.platform}`;
+        const label = ev.decision === 'cook' ? 'No order needed' : `Order placed via ${ev.platform}`;
         setStep(3, 'done', label);
 
         if (ev.placed) {
           document.getElementById('orderCard').innerHTML =
             `<div class="order-card">
-              <div class="order-header">
-                <div class="order-badge">✓</div>
-                <div style="flex:1; min-width:0;">
-                  <div class="order-title">Order Confirmed</div>
-                  <div class="order-id">${escapeHtml(ev.order_id)}</div>
-                </div>
+              <div class="order-icon-wrap"><i data-lucide="circle-check"></i></div>
+              <div class="order-title">Order confirmed!</div>
+              <div class="order-id">${escapeHtml(ev.order_id)}</div>
+              <div class="order-details">
+                <div class="order-row"><span class="order-label">Platform</span><span class="order-value">${escapeHtml(ev.platform)}</span></div>
+                <div class="order-row"><span class="order-label">Items</span><span class="order-value">${(ev.items || []).map(escapeHtml).join(', ')}</span></div>
+                <div class="order-row"><span class="order-label">ETA</span><span class="order-value eta">~${escapeHtml(ev.eta_minutes)} min</span></div>
               </div>
-              <div class="order-row"><span class="order-label">Platform</span><span>${escapeHtml(ev.platform)}</span></div>
-              <div class="order-row"><span class="order-label">Items</span><span>${(ev.items || []).map(escapeHtml).join(', ')}</span></div>
-              <div class="order-row"><span class="order-label">ETA</span><span>~${ev.eta_minutes} min</span></div>
             </div>`;
         } else if (ev.decision === 'cook') {
           document.getElementById('orderCard').innerHTML =
-            `<div class="card" style="border-color:rgba(16,185,129,.3)">
-              <div style="text-align:center;font-size:36px;margin-bottom:8px">🍳</div>
-              <div style="text-align:center;font-weight:700">Time to Cook!</div>
-              <div style="text-align:center;color:var(--muted);font-size:13px;margin-top:4px">All ingredients are in your fridge.</div>
+            `<div class="cook-card">
+              <i data-lucide="flame"></i>
+              <div class="title">Time to cook!</div>
+              <div class="sub">All ingredients are in your fridge.</div>
             </div>`;
         }
+        try { lucide.createIcons(); } catch {}
         return;
       }
 
       if (ev.type === 'error') {
         [1,2,3].forEach(i => { if(document.getElementById('s'+i).classList.contains('active')) setStep(i,'','Error'); });
         document.getElementById('orderCard').innerHTML =
-          `<div class="error-card">⚠️ ${escapeHtml(ev.message)}</div>`;
+          `<div class="error-card"><i data-lucide="triangle-alert"></i><span>${escapeHtml(ev.message)}</span></div>`;
         resultsEl.classList.add('show');
+        try { lucide.createIcons(); } catch {}
         resetChoiceButtons();
       }
 
       if (ev.type === 'auth_required') {
         setStep(3, '', 'Login required');
         document.getElementById('orderCard').innerHTML =
-          `<div class="card auth-required-card">
-            <div class="auth-required-icon">🛵</div>
-            <p>${escapeHtml(ev.message || 'To place this order, connect your Swiggy account')}</p>
-            <p class="auth-required-note">Swiggy login required to place this order</p>
-            <a class="btn btn-swiggy" href="/auth/login">Connect Swiggy</a>
+          `<div class="auth-card">
+            <div class="auth-card-icon"><i data-lucide="bike"></i></div>
+            <div class="auth-card-title">Connect your Swiggy account</div>
+            <div class="auth-card-sub">${escapeHtml(ev.message || 'Login to place this order instantly')}</div>
+            <a class="auth-cta" href="/auth/login"><i data-lucide="link"></i> Connect with Swiggy</a>
           </div>`;
         resultsEl.classList.add('show');
+        try { lucide.createIcons(); } catch {}
         checkAuth();
         resetChoiceButtons();
       }
     }
+
+    // Initial render
+    [1,2,3].forEach(i => setStep(i, '', 'Waiting'));
+    try { lucide.createIcons(); } catch {}
   </script>
 </body>
 </html>
