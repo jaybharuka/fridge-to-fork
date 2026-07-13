@@ -287,6 +287,17 @@
     .cook-card .title { color:var(--swiggy-green); font-weight:700; font-size:16px; }
     .cook-card .sub { color:var(--swiggy-text-2); font-size:12px; margin-top:4px; }
 
+    /* Inventory mode card */
+    .inventory-card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:20px; padding:24px 20px; text-align:center; }
+    .inventory-card .icon-circle { width:64px; height:64px; margin:0 auto; border-radius:50%; background:rgba(252,128,25,.1); border:1.5px solid rgba(252,128,25,.25); display:flex; align-items:center; justify-content:center; }
+    .inventory-card .icon-circle i { width:28px; height:28px; color:var(--swiggy-orange); }
+    .inventory-card .title { font-size:15px; font-weight:700; color:var(--swiggy-text); margin-top:14px; }
+    .inventory-card .sub { font-size:12px; color:var(--swiggy-text-3); margin-top:4px; }
+    .inventory-card .pantry-link { display:inline-flex; align-items:center; gap:6px; margin-top:14px; font-size:12px; font-weight:600; color:var(--swiggy-orange); text-decoration:none; }
+    .inventory-card .pantry-link i { width:13px; height:13px; }
+    .inventory-updated-line { display:flex; align-items:center; gap:6px; justify-content:center; font-size:11px; color:var(--swiggy-text-2); margin-top:8px; }
+    .inventory-updated-line i { width:12px; height:12px; color:var(--swiggy-green); }
+
     /* Error card */
     .error-card { background:rgba(231,76,60,.1); border:1px solid rgba(231,76,60,.3); border-radius:16px; padding:16px; font-size:13px; color:var(--swiggy-red); overflow-wrap:break-word; word-break:normal; display:flex; align-items:flex-start; gap:8px; }
     .error-card i { width:16px; height:16px; flex-shrink:0; margin-top:1px; }
@@ -358,6 +369,14 @@
           <button class="ghost-btn" onclick="resetUI()"><i data-lucide="camera"></i> Retake</button>
           <button class="ghost-btn" onclick="triggerGallery(event)"><i data-lucide="image"></i> Change</button>
         </div>
+      </div>
+
+      <!-- Inventory mode card -->
+      <div class="inventory-card" id="inventoryCard" style="display:none;">
+        <div class="icon-circle"><i data-lucide="package"></i></div>
+        <p class="title">Using your Home Pantry inventory</p>
+        <p class="sub">We'll plan your meal from what's already stocked at home.</p>
+        <a class="pantry-link" href="/pantry"><i data-lucide="external-link"></i> View or edit pantry</a>
       </div>
 
       <!-- Analyse button -->
@@ -468,6 +487,18 @@
     const resultsEl = document.getElementById('results');
 
     let selectedFile = null;
+
+    const params = new URLSearchParams(window.location.search);
+    const currentMode = params.get('mode') === 'inventory' ? 'inventory' : 'photo';
+
+    function initModeUI() {
+      if (currentMode !== 'inventory') return;
+      uploadZone.style.display = 'none';
+      preview.classList.remove('show');
+      document.getElementById('inventoryCard').style.display = '';
+      setAnalyseReady('Plan my meal from pantry');
+      try { lucide.createIcons(); } catch {}
+    }
 
     function triggerCamera(e) {
       if (e) e.stopPropagation();
@@ -671,6 +702,28 @@
 
     let orderInFlight = false;
 
+    async function syncInventoryAfterCook() {
+      if (currentMode !== 'inventory') return;
+      // Stub consumption estimate — real per-item amounts come from step2 in a future iteration.
+      const consumptionItems = currentMissingIngredients.map(name => ({
+        itemName: name,
+        delta: 0,
+      }));
+      try {
+        await fetch('/api/inventory/consume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dishName: currentMealName || 'Unknown dish',
+            items: consumptionItems,
+          }),
+        });
+        const orderCard = document.getElementById('orderCard');
+        orderCard.innerHTML += `<div class="inventory-updated-line"><i data-lucide="check-circle"></i> Inventory updated</div>`;
+        try { lucide.createIcons(); } catch {}
+      } catch {}
+    }
+
     async function chooseAction(action, btnEl) {
       if (orderInFlight) return;
       orderInFlight = true;
@@ -704,7 +757,7 @@
     }
 
     async function analyse() {
-      if (!selectedFile) return;
+      if (currentMode !== 'inventory' && !selectedFile) return;
 
       // UI state
       setAnalyseLoading();
@@ -719,7 +772,11 @@
       currentMissingIngredients = [];
 
       const form = new FormData();
-      form.append('file', selectedFile);
+      if (currentMode === 'inventory') {
+        form.append('mode', 'inventory');
+      } else {
+        form.append('file', selectedFile);
+      }
 
       const targetDish = document.getElementById('targetDish').value.trim();
       if (targetDish) {
@@ -844,6 +901,7 @@
             <div class="sub">All ingredients are ready in your kitchen.</div>
           </div>`;
         try { lucide.createIcons(); } catch {}
+        syncInventoryAfterCook();
         return;
       }
 
@@ -870,6 +928,7 @@
               <div class="title">Time to cook!</div>
               <div class="sub">All ingredients are in your fridge.</div>
             </div>`;
+          syncInventoryAfterCook();
         }
         try { lucide.createIcons(); } catch {}
         return;
@@ -903,6 +962,7 @@
     // Initial render
     setAnalyseDefault();
     [1,2,3].forEach(i => setStep(i, '', 'Waiting'));
+    initModeUI();
     try { lucide.createIcons(); } catch {}
   </script>
 </body>
