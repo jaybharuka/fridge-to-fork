@@ -280,6 +280,96 @@ async def api_food_items():
     return {"ingredients": ingredient_list}
 
 
+@app.post("/api/inventory/cart-fill")
+async def cart_fill(request: Request):
+    """
+    SSE stream that uses the Google ADK agent to search each
+    low-stock item on Instamart and add it to the user's cart.
+    Requires valid Swiggy Bearer token from session.
+    """
+    body = await request.json()
+    items = body.get("items", [])
+    # items = [{"id": "d1", "name": "Basmati Rice", "qty_needed": 5, "unit": "kg"}]
+
+    access_token = request.session.get("access_token")
+
+    async def stream():
+        if not access_token:
+            yield _sse({"type": "auth_required"})
+            return
+
+        for item in items:
+            yield _sse({
+                "type": "item_searching",
+                "itemId": item["id"],
+                "itemName": item["name"]
+            })
+
+            try:
+                from fridge_to_fork.swiggy_agent import run_swiggy_agent
+                from fridge_to_fork.models import (
+                    Decision, MealPlan, MealSuggestion
+                )
+
+                # Build a mini meal plan just for this item
+                suggestion = MealSuggestion(
+                    name=item["name"],
+                    description="",
+                    can_cook_now=False,
+                    missing_ingredients=[item["name"]],
+                    cuisine="",
+                    prep_time_minutes=0
+                )
+                plan = MealPlan(
+                    suggestions=[suggestion],
+                    decision=Decision.ORDER_GROCERIES,
+                    recommended_meal=suggestion,
+                    reasoning=""
+                )
+
+                result = await run_swiggy_agent(
+                    plan=plan,
+                    delivery_address=os.environ.get(
+                        "DELIVERY_ADDRESS", "Mumbai, India"
+                    ),
+                    access_token=access_token,
+                    dry_run=False
+                )
+
+                if result and result.success:
+                    yield _sse({
+                        "type": "item_added",
+                        "itemId": item["id"],
+                        "itemName": item["name"]
+                    })
+                else:
+                    error = result.error if result else "unknown"
+                    if error == "auth_required":
+                        yield _sse({"type": "auth_required"})
+                        return
+                    yield _sse({
+                        "type": "item_failed",
+                        "itemId": item["id"],
+                        "itemName": item["name"]
+                    })
+
+            except Exception as e:
+                print(f"[CART_FILL] Error for {item['name']}: {e}")
+                yield _sse({
+                    "type": "item_failed",
+                    "itemId": item["id"],
+                    "itemName": item["name"]
+                })
+
+        yield _sse({"type": "cart_complete"})
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
+
+
 # ---------------------------------------------------------------------------
 # Auth routes — Swiggy OAuth 2.1 with PKCE
 # ---------------------------------------------------------------------------
