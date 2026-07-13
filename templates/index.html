@@ -401,12 +401,13 @@
     .purchased-btn:hover { background:rgba(72,196,121,.2); }
 
     .fab {
-      position:fixed; bottom:76px; right:calc(50% - 220px + 20px); z-index:35;
+      position:fixed; bottom:80px; right:calc(50% - 220px + 20px); z-index:35;
       width:52px; height:52px; border-radius:50%; background:var(--swiggy-orange); color:#fff; border:none;
       display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(252,128,25,.4); cursor:pointer;
     }
     @media (max-width:480px) { .fab { right:20px; } }
     .fab i { width:24px; height:24px; }
+    #pantryTab .wrap { margin-bottom:70px; }
 
     .shopping-panel { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:16px; padding:16px; margin-top:20px; }
     .shopping-panel h3 { font-size:14px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
@@ -1404,7 +1405,7 @@
     function renderSmartCartButton() {
       const section = document.getElementById('smartCartSection');
       if (!section) return;
-      const lowStockItems = inventoryItems.filter(item => item.qty <= item.threshold);
+      const lowStockItems = inventoryItems.filter(item => item.qty < item.threshold || item.qty === 0);
       section.innerHTML = `
         <button id="smartCartBtn" onclick="openSmartCart()" ${lowStockItems.length === 0 ? 'disabled' : ''}>
           <i data-lucide="shopping-cart"></i>
@@ -1555,7 +1556,7 @@
     async function openSmartCart() {
       // Get low stock items from current inventory
       const lowStockItems = inventoryItems.filter(
-        item => item.qty <= item.threshold
+        item => item.qty < item.threshold || item.qty === 0
       ).map(item => ({
         id: item.id,
         name: item.name,
