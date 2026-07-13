@@ -311,6 +311,13 @@
     .topup-add i { width:11px; height:11px; }
     .topup-add.instamart { border:1px solid var(--swiggy-green); color:var(--swiggy-green); }
     .topup-add.swiggy_food { border:1px solid var(--swiggy-orange); color:var(--swiggy-orange); }
+    .topup-add.added { border:1px solid var(--swiggy-green); background:rgba(72,196,121,.12); color:var(--swiggy-green); cursor:default; }
+
+    /* Secondary/cancel button, reused by the Top Up and order-preview sheets */
+    .modal-cancel-btn {
+      width:100%; height:48px; border-radius:14px; background:transparent; color:var(--swiggy-text-2);
+      border:1px solid var(--swiggy-border); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px;
+    }
 
     /* Auth required card */
     .auth-card { background:rgba(252,128,25,.06); border:1px solid rgba(252,128,25,.2); border-radius:16px; padding:20px; text-align:center; }
@@ -747,6 +754,8 @@
 
   <div class="toast" id="toast"></div>
   <div id="addItemModalContainer"></div>
+  <div id="topUpAddModalContainer"></div>
+  <div id="orderPreviewModalContainer"></div>
 
   <div id="smartCartModal" style="display:none;position:fixed;
        inset:0;z-index:2000;background:rgba(0,0,0,0.7);
@@ -1001,6 +1010,7 @@
 
     let currentMealName = null;
     let currentMissingIngredients = [];
+    let currentTopUpSuggestions = [];
 
     function isInternalReasoning(text) {
       if (!text) return true;
@@ -1029,7 +1039,7 @@
         </button>`;
 
       const groceriesBtn = missing.length ? `
-        <button class="choice-btn order_groceries ${rec === 'order_groceries' ? 'recommended' : ''}" data-action="order_groceries" onclick="chooseAction('order_groceries', this)">
+        <button class="choice-btn order_groceries ${rec === 'order_groceries' ? 'recommended' : ''}" data-action="order_groceries" onclick="confirmOrderGroceries(this)">
           <div class="choice-icon-circle"><i data-lucide="shopping-cart"></i></div>
           <div class="choice-text">
             <div class="choice-btn-title">Order missing items</div>
@@ -1101,6 +1111,72 @@
       } catch {}
     }
 
+    /* ═══════════════ TOP UP — ADD TO PANTRY ═══════════════ */
+    function openTopUpAddModal(idx) {
+      const item = currentTopUpSuggestions[idx];
+      if (!item) return;
+      document.getElementById('topUpAddModalContainer').innerHTML = `
+        <div class="modal-overlay" onclick="closeTopUpAddModal(event)">
+          <div class="modal-sheet" onclick="event.stopPropagation()">
+            <div class="modal-header">
+              <h3>Add to pantry</h3>
+              <button class="modal-close" onclick="closeTopUpAddModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="field">
+              <label>Item</label>
+              <input value="${escapeHtml(item.name)}" disabled />
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Quantity</label><input id="topUpAddQty" type="number" step="0.01" value="1" /></div>
+              <div class="field"><label>Unit</label><input id="topUpAddUnit" value="piece" /></div>
+            </div>
+            <button class="modal-submit" onclick="confirmTopUpAdd(${idx})">Add to Pantry</button>
+            <button class="modal-cancel-btn" onclick="closeTopUpAddModal()">Cancel</button>
+          </div>
+        </div>`;
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function closeTopUpAddModal(e) {
+      if (e) e.stopPropagation();
+      document.getElementById('topUpAddModalContainer').innerHTML = '';
+    }
+
+    async function confirmTopUpAdd(idx) {
+      const item = currentTopUpSuggestions[idx];
+      if (!item) return;
+      const qty = parseFloat(document.getElementById('topUpAddQty').value) || 1;
+      const unit = document.getElementById('topUpAddUnit').value.trim() || 'piece';
+      const newItem = {
+        id: `custom_${Date.now()}`,
+        name: item.name,
+        category: 'food',
+        qty,
+        threshold: qty,
+        unit,
+        dailyUse: 0,
+        barcode: '',
+      };
+      closeTopUpAddModal();
+      try {
+        await fetch('/api/inventory/item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newItem),
+        });
+        showToast(`${item.name} added to pantry`);
+        const btn = document.getElementById(`topupAddBtn-${idx}`);
+        if (btn) {
+          btn.innerHTML = '<i data-lucide="check"></i> Added';
+          btn.classList.add('added');
+          btn.disabled = true;
+          try { lucide.createIcons(); } catch {}
+        }
+      } catch {
+        showToast('Could not add to pantry');
+      }
+    }
+
     async function chooseAction(action, btnEl) {
       if (orderInFlight) return;
       orderInFlight = true;
@@ -1130,6 +1206,80 @@
         resetChoiceButtons();
       } finally {
         orderInFlight = false;
+      }
+    }
+
+    /* ═══════════════ ORDER MISSING ITEMS — PANTRY PREVIEW ═══════════════ */
+    let pendingGroceriesBtn = null;
+
+    function confirmOrderGroceries(btnEl) {
+      const items = currentMissingIngredients;
+      if (!items.length) {
+        chooseAction('order_groceries', btnEl);
+        return;
+      }
+      pendingGroceriesBtn = btnEl;
+
+      const rows = items.map(name => {
+        const qty = Math.round(0.1 * 14 * 100) / 100;
+        return `<div class="shopping-list-item"><span>${escapeHtml(name)}</span><span>${qty} piece</span></div>`;
+      }).join('');
+
+      document.getElementById('orderPreviewModalContainer').innerHTML = `
+        <div class="modal-overlay" onclick="closeOrderPreviewModal(event)">
+          <div class="modal-sheet" onclick="event.stopPropagation()">
+            <div class="modal-header">
+              <h3>Order missing items</h3>
+              <button class="modal-close" onclick="closeOrderPreviewModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="cart-items-list">${rows}</div>
+            <button class="modal-submit" onclick="confirmAndOrderGroceries()">Confirm and Order</button>
+            <button class="modal-cancel-btn" onclick="closeOrderPreviewModal()">Cancel</button>
+          </div>
+        </div>`;
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function closeOrderPreviewModal(e) {
+      if (e) e.stopPropagation();
+      document.getElementById('orderPreviewModalContainer').innerHTML = '';
+    }
+
+    async function confirmAndOrderGroceries() {
+      const btnEl = pendingGroceriesBtn;
+      const items = currentMissingIngredients;
+      closeOrderPreviewModal();
+
+      // 1. Fire the existing order flow as normal.
+      chooseAction('order_groceries', btnEl);
+
+      // 2. Also sync these missing ingredients into the pantry with a
+      //    default two-week supply, since their real daily-use rate is
+      //    unknown until the item exists in inventory.
+      let addedCount = 0;
+      for (let i = 0; i < items.length; i++) {
+        const dailyUse = 0.1;
+        const qty = Math.round(dailyUse * 14 * 100) / 100;
+        try {
+          await fetch('/api/inventory/item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: `custom_${Date.now()}_${i}`,
+              name: items[i],
+              category: 'food',
+              qty,
+              threshold: qty,
+              unit: 'piece',
+              dailyUse,
+              barcode: '',
+            }),
+          });
+          addedCount++;
+        } catch {}
+      }
+      if (addedCount > 0) {
+        showToast(`${addedCount} items added to your pantry`);
       }
     }
 
@@ -1239,6 +1389,7 @@
       if (ev.type === 'top_up') {
         const suggestions = ev.suggestions || [];
         if (!suggestions.length) return;
+        currentTopUpSuggestions = suggestions;
 
         const rows = suggestions.map((s, i) => {
           const source = s.source === 'swiggy_food' ? 'swiggy_food' : 'instamart';
@@ -1254,7 +1405,7 @@
               <div class="topup-right">
                 <div class="topup-price">₹${escapeHtml(s.estimated_price)}</div>
                 <div class="topup-source ${source}">${sourceLabel}</div>
-                <button class="topup-add ${source}" onclick="showToast('Coming soon — connect Swiggy to order instantly')">
+                <button class="topup-add ${source}" id="topupAddBtn-${i}" onclick="openTopUpAddModal(${i})">
                   <i data-lucide="plus-circle"></i> Add
                 </button>
               </div>
