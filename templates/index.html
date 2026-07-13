@@ -1460,7 +1460,16 @@
       container.innerHTML = `
         <div class="shopping-panel">
           <h3><i data-lucide="shopping-cart"></i> Shopping list (${shoppingItems.length})</h3>
-          ${shoppingItems.map(i => `<div class="shopping-list-item"><span>${escapeHtml(i.name)}</span><span>${round2(i.qty)} ${escapeHtml(i.unit)}</span></div>`).join('')}
+          ${shoppingItems.map(i => {
+            const countableUnits = [
+              'bottle', 'pack', 'piece', 'roll',
+              'box', 'dozen', 'bag', 'bunch'
+            ];
+            const displayQty = countableUnits.includes(i.unit)
+              ? Math.ceil(i.qty)
+              : Math.round(i.qty * 10) / 10;
+            return `<div class="shopping-list-item"><span>${escapeHtml(i.name)}</span><span>${displayQty} ${escapeHtml(i.unit)}</span></div>`;
+          }).join('')}
           <button class="modal-submit" style="margin-top:12px;background:var(--swiggy-green-deep)" onclick="markAllPurchased()">Mark all as purchased</button>
         </div>`;
     }
@@ -1623,7 +1632,16 @@
       ).map(item => ({
         id: item.id,
         name: item.name,
-        qty_needed: Math.max(0, item.dailyUse * 14 - item.qty),
+        qty_needed: (() => {
+          const raw = Math.max(0, item.dailyUse * 14 - item.qty);
+          const countableUnits = [
+            'bottle', 'pack', 'piece', 'roll',
+            'box', 'dozen', 'bag', 'bunch'
+          ];
+          return countableUnits.includes(item.unit)
+            ? Math.ceil(raw)
+            : Math.round(raw * 10) / 10;
+        })(),
         unit: item.unit,
         threshold: item.threshold,
         category: item.category
