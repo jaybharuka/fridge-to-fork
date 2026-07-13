@@ -43,7 +43,12 @@ from fridge_to_fork.step3_order_router import (
     order_dish_from_swiggy,
     order_groceries_from_instamart,
 )
-from fridge_to_fork.models import Decision, MealPlan, MealSuggestion
+from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion
+from fridge_to_fork.inventory_db import (
+    init_db, get_all_items, get_food_items,
+    update_item_qty, adjust_item_qty, upsert_item,
+    delete_item, log_consumption, fuzzy_match_items
+)
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
 
@@ -62,6 +67,11 @@ app.add_middleware(
 )
 
 SWIGGY_AUTH_BASE = "https://mcp.swiggy.com"
+
+
+@app.on_event("startup")
+async def startup_event():
+    await init_db()
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +174,122 @@ async def health():
 
 
 # ---------------------------------------------------------------------------
+# Pantry page
+# ---------------------------------------------------------------------------
+
+@app.get("/pantry", response_class=HTMLResponse)
+async def pantry():
+    return (Path(__file__).parent / "templates" / "pantry.html").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Inventory CRUD
+# ---------------------------------------------------------------------------
+
+@app.get("/api/inventory")
+async def api_get_inventory():
+    items = await get_all_items()
+    normalized = []
+    for item in items:
+        normalized.append({
+            "id":        item["id"],
+            "name":      item["name"],
+            "category":  item["category"],
+            "qty":       item["qty"],
+            "threshold": item["threshold"],
+            "unit":      item["unit"],
+            "dailyUse":  item["daily_use"],
+            "barcode":   item["barcode"] or "",
+        })
+    return {"items": normalized, "count": len(normalized)}
+
+
+@app.post("/api/inventory/item")
+async def api_upsert_item(request: Request):
+    body = await request.json()
+    await upsert_item(body)
+    return {"success": True}
+
+
+@app.delete("/api/inventory/item/{item_id}")
+async def api_delete_item(item_id: str):
+    await delete_item(item_id)
+    return {"success": True}
+
+
+@app.post("/api/inventory/adjust")
+async def api_adjust_qty(request: Request):
+    body = await request.json()
+    item_id = body.get("itemId")
+    delta = body.get("delta", 0)
+    new_qty = await adjust_item_qty(item_id, delta)
+    return {"success": True, "newQty": new_qty}
+
+
+@app.post("/api/inventory/consume")
+async def api_consume(request: Request):
+    body = await request.json()
+    dish_name = body.get("dishName", "Unknown dish")
+    items = body.get("items", [])
+
+    updated = []
+    for item in items:
+        item_id = item.get("itemId")
+        delta = item.get("delta", 0)
+        if delta > 0:
+            delta = -delta  # ensure deduction
+        new_qty = await adjust_item_qty(item_id, delta)
+        if new_qty is not None:
+            updated.append({"itemId": item_id, "newQty": new_qty})
+
+    await log_consumption(dish_name, items)
+    return {"success": True, "updated": updated}
+
+
+@app.post("/api/inventory/restock")
+async def api_restock(request: Request):
+    body = await request.json()
+    names = body.get("itemNames", [])
+
+    all_items = await get_all_items()
+    matches = await fuzzy_match_items(names, all_items)
+
+    restocked = []
+    for match in matches:
+        if match["matched"]:
+            inv_item = next(
+                (i for i in all_items if i["id"] == match["item_id"]), None
+            )
+            if inv_item:
+                restock_qty = inv_item["daily_use"] * 14
+                if restock_qty == 0:
+                    restock_qty = inv_item["threshold"] * 5
+                await update_item_qty(match["item_id"], restock_qty)
+                restocked.append({
+                    "name":    match["name"],
+                    "item_id": match["item_id"],
+                    "new_qty": restock_qty
+                })
+    return {"success": True, "restocked": restocked}
+
+
+@app.get("/api/inventory/food")
+async def api_food_items():
+    """Returns food items formatted for the meal planner prompt."""
+    items = await get_food_items()
+    ingredient_list = []
+    for item in items:
+        ingredient_list.append({
+            "id":      item["id"],
+            "name":    item["name"],
+            "qty":     item["qty"],
+            "unit":    item["unit"],
+            "dailyUse": item["daily_use"],
+        })
+    return {"ingredients": ingredient_list}
+
+
+# ---------------------------------------------------------------------------
 # Auth routes — Swiggy OAuth 2.1 with PKCE
 # ---------------------------------------------------------------------------
 
@@ -251,41 +377,75 @@ async def auth_logout(request: Request):
 @app.post("/api/scan")
 async def scan(
     request: Request,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
     target_dish: str | None = Form(None),
+    mode: str | None = Form(None),
+    household_mode: str | None = Form(None),
 ):
-    img_bytes = await file.read()
-    suffix = Path(file.filename or "image.jpg").suffix or ".jpg"
+    scan_mode = mode or household_mode
+    img_bytes = await file.read() if file is not None else b""
+    suffix = Path(file.filename or "image.jpg").suffix or ".jpg" if file is not None else ".jpg"
 
     async def stream():
         tmp_path = None
         fridge = None
         try:
-            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-                tmp.write(img_bytes)
-                tmp_path = tmp.name
+            if scan_mode == "inventory":
+                # ── Step 1: Skip vision, read from household inventory ──────
+                yield _sse({"type": "progress", "step": 1, "message": "Reading your home pantry…"})
+                food_items = await get_food_items()
+                ingredients = [
+                    Ingredient(
+                        name=item["name"],
+                        quantity=f"{item['qty']} {item['unit']}",
+                        confidence=1.0,
+                    )
+                    for item in food_items
+                    if item["qty"] > 0
+                ]
+                fridge = FridgeContents(
+                    ingredients=ingredients,
+                    raw_description=f"Household inventory: {len(ingredients)} food items available",
+                )
+                yield _sse({
+                    "type": "step1",
+                    "raw_description": fridge.raw_description,
+                    "ingredients": [
+                        {
+                            "name": i.name,
+                            "quantity": i.quantity or "available",
+                            "confidence": 100,
+                        }
+                        for i in fridge.ingredients
+                    ],
+                    "source": "inventory",
+                })
+            else:
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                    tmp.write(img_bytes)
+                    tmp_path = tmp.name
 
-            # ── Step 1: Vision ──────────────────────────────────────────────
-            yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
-            try:
-                fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
-            except Exception as e:
-                import traceback
-                print(f"[STEP1 ERROR] identify_ingredients failed: {e}")
-                traceback.print_exc()
-                raise  # re-raise so the outer handler catches it
-            yield _sse({
-                "type": "step1",
-                "raw_description": fridge.raw_description,
-                "ingredients": [
-                    {
-                        "name": i.name,
-                        "quantity": i.quantity or "—",
-                        "confidence": round(i.confidence * 100),
-                    }
-                    for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)
-                ],
-            })
+                # ── Step 1: Vision ──────────────────────────────────────────
+                yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
+                try:
+                    fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
+                except Exception as e:
+                    import traceback
+                    print(f"[STEP1 ERROR] identify_ingredients failed: {e}")
+                    traceback.print_exc()
+                    raise  # re-raise so the outer handler catches it
+                yield _sse({
+                    "type": "step1",
+                    "raw_description": fridge.raw_description,
+                    "ingredients": [
+                        {
+                            "name": i.name,
+                            "quantity": i.quantity or "—",
+                            "confidence": round(i.confidence * 100),
+                        }
+                        for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)
+                    ],
+                })
 
             # ── Step 2: Meal planning ───────────────────────────────────────
             if target_dish:
