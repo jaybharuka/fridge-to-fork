@@ -413,13 +413,13 @@
     .shopping-panel h3 i { width:16px; height:16px; color:var(--swiggy-orange); }
     .shopping-list-item { display:flex; justify-content:space-between; font-size:12px; color:var(--swiggy-text-2); padding:6px 0; border-bottom:1px solid rgba(255,255,255,.05); }
     .shopping-list-item:last-child { border-bottom:none; }
-    .platform-row { display:flex; gap:8px; margin-top:14px; }
-    .platform-btn {
-      flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 4px; border-radius:12px;
-      border:1px solid var(--swiggy-border); background:var(--swiggy-surface-2); color:#fff; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;
+    .instamart-order-btn {
+      width:100%; margin-top:14px; height:48px; border-radius:14px; border:none;
+      background:var(--swiggy-orange); color:#fff; font-size:14px; font-weight:700; font-family:inherit;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:.15s ease;
     }
-    .platform-btn:hover { border-color:var(--platform-color, var(--swiggy-orange)); }
-    .platform-dot { width:10px; height:10px; border-radius:50%; }
+    .instamart-order-btn:hover { background:var(--swiggy-orange-dark); }
+    .instamart-order-btn i { width:16px; height:16px; }
 
     .order-launched-card {
       background:rgba(72,196,121,.08); border:1px solid rgba(72,196,121,.3); border-radius:16px; padding:16px; margin-top:14px; text-align:center;
@@ -1183,9 +1183,7 @@
     ];
 
     const PLATFORMS = [
-      { id: 'blinkit',   name: 'Blinkit',   color: '#F8CB46', url: 'https://blinkit.com/s/?q=' },
-      { id: 'instamart', name: 'Instamart', color: '#48C479', url: 'https://www.swiggy.com/instamart/search?custom_back=true&query=' },
-      { id: 'zepto',     name: 'Zepto',     color: '#8B3DFF', url: 'https://www.zeptonow.com/search?query=' },
+      { id: 'instamart', name: 'Instamart', color: '#FC8019', url: 'https://www.swiggy.com/instamart/search?query=' },
     ];
 
     let inventoryItems = [];
@@ -1299,23 +1297,24 @@
         <div class="shopping-panel">
           <h3><i data-lucide="shopping-cart"></i> Shopping list (${shoppingItems.length})</h3>
           ${shoppingItems.map(i => `<div class="shopping-list-item"><span>${escapeHtml(i.name)}</span><span>${round2(i.qty)} ${escapeHtml(i.unit)}</span></div>`).join('')}
-          <div class="platform-row">
-            ${PLATFORMS.map(p => `<button class="platform-btn" style="--platform-color:${p.color}" onclick="openPlatform('${p.id}')"><span class="platform-dot" style="background:${p.color}"></span>${p.name}</button>`).join('')}
-          </div>
+          <button class="instamart-order-btn" onclick="orderOnInstamart()"><i data-lucide="shopping-cart"></i> Order on Instamart</button>
           <button class="modal-submit" style="margin-top:12px;background:var(--swiggy-green-deep)" onclick="markAllPurchased()">Mark all as purchased</button>
           <div id="orderLaunchedContainer"></div>
         </div>`;
     }
 
-    function openPlatform(id) {
-      const platform = PLATFORMS.find(p => p.id === id);
+    async function orderOnInstamart() {
+      const platform = PLATFORMS.find(p => p.id === 'instamart');
       if (!platform) return;
       const shoppingItems = inventoryItems.filter(i => stockUrgency(i) !== 'ok');
-      const query = shoppingItems.map(i => i.name).join(' ');
-      window.open(platform.url + encodeURIComponent(query), '_blank');
+      if (!shoppingItems.length) return;
+      const fullList = shoppingItems.map(i => i.name).join(', ');
+      try { await navigator.clipboard.writeText(fullList); } catch (e) {}
+      const firstItem = shoppingItems[0];
+      window.open(platform.url + encodeURIComponent(firstItem.name), '_blank');
       const el = document.getElementById('orderLaunchedContainer');
       if (el) {
-        el.innerHTML = `<div class="order-launched-card"><i data-lucide="check-circle"></i><div class="title">Order launched on ${platform.name}</div><div class="sub">A new tab opened with your shopping list pre-searched.</div></div>`;
+        el.innerHTML = `<div class="order-launched-card"><i data-lucide="check-circle"></i><div class="title">Order launched on Instamart</div><div class="sub">Full shopping list copied to clipboard — paste it in to add the rest.</div></div>`;
         try { lucide.createIcons(); } catch {}
       }
     }
