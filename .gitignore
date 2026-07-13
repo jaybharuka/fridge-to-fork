@@ -37,3 +37,6 @@ scripts/
 
 # Claude Code config
 .claude/
+
+# Runtime data
+inventory.db
