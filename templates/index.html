@@ -409,6 +409,22 @@
     .pantry-cook-btn:hover { background:rgba(72,196,121,.08); }
     .pantry-cook-btn i { width:16px; height:16px; }
 
+    .fix-units-btn {
+      background:none; border:none; color:var(--swiggy-text-3); font-size:11px; font-weight:600;
+      cursor:pointer; font-family:inherit; text-decoration:underline; flex-shrink:0; padding:4px 0; margin-top:4px; white-space:nowrap;
+    }
+    .fix-units-btn:hover { color:var(--swiggy-text-2); }
+
+    .search-wrap { position:relative; margin-bottom:14px; }
+    .search-input { padding-right:44px; }
+    .search-clear-btn {
+      position:absolute; right:6px; top:50%; transform:translateY(-50%);
+      background:none; border:none; color:var(--swiggy-text-3); cursor:pointer;
+      padding:8px; display:flex; align-items:center; justify-content:center; border-radius:50%;
+    }
+    .search-clear-btn:hover { color:var(--swiggy-text-2); background:var(--swiggy-hover-overlay); }
+    .search-clear-btn i { width:16px; height:16px; }
+
     .cat-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; }
     .cat-tab {
       flex-shrink:0; padding:8px 16px; border-radius:20px; font-size:12px; font-weight:600;
@@ -720,12 +736,22 @@
     <!-- ═══════════════ PANTRY TAB ═══════════════ -->
     <div id="pantryTab" style="display:none;">
       <div class="hero">
-        <h1 class="hero-title">Home Pantry</h1>
-        <p class="hero-sub">Track what's stocked, running low, or out.</p>
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+          <div>
+            <h1 class="hero-title">Home Pantry</h1>
+            <p class="hero-sub">Track what's stocked, running low, or out.</p>
+          </div>
+          <button type="button" id="fixUnitsBtn" class="fix-units-btn" onclick="fixBadUnits()">Fix units</button>
+        </div>
       </div>
 
       <div class="wrap">
         <button type="button" class="pantry-cook-btn" onclick="whatCanICook()"><i data-lucide="chef-hat"></i> What can I cook?</button>
+
+        <div class="search-wrap">
+          <input type="text" id="pantrySearch" class="dish-input search-input" placeholder="Search pantry items..." oninput="onPantrySearchInput()" />
+          <button type="button" id="pantrySearchClear" class="search-clear-btn" style="display:none;" onclick="clearPantrySearch()"><i data-lucide="x"></i></button>
+        </div>
 
         <div class="cat-tabs" id="categoryTabs"></div>
 
@@ -1212,6 +1238,24 @@
     /* ═══════════════ ORDER MISSING ITEMS — PANTRY PREVIEW ═══════════════ */
     let pendingGroceriesBtn = null;
 
+    function getMissingIngredientDefaults(name) {
+      const lower = name.toLowerCase();
+      const rules = [
+        { words: ['dal', 'rice', 'atta', 'flour', 'sugar', 'salt', 'oil', 'ghee', 'masala', 'powder'], unit: 'kg', qty: 0.5 },
+        { words: ['milk', 'juice', 'water', 'lassi'], unit: 'L', qty: 1 },
+        { words: ['leaves', 'coriander', 'methi', 'curry'], unit: 'bunch', qty: 1 },
+        { words: ['egg'], unit: 'piece', qty: 6 },
+      ];
+      for (const rule of rules) {
+        if (rule.words.some(w => lower.includes(w))) {
+          return { unit: rule.unit, qty: rule.qty };
+        }
+      }
+      // Fallback: no dailyUse to base a real estimate on, so use a
+      // single sensible pack rather than a fractional "1.4 piece".
+      return { unit: 'pack', qty: 1 };
+    }
+
     function confirmOrderGroceries(btnEl) {
       const items = currentMissingIngredients;
       if (!items.length) {
@@ -1221,8 +1265,8 @@
       pendingGroceriesBtn = btnEl;
 
       const rows = items.map(name => {
-        const qty = Math.round(0.1 * 14 * 100) / 100;
-        return `<div class="shopping-list-item"><span>${escapeHtml(name)}</span><span>${qty} piece</span></div>`;
+        const { unit, qty } = getMissingIngredientDefaults(name);
+        return `<div class="shopping-list-item"><span>${escapeHtml(name)}</span><span>${qty} ${escapeHtml(unit)}</span></div>`;
       }).join('');
 
       document.getElementById('orderPreviewModalContainer').innerHTML = `
@@ -1253,13 +1297,13 @@
       // 1. Fire the existing order flow as normal.
       chooseAction('order_groceries', btnEl);
 
-      // 2. Also sync these missing ingredients into the pantry with a
-      //    default two-week supply, since their real daily-use rate is
-      //    unknown until the item exists in inventory.
+      // 2. Also sync these missing ingredients into the pantry, using a
+      //    unit/qty guessed from the ingredient name since their real
+      //    daily-use rate is unknown until the item exists in inventory.
       let addedCount = 0;
       for (let i = 0; i < items.length; i++) {
-        const dailyUse = 0.1;
-        const qty = Math.round(dailyUse * 14 * 100) / 100;
+        const { unit, qty } = getMissingIngredientDefaults(items[i]);
+        const dailyUse = Math.round((qty / 14) * 1000) / 1000;
         try {
           await fetch('/api/inventory/item', {
             method: 'POST',
@@ -1270,7 +1314,7 @@
               category: 'food',
               qty,
               threshold: qty,
-              unit: 'piece',
+              unit,
               dailyUse,
               barcode: '',
             }),
@@ -1502,6 +1546,7 @@
 
     let inventoryItems = [];
     let activeCategory = 'all';
+    let pantrySearchQuery = '';
 
     function round2(n) { return Math.round((n || 0) * 100) / 100; }
 
@@ -1539,6 +1584,41 @@
       }
     }
 
+    async function fixBadUnits() {
+      const btn = document.getElementById('fixUnitsBtn');
+      if (btn) btn.style.display = 'none';
+
+      const badItems = inventoryItems.filter(i => i.unit === 'piece' && !Number.isInteger(i.qty));
+      if (!badItems.length) {
+        showToast('No items need fixing');
+        return;
+      }
+
+      let fixedCount = 0;
+      for (const item of badItems) {
+        try {
+          await fetch('/api/inventory/item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: item.id,
+              name: item.name,
+              category: item.category,
+              qty: Math.round(item.qty),
+              threshold: item.threshold,
+              unit: 'pack',
+              dailyUse: item.dailyUse,
+              barcode: item.barcode || '',
+            }),
+          });
+          fixedCount++;
+        } catch {}
+      }
+
+      await loadInventory();
+      showToast(`Fixed ${fixedCount} items`);
+    }
+
     function renderInventory() {
       renderCategoryTabs();
       renderRunningOutStrip();
@@ -1559,6 +1639,20 @@
       renderInventory();
     }
 
+    function onPantrySearchInput() {
+      const input = document.getElementById('pantrySearch');
+      pantrySearchQuery = input.value.trim().toLowerCase();
+      document.getElementById('pantrySearchClear').style.display = pantrySearchQuery ? 'flex' : 'none';
+      renderItemGrid();
+    }
+
+    function clearPantrySearch() {
+      pantrySearchQuery = '';
+      document.getElementById('pantrySearch').value = '';
+      document.getElementById('pantrySearchClear').style.display = 'none';
+      renderItemGrid();
+    }
+
     function renderRunningOutStrip() {
       const container = document.getElementById('runningOutSection');
       const running = inventoryItems.filter(i => stockUrgency(i) !== 'ok')
@@ -1576,11 +1670,16 @@
     }
 
     function renderItemGrid() {
-      const filtered = activeCategory === 'all' ? inventoryItems : inventoryItems.filter(i => i.category === activeCategory);
+      let filtered = activeCategory === 'all' ? inventoryItems : inventoryItems.filter(i => i.category === activeCategory);
+      if (pantrySearchQuery) {
+        filtered = filtered.filter(i => i.name.toLowerCase().includes(pantrySearchQuery));
+      }
       const grid = document.getElementById('itemGrid');
       document.getElementById('itemCount').textContent = filtered.length;
       if (!filtered.length) {
-        grid.innerHTML = '<div class="empty-state">No items in this category yet.</div>';
+        grid.innerHTML = pantrySearchQuery
+          ? `<div class="empty-state">No items found for "${escapeHtml(pantrySearchQuery)}"</div>`
+          : '<div class="empty-state">No items in this category yet.</div>';
         return;
       }
       grid.innerHTML = filtered.map(item => {
