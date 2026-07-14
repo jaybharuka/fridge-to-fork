@@ -462,6 +462,7 @@ async def scan(
     target_dish: str | None = Form(None),
     mode: str | None = Form(None),
     household_mode: str | None = Form(None),
+    servings: int = Form(2),
 ):
     scan_mode = mode or household_mode
     img_bytes = await file.read() if file is not None else b""
@@ -535,7 +536,9 @@ async def scan(
                 yield _sse({"type": "progress", "step": 2, "message": "Planning your meals…"})
 
             try:
-                plan = await asyncio.to_thread(plan_meals, fridge, target_dish=target_dish)
+                plan = await asyncio.to_thread(
+                    plan_meals, fridge, target_dish=target_dish, servings=servings
+                )
             except Exception as e:
                 import traceback
                 print(f"[STEP2 ERROR] plan_meals failed: {e}")
@@ -557,6 +560,19 @@ async def scan(
                         "prep_time_minutes": s.prep_time_minutes,
                     }
                     for s in plan.suggestions
+                ],
+                "recipe_ingredients": [
+                    {
+                        "name": ri.name,
+                        "quantity": ri.quantity,
+                        "is_staple": ri.is_staple,
+                    }
+                    for ri in (
+                        plan.recommended_meal.recipe_ingredients
+                        if plan.recommended_meal
+                        and getattr(plan.recommended_meal, "recipe_ingredients", None)
+                        else []
+                    )
                 ],
             })
 
@@ -608,6 +624,19 @@ async def scan(
                             "prep_time_minutes": s.prep_time_minutes,
                         }
                         for s in plan.suggestions
+                    ],
+                    "recipe_ingredients": [
+                        {
+                            "name": ri.name,
+                            "quantity": ri.quantity,
+                            "is_staple": ri.is_staple,
+                        }
+                        for ri in (
+                            plan.recommended_meal.recipe_ingredients
+                            if plan.recommended_meal
+                            and getattr(plan.recommended_meal, "recipe_ingredients", None)
+                            else []
+                        )
                     ],
                 })
                 yield _sse({

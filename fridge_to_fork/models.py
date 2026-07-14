@@ -25,6 +25,13 @@ class FridgeContents:
 
 
 @dataclass
+class RecipeIngredient:
+    name: str
+    quantity: str
+    is_staple: bool = False
+
+
+@dataclass
 class MealSuggestion:
     name: str
     description: str
@@ -32,6 +39,7 @@ class MealSuggestion:
     missing_ingredients: list[str] = field(default_factory=list)
     cuisine: str = ""
     prep_time_minutes: int = 0
+    recipe_ingredients: list[RecipeIngredient] = None
 
 
 @dataclass
