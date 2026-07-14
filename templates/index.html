@@ -125,35 +125,7 @@
     .servings-pill:hover { border-color:var(--swiggy-orange); }
     .servings-pill.active { background:var(--swiggy-orange); border-color:var(--swiggy-orange); color:#fff; }
 
-    /* Mode pills (Scan Photo / Use Pantry) */
-    .mode-pills { display:flex; gap:8px; margin:10px 0 14px; }
-    .mode-pill {
-      flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
-      padding:10px; border-radius:12px; border:1px solid var(--swiggy-border); background:var(--swiggy-surface);
-      color:var(--swiggy-text-2); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s ease;
-    }
-    .mode-pill i { width:14px; height:14px; }
-    .mode-pill.active { background:var(--swiggy-orange); border-color:var(--swiggy-orange); color:#fff; }
-
-    /* Fridge capture */
-    .upload-zone {
-      position:relative; width:100%; min-height:200px; border-radius:20px;
-      border:2px dashed var(--swiggy-border); background:var(--swiggy-surface);
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      cursor:pointer; transition:border-color .2s ease, background .2s ease; overflow:hidden;
-    }
-    .upload-zone:hover, .upload-zone.drag { border-color:var(--swiggy-orange); background:rgba(252,128,25,.04); }
-    .upload-zone input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; z-index:1; }
-    .upload-empty { position:relative; z-index:2; text-align:center; color:var(--swiggy-text-2); pointer-events:none; padding:20px; }
-    .upload-icon-circle {
-      width:64px; height:64px; margin:0 auto; border-radius:50%;
-      background:rgba(252,128,25,.1); border:1.5px solid rgba(252,128,25,.25);
-      display:flex; align-items:center; justify-content:center;
-    }
-    .upload-icon-circle i { width:28px; height:28px; color:var(--swiggy-orange); }
-    .upload-title { font-size:15px; font-weight:600; color:var(--swiggy-text); margin-top:14px; }
-    .upload-sub { font-size:12px; color:var(--swiggy-text-3); margin-top:4px; }
-    .upload-actions { display:flex; gap:10px; margin-top:16px; justify-content:center; pointer-events:auto; }
+    /* Shared pill-style buttons, reused by the inline recipe fridge scan area */
     .pill-btn {
       display:inline-flex; align-items:center; gap:6px; border-radius:20px; padding:8px 18px;
       font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; background:transparent;
@@ -164,18 +136,6 @@
     .pill-btn-primary:hover { background:rgba(252,128,25,.08); }
     .pill-btn-secondary { border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); font-weight:500; }
     .pill-btn-secondary:hover { background:var(--swiggy-hover-overlay); }
-
-    .preview { display:none; position:relative; width:100%; height:220px; border-radius:20px; overflow:hidden; }
-    .preview.show { display:block; }
-    .preview img { width:100%; height:100%; object-fit:cover; display:block; }
-    .preview-grad { position:absolute; inset:0; background:linear-gradient(transparent, rgba(0,0,0,.7)); pointer-events:none; }
-    .preview-row { position:absolute; bottom:0; left:0; right:0; padding:12px 16px; display:flex; gap:10px; justify-content:center; }
-    .ghost-btn {
-      display:inline-flex; align-items:center; gap:6px;
-      background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.2);
-      color:#fff; font-size:12px; font-weight:600; padding:6px 14px; border-radius:20px; cursor:pointer; font-family:inherit;
-    }
-    .ghost-btn i { width:14px; height:14px; }
 
     /* Analyse button */
     .analyse-btn {
@@ -189,6 +149,13 @@
     .analyse-btn.ready:active:not(:disabled) { transform:translateY(0); }
     .analyse-btn.loading { background:var(--swiggy-orange); color:#fff; opacity:.85; cursor:not-allowed; }
     .analyse-btn:disabled:not(.ready):not(.loading) { cursor:not-allowed; }
+
+    .pantry-secondary-link {
+      display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;
+      font-size:12px; font-weight:600; color:var(--swiggy-text-3); cursor:pointer; text-decoration:none;
+    }
+    .pantry-secondary-link:hover { color:var(--swiggy-text-2); }
+    .pantry-secondary-link i { width:13px; height:13px; }
 
     /* Bottom hint */
     .bottom-hint { margin-top:12px; text-align:center; font-size:11px; color:var(--swiggy-hint-faint); }
@@ -229,7 +196,7 @@
        surfaces like inputs/pills) a subtle shadow instead of relying
        only on a darker fill, matching how dark mode elevates them. */
     .card, .meal-card, .topup-card, .modal-sheet, .shopping-panel,
-    .step, .running-card, .item-card, .inventory-card, .choice-btn {
+    .step, .running-card, .item-card, .recipe-checklist-card, .choice-btn {
       box-shadow: var(--swiggy-card-shadow);
     }
 
@@ -279,6 +246,21 @@
     }
     .recipe-cart-btn:hover { background:var(--swiggy-orange-dark); }
     .recipe-cart-btn i { width:16px; height:16px; }
+
+    .recipe-scan-link {
+      display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:14px;
+      background:none; border:none; color:var(--swiggy-text-3); font-size:12px; font-weight:600;
+      cursor:pointer; font-family:inherit; padding:4px 0;
+    }
+    .recipe-scan-link:hover { color:var(--swiggy-text-2); }
+    .recipe-scan-link i { width:13px; height:13px; }
+    .recipe-scan-area { margin-top:12px; padding-top:14px; border-top:1px solid var(--swiggy-border); }
+    .recipe-scan-actions { display:flex; gap:10px; justify-content:center; }
+    .recipe-scan-status {
+      display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;
+      font-size:12px; color:var(--swiggy-text-2); text-align:center;
+    }
+    .recipe-scan-status i { width:14px; height:14px; color:var(--swiggy-green); }
 
     /* Meal cards */
     #mealCards { display:flex; flex-direction:column; gap:10px; }
@@ -394,17 +376,6 @@
     .cook-card .title { color:var(--swiggy-green); font-weight:700; font-size:16px; }
     .cook-card .sub { color:var(--swiggy-text-2); font-size:12px; margin-top:4px; }
 
-    /* Inventory mode card (Cook tab, Use Pantry pill active) */
-    .inventory-card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:20px; padding:24px 20px; text-align:center; }
-    .inventory-card .icon-circle { width:64px; height:64px; margin:0 auto; border-radius:50%; background:rgba(252,128,25,.1); border:1.5px solid rgba(252,128,25,.25); display:flex; align-items:center; justify-content:center; }
-    .inventory-card .icon-circle i { width:28px; height:28px; color:var(--swiggy-orange); }
-    .inventory-card .title { font-size:15px; font-weight:700; color:var(--swiggy-text); margin-top:14px; }
-    .inventory-card .sub { font-size:12px; color:var(--swiggy-text-3); margin-top:4px; }
-    .inventory-card .pantry-link {
-      display:inline-flex; align-items:center; gap:6px; margin-top:14px; font-size:12px; font-weight:600;
-      color:var(--swiggy-orange); background:none; border:none; cursor:pointer; font-family:inherit;
-    }
-    .inventory-card .pantry-link i { width:13px; height:13px; }
     .inventory-updated-line { display:flex; align-items:center; gap:6px; justify-content:center; font-size:11px; color:var(--swiggy-text-2); margin-top:8px; }
     .inventory-updated-line i { width:12px; height:12px; color:var(--swiggy-green); }
 
@@ -642,8 +613,8 @@
     <!-- ═══════════════ COOK TAB ═══════════════ -->
     <div id="cookTab">
       <div class="hero">
-        <h1 class="hero-title">What's in your fridge?</h1>
-        <p class="hero-sub">Tell us what you want to eat. We'll handle the rest.</p>
+        <h1 class="hero-title">What do you want to cook?</h1>
+        <p class="hero-sub">Get the full recipe, then check off what you already have.</p>
       </div>
 
       <div class="wrap">
@@ -668,51 +639,15 @@
           </div>
         </div>
 
-        <!-- Scan Photo / Use Pantry pills -->
-        <div class="mode-pills">
-          <button type="button" class="mode-pill active" id="pillScan" onclick="setMode('photo')"><i data-lucide="camera"></i> Scan Photo</button>
-          <button type="button" class="mode-pill" id="pillPantry" onclick="setMode('inventory')"><i data-lucide="package"></i> Use Pantry</button>
-        </div>
-
-        <!-- Upload -->
-        <div class="upload-zone" id="uploadZone">
-          <input type="file" id="fileInput" accept="image/*" capture="environment" />
-          <div class="upload-empty">
-            <div class="upload-icon-circle"><i data-lucide="camera"></i></div>
-            <p class="upload-title">Photograph your fridge</p>
-            <p class="upload-sub">Or upload a photo from gallery</p>
-            <div class="upload-actions">
-              <button type="button" class="pill-btn pill-btn-primary" onclick="triggerCamera(event)"><i data-lucide="camera"></i> Take Photo</button>
-              <button type="button" class="pill-btn pill-btn-secondary" onclick="triggerGallery(event)"><i data-lucide="image"></i> Choose Photo</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Preview -->
-        <div class="preview" id="preview">
-          <img id="previewImg" src="" alt="Fridge preview" />
-          <div class="preview-grad"></div>
-          <div class="preview-row">
-            <button class="ghost-btn" onclick="resetUI()"><i data-lucide="camera"></i> Retake</button>
-            <button class="ghost-btn" onclick="triggerGallery(event)"><i data-lucide="image"></i> Change</button>
-          </div>
-        </div>
-
-        <!-- Inventory mode card -->
-        <div class="inventory-card" id="inventoryCard" style="display:none;">
-          <div class="icon-circle"><i data-lucide="package"></i></div>
-          <p class="title">Using your Home Pantry inventory</p>
-          <p class="sub">We'll plan your meal from what's already stocked at home.</p>
-          <button type="button" class="pantry-link" onclick="switchTab('pantry')"><i data-lucide="external-link"></i> View or edit pantry</button>
-        </div>
-
-        <!-- Analyse button -->
-        <button class="analyse-btn" id="analyseBtn" onclick="analyse()" disabled>
+        <!-- Get Recipe -->
+        <button class="analyse-btn ready" id="analyseBtn" onclick="startScan('recipe')">
           <span id="btnIcon"><i data-lucide="sparkles"></i></span>
-          <span id="btnText">Upload a fridge photo to start</span>
+          <span id="btnText">Get Recipe →</span>
         </button>
 
-        <p class="bottom-hint">Powered by Gemini Vision <span class="hint-dot">•</span> Swiggy MCP</p>
+        <a class="pantry-secondary-link" onclick="usePantryInventory()"><i data-lucide="package"></i> or use pantry inventory →</a>
+
+        <p class="bottom-hint">Powered by Gemini <span class="hint-dot">•</span> Swiggy MCP</p>
 
         <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 16px 16px 24px; margin-top:4px;">
 
@@ -760,11 +695,13 @@
 
         <!-- Results -->
         <div class="results" id="results">
-          <!-- Ingredients -->
-          <div class="section-label"><i data-lucide="list"></i> What's in your fridge</div>
-          <div class="card">
-            <p class="desc" id="fridgeDesc"></p>
-            <div class="chips" id="ingredientChips"></div>
+          <!-- Ingredients (hidden when there's no fridge scan to show, e.g. recipe mode) -->
+          <div id="fridgeIngredientsSection" style="display:none;">
+            <div class="section-label"><i data-lucide="list"></i> What's in your fridge</div>
+            <div class="card">
+              <p class="desc" id="fridgeDesc"></p>
+              <div class="chips" id="ingredientChips"></div>
+            </div>
           </div>
 
           <!-- Recipe checklist (only if the plan returned recipe_ingredients) -->
@@ -921,15 +858,10 @@
     }
 
     /* ═══════════════ COOK TAB — SCAN FLOW ═══════════════ */
-    const fileInput = document.getElementById('fileInput');
-    const uploadZone = document.getElementById('uploadZone');
-    const preview = document.getElementById('preview');
-    const previewImg = document.getElementById('previewImg');
     const analyseBtn = document.getElementById('analyseBtn');
     const stepsEl = document.getElementById('steps');
     const resultsEl = document.getElementById('results');
 
-    let selectedFile = null;
     let inventoryMode = false;
     let servings = 2;
 
@@ -940,54 +872,13 @@
       });
     }
 
-    function setMode(mode) {
-      inventoryMode = mode === 'inventory';
-      document.getElementById('pillScan').classList.toggle('active', !inventoryMode);
-      document.getElementById('pillPantry').classList.toggle('active', inventoryMode);
-
-      if (inventoryMode) {
-        uploadZone.style.display = 'none';
-        preview.classList.remove('show');
-        document.getElementById('inventoryCard').style.display = '';
-        setAnalyseReady('Plan my meal from pantry');
-      } else {
-        document.getElementById('inventoryCard').style.display = 'none';
-        if (selectedFile) {
-          uploadZone.style.display = 'none';
-          preview.classList.add('show');
-          setAnalyseReady();
-        } else {
-          uploadZone.style.display = '';
-          preview.classList.remove('show');
-          setAnalyseDefault();
-        }
-      }
-      try { lucide.createIcons(); } catch {}
-    }
-
     function whatCanICook() {
       switchTab('cook');
-      setMode('inventory');
+      usePantryInventory();
     }
 
-    function triggerCamera(e) {
-      if (e) e.stopPropagation();
-      fileInput.setAttribute('capture', 'environment');
-      fileInput.click();
-    }
-
-    function triggerGallery(e) {
-      if (e) e.stopPropagation();
-      fileInput.removeAttribute('capture');
-      fileInput.click();
-    }
-
-    function setAnalyseDefault() {
-      analyseBtn.disabled = true;
-      analyseBtn.classList.remove('ready', 'loading');
-      document.getElementById('btnIcon').innerHTML = '<i data-lucide="sparkles"></i>';
-      document.getElementById('btnText').textContent = 'Upload a fridge photo to start';
-      try { lucide.createIcons(); } catch {}
+    function usePantryInventory() {
+      startScan('inventory');
     }
 
     function setAnalyseReady(text) {
@@ -995,7 +886,7 @@
       analyseBtn.classList.remove('loading');
       analyseBtn.classList.add('ready');
       document.getElementById('btnIcon').innerHTML = '<i data-lucide="sparkles"></i>';
-      document.getElementById('btnText').textContent = text || 'Analyse My Fridge';
+      document.getElementById('btnText').textContent = text || 'Get Recipe →';
       try { lucide.createIcons(); } catch {}
     }
 
@@ -1004,42 +895,7 @@
       analyseBtn.classList.remove('ready');
       analyseBtn.classList.add('loading');
       document.getElementById('btnIcon').innerHTML = '<div class="spin"></div>';
-      document.getElementById('btnText').textContent = 'Analysing your fridge...';
-    }
-
-    fileInput.addEventListener('change', e => {
-      selectedFile = e.target.files[0];
-      if (!selectedFile) return;
-      const url = URL.createObjectURL(selectedFile);
-      previewImg.src = url;
-      preview.classList.add('show');
-      uploadZone.style.display = 'none';
-      setAnalyseReady();
-      resultsEl.classList.remove('show');
-      stepsEl.classList.remove('show');
-    });
-
-    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
-    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
-    uploadZone.addEventListener('drop', e => {
-      e.preventDefault();
-      uploadZone.classList.remove('drag');
-      const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith('image/')) {
-        fileInput.files = e.dataTransfer.files;
-        fileInput.dispatchEvent(new Event('change'));
-      }
-    });
-
-    function resetUI() {
-      selectedFile = null;
-      fileInput.value = '';
-      preview.classList.remove('show');
-      uploadZone.style.display = '';
-      setAnalyseDefault();
-      stepsEl.classList.remove('show');
-      resultsEl.classList.remove('show');
-      [1,2,3].forEach(i => setStep(i, '', 'Waiting'));
+      document.getElementById('btnText').textContent = 'Getting your recipe...';
     }
 
     function setStep(n, status, msg) {
@@ -1119,10 +975,13 @@
           (name.includes('garlic') && f.includes('garlic'))
         );
 
+        // Status is driven purely by whether a fridge scan found this
+        // ingredient. With no scan yet (fridgeIngredients is empty),
+        // that means every item — staples included — starts MISSING,
+        // per the new "get recipe first, scan later" flow.
         return {
           ...ing,
-          status: ing.is_staple ? 'have_it' :
-                  found ? 'have_it' : 'missing'
+          status: found ? 'have_it' : 'missing'
         };
       });
     }
@@ -1144,12 +1003,41 @@
       renderRecipeChecklistCard();
     }
 
+    // Builds the card shell ONCE per new recipe. Row toggles and the
+    // inline fridge scan only touch #recipeRowsContainer /
+    // #recipeChecklistFooter afterwards, so the scan area's own open/
+    // closed state and any in-progress upload survive re-renders.
     function renderRecipeChecklistCard() {
       const section = document.getElementById('recipeChecklistSection');
       if (!section) return;
       if (!currentRecipeChecklist.length) { section.innerHTML = ''; return; }
 
-      const rows = currentRecipeChecklist.map((ing, idx) => {
+      section.innerHTML = `
+        <div class="card recipe-checklist-card">
+          <div class="recipe-checklist-header">🧾 Recipe — ${escapeHtml(currentRecipeDishName)} for ${currentRecipeServings} people</div>
+          <p class="recipe-checklist-sub">Tap to uncheck items you already have</p>
+          <div class="recipe-rows" id="recipeRowsContainer">${buildRecipeRowsHtml()}</div>
+          <div id="recipeChecklistFooter">${buildRecipeFooterHtml()}</div>
+          <button type="button" class="recipe-scan-link" id="recipeScanLink" onclick="toggleInlineFridgeScan()">
+            <i data-lucide="camera"></i> Scan fridge to auto-detect what you have
+          </button>
+          <div class="recipe-scan-area" id="recipeScanArea" style="display:none;">
+            <input type="file" id="recipeScanFileInput" accept="image/*" capture="environment" style="display:none;" />
+            <div class="recipe-scan-actions">
+              <button type="button" class="pill-btn pill-btn-primary" onclick="triggerRecipeScanCamera()"><i data-lucide="camera"></i> Take Photo</button>
+              <button type="button" class="pill-btn pill-btn-secondary" onclick="triggerRecipeScanGallery()"><i data-lucide="image"></i> Choose Photo</button>
+            </div>
+            <div id="recipeScanStatus" class="recipe-scan-status"></div>
+          </div>
+        </div>`;
+
+      const scanInput = document.getElementById('recipeScanFileInput');
+      if (scanInput) scanInput.addEventListener('change', handleRecipeScanFile);
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function buildRecipeRowsHtml() {
+      return currentRecipeChecklist.map((ing, idx) => {
         const state = ing.status; // 'have_it' | 'missing' | 'unchecked'
         const icon = state === 'unchecked' ? 'circle' : state === 'have_it' ? 'check-circle' : 'x-circle';
         return `
@@ -1161,22 +1049,25 @@
             </div>
           </div>`;
       }).join('');
+    }
 
+    function buildRecipeFooterHtml() {
       const missingCount = currentRecipeChecklist.filter(i => i.status === 'missing').length;
-
-      section.innerHTML = `
-        <div class="card recipe-checklist-card">
-          <div class="recipe-checklist-header">🧾 Recipe — ${escapeHtml(currentRecipeDishName)} for ${currentRecipeServings} people</div>
-          <p class="recipe-checklist-sub">Tap to uncheck items you already have</p>
-          <div class="recipe-rows">${rows}</div>
-          ${missingCount > 0 ? `
-            <div class="recipe-checklist-footer">
-              <p class="recipe-order-count">${missingCount} ingredient${missingCount === 1 ? '' : 's'} to order from Instamart</p>
-              <button class="recipe-cart-btn" onclick="orderRecipeCart()">
-                <i data-lucide="shopping-cart"></i> Add ${missingCount} item${missingCount === 1 ? '' : 's'} to Instamart Cart
-              </button>
-            </div>` : ''}
+      if (missingCount === 0) return '';
+      return `
+        <div class="recipe-checklist-footer">
+          <p class="recipe-order-count">${missingCount} ingredient${missingCount === 1 ? '' : 's'} to order from Instamart</p>
+          <button class="recipe-cart-btn" onclick="orderRecipeCart()">
+            <i data-lucide="shopping-cart"></i> Add ${missingCount} item${missingCount === 1 ? '' : 's'} to Instamart Cart
+          </button>
         </div>`;
+    }
+
+    function updateRecipeRowsAndFooter() {
+      const rowsEl = document.getElementById('recipeRowsContainer');
+      const footerEl = document.getElementById('recipeChecklistFooter');
+      if (rowsEl) rowsEl.innerHTML = buildRecipeRowsHtml();
+      if (footerEl) footerEl.innerHTML = buildRecipeFooterHtml();
       try { lucide.createIcons(); } catch {}
     }
 
@@ -1184,7 +1075,68 @@
       const item = currentRecipeChecklist[idx];
       if (!item) return;
       item.status = (item.status === 'unchecked') ? item.defaultStatus : 'unchecked';
-      renderRecipeChecklistCard();
+      updateRecipeRowsAndFooter();
+    }
+
+    /* ── Inline "Scan fridge" inside the recipe checklist card ── */
+    function toggleInlineFridgeScan() {
+      const area = document.getElementById('recipeScanArea');
+      const link = document.getElementById('recipeScanLink');
+      if (!area) return;
+      const showing = area.style.display !== 'none';
+      area.style.display = showing ? 'none' : 'block';
+      if (link) link.style.display = showing ? '' : 'none';
+    }
+
+    function triggerRecipeScanCamera() {
+      const input = document.getElementById('recipeScanFileInput');
+      input.setAttribute('capture', 'environment');
+      input.click();
+    }
+
+    function triggerRecipeScanGallery() {
+      const input = document.getElementById('recipeScanFileInput');
+      input.removeAttribute('capture');
+      input.click();
+    }
+
+    async function handleRecipeScanFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const statusEl = document.getElementById('recipeScanStatus');
+      statusEl.innerHTML = '<div class="spin"></div> Scanning your fridge…';
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const res = await fetch('/api/scan/vision-only', { method: 'POST', body: form });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        applyFridgeScanToChecklist(data.ingredients || []);
+        statusEl.innerHTML = `<i data-lucide="check-circle"></i> Found ${(data.ingredients || []).length} ingredients — checklist updated`;
+        try { lucide.createIcons(); } catch {}
+      } catch (err) {
+        statusEl.textContent = 'Could not scan fridge. Try again.';
+      }
+    }
+
+    function applyFridgeScanToChecklist(fridgeIngredients) {
+      currentFridgeIngredients = fridgeIngredients;
+      const matched = matchRecipeToFridge(
+        currentRecipeChecklist.map(i => ({ name: i.name, quantity: i.quantity, is_staple: i.is_staple })),
+        fridgeIngredients
+      );
+      currentRecipeChecklist = currentRecipeChecklist.map((item, idx) => {
+        const newStatus = matched[idx].status;
+        if (item.status === 'unchecked') {
+          // Respect the user's manual override, just refresh what
+          // "unchecking" would now restore to.
+          return { ...item, defaultStatus: newStatus };
+        }
+        return { ...item, status: newStatus, defaultStatus: newStatus };
+      });
+      updateRecipeRowsAndFooter();
     }
 
     function parseQuantityString(qtyStr) {
@@ -1501,8 +1453,8 @@
       }
     }
 
-    async function analyse() {
-      if (!inventoryMode && !selectedFile) return;
+    async function startScan(mode) {
+      inventoryMode = mode === 'inventory';
 
       // UI state
       setAnalyseLoading();
@@ -1520,11 +1472,7 @@
       currentRecipeChecklist = [];
 
       const form = new FormData();
-      if (inventoryMode) {
-        form.append('mode', 'inventory');
-      } else {
-        form.append('file', selectedFile);
-      }
+      form.append('mode', mode);
 
       const targetDish = document.getElementById('targetDish').value.trim();
       if (targetDish) {
@@ -1542,7 +1490,7 @@
         try { lucide.createIcons(); } catch {}
         resultsEl.classList.add('show');
       } finally {
-        setAnalyseReady(inventoryMode ? 'Plan my meal from pantry' : 'Analyse Again');
+        setAnalyseReady(inventoryMode ? 'Plan my meal from pantry' : 'Get Recipe →');
       }
     }
 
@@ -1553,8 +1501,10 @@
       }
 
       if (ev.type === 'step1') {
-        setStep(1, 'done', `${ev.ingredients.length} ingredients found`);
+        const hasIngredients = (ev.ingredients || []).length > 0;
+        setStep(1, 'done', hasIngredients ? `${ev.ingredients.length} ingredients found` : 'No fridge scan');
         currentFridgeIngredients = ev.ingredients || [];
+        document.getElementById('fridgeIngredientsSection').style.display = hasIngredients ? '' : 'none';
         document.getElementById('fridgeDesc').textContent = ev.raw_description;
         const chips = ev.ingredients.map((i, idx) =>
           `<div class="chip ${confClass(i.confidence)}" style="animation-delay:${idx * 30}ms">
@@ -2320,7 +2270,7 @@
     }
 
     // Initial render
-    setAnalyseDefault();
+    setAnalyseReady('Get Recipe →');
     [1,2,3].forEach(i => setStep(i, '', 'Waiting'));
     try { lucide.createIcons(); } catch {}
   </script>

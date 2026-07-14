@@ -502,6 +502,21 @@ async def scan(
                     ],
                     "source": "inventory",
                 })
+            elif scan_mode == "recipe":
+                # ── Step 1: No fridge data at all — recipe checklist starts
+                #    with everything marked missing until the user checks
+                #    off items or scans their fridge from inside the card ──
+                yield _sse({"type": "progress", "step": 1, "message": "Preparing your recipe…"})
+                fridge = FridgeContents(
+                    ingredients=[],
+                    raw_description="No fridge scan yet — every ingredient starts as missing until you check off what you have.",
+                )
+                yield _sse({
+                    "type": "step1",
+                    "raw_description": fridge.raw_description,
+                    "ingredients": [],
+                    "source": "recipe",
+                })
             else:
                 with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                     tmp.write(img_bytes)
@@ -672,6 +687,43 @@ async def scan(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Vision-only scan — used by the inline "Scan fridge" button inside the
+# recipe checklist card to refresh have_it/missing status without
+# re-running the whole plan_meals pipeline.
+# ---------------------------------------------------------------------------
+
+@app.post("/api/scan/vision-only")
+async def scan_vision_only(file: UploadFile = File(...)):
+    img_bytes = await file.read()
+    suffix = Path(file.filename or "image.jpg").suffix or ".jpg"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(img_bytes)
+            tmp_path = tmp.name
+
+        fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
+
+        return {
+            "raw_description": fridge.raw_description,
+            "ingredients": [
+                {
+                    "name": i.name,
+                    "quantity": i.quantity or "—",
+                    "confidence": round(i.confidence * 100),
+                }
+                for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)
+            ],
+        }
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------
