@@ -69,7 +69,7 @@
 
     /* Layout */
     .page { max-width:480px; margin:0 auto; min-height:100vh; position:relative; z-index:1; }
-    .wrap { padding:16px 16px 96px; }
+    .wrap { padding:16px 16px 32px; }
 
     @media (min-width:481px) {
       .page { max-width:440px; box-shadow:0 0 60px rgba(0,0,0,.5); border-left:1px solid var(--swiggy-border); border-right:1px solid var(--swiggy-border); }
@@ -89,6 +89,7 @@
     }
     .theme-toggle:hover { background:var(--swiggy-hover-overlay); }
     .theme-toggle i { width:18px; height:18px; }
+    .theme-toggle.active { color:var(--swiggy-green); background:var(--swiggy-hover-overlay); }
 
     /* Hero */
     .hero { padding:20px 16px 8px; }
@@ -112,6 +113,17 @@
     }
     .dish-input:focus { border-color:var(--swiggy-orange); box-shadow:0 0 0 3px rgba(252,128,25,.12); }
     .dish-input::placeholder { color:var(--swiggy-placeholder); }
+
+    /* Servings selector */
+    .servings-section { margin:14px 0 4px; }
+    .servings-pills { display:flex; gap:8px; flex-wrap:wrap; }
+    .servings-pill {
+      min-width:40px; height:36px; padding:0 12px; border-radius:10px;
+      border:1px solid var(--swiggy-border); background:transparent; color:var(--swiggy-text-2);
+      font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s ease;
+    }
+    .servings-pill:hover { border-color:var(--swiggy-orange); }
+    .servings-pill.active { background:var(--swiggy-orange); border-color:var(--swiggy-orange); color:#fff; }
 
     /* Mode pills (Scan Photo / Use Pantry) */
     .mode-pills { display:flex; gap:8px; margin:10px 0 14px; }
@@ -233,6 +245,40 @@
     .chip.low { background:var(--swiggy-hover-overlay); border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); }
     .chip.low .chip-dot { background:var(--swiggy-text-3); }
     .chip-pct { color:var(--swiggy-text-3); font-size:11px; }
+
+    /* Recipe checklist card */
+    .recipe-checklist-card { margin-bottom:14px; }
+    .recipe-checklist-header { font-size:15px; font-weight:700; color:var(--swiggy-text); margin-bottom:2px; overflow-wrap:break-word; word-break:normal; }
+    .recipe-checklist-sub { font-size:12px; color:var(--swiggy-text-3); margin-bottom:12px; }
+    .recipe-rows { display:flex; flex-direction:column; gap:6px; }
+    .recipe-row {
+      display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:12px; cursor:pointer;
+      border:1px solid transparent; transition:.15s ease;
+    }
+    .recipe-row-icon { width:18px; height:18px; flex-shrink:0; margin-top:1px; }
+    .recipe-row-info { flex:1; min-width:0; }
+    .recipe-row-name { font-size:13px; font-weight:600; color:var(--swiggy-text); overflow-wrap:break-word; word-break:normal; }
+    .recipe-row-qty { font-size:11px; color:var(--swiggy-text-2); margin-top:2px; overflow-wrap:break-word; word-break:normal; }
+
+    .recipe-row.have_it { background:rgba(72,196,121,.1); border-color:rgba(72,196,121,.25); }
+    .recipe-row.have_it .recipe-row-icon { color:var(--swiggy-green); }
+
+    .recipe-row.missing { background:rgba(231,76,60,.1); border-color:rgba(231,76,60,.25); }
+    .recipe-row.missing .recipe-row-icon { color:var(--swiggy-red); }
+
+    .recipe-row.unchecked { background:var(--swiggy-surface-2); opacity:.65; }
+    .recipe-row.unchecked .recipe-row-icon { color:var(--swiggy-text-3); }
+    .recipe-row.unchecked .recipe-row-name, .recipe-row.unchecked .recipe-row-qty { text-decoration:line-through; color:var(--swiggy-text-3); }
+
+    .recipe-checklist-footer { margin-top:14px; padding-top:12px; border-top:1px solid var(--swiggy-border); }
+    .recipe-order-count { font-size:12px; color:var(--swiggy-text-2); margin-bottom:10px; text-align:center; }
+    .recipe-cart-btn {
+      width:100%; height:48px; border-radius:14px; border:none; background:var(--swiggy-orange); color:#fff;
+      font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .recipe-cart-btn:hover { background:var(--swiggy-orange-dark); }
+    .recipe-cart-btn i { width:16px; height:16px; }
 
     /* Meal cards */
     #mealCards { display:flex; flex-direction:column; gap:10px; }
@@ -377,27 +423,13 @@
 
     /* Toast */
     .toast {
-      position:fixed; left:50%; bottom:80px; transform:translateX(-50%) translateY(20px);
+      position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
       background:var(--swiggy-surface-2); border:1px solid var(--swiggy-border); color:var(--swiggy-text);
       padding:12px 18px; border-radius:12px; font-size:13px; z-index:60; opacity:0;
       transition:.3s ease; pointer-events:none; max-width:90%; text-align:center;
     }
     .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-    /* ── Bottom navigation ─────────────────────────────────────────── */
-    .bottom-nav {
-      position:fixed; bottom:0; left:0; right:0; z-index:40; height:56px;
-      background:var(--swiggy-nav-bg); backdrop-filter:blur(12px); border-top:1px solid var(--swiggy-border);
-      display:flex; justify-content:center;
-    }
-    .bottom-nav-inner { max-width:480px; width:100%; display:flex; }
-    .nav-tab {
-      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-      background:none; border:none; cursor:pointer; font-family:inherit; color:var(--swiggy-text-3);
-      font-size:11px; font-weight:600; transition:.15s ease;
-    }
-    .nav-tab i { width:20px; height:20px; }
-    .nav-tab.active { color:var(--swiggy-orange); }
 
     /* ── Pantry dashboard (merged from templates/pantry.html) ───────── */
     .pantry-cook-btn {
@@ -466,13 +498,13 @@
     .purchased-btn:hover { background:rgba(72,196,121,.2); }
 
     .fab {
-      position:fixed; bottom:80px; right:calc(50% - 220px + 20px); z-index:35;
+      position:fixed; bottom:24px; right:calc(50% - 220px + 20px); z-index:35;
       width:52px; height:52px; border-radius:50%; background:var(--swiggy-orange); color:#fff; border:none;
       display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(252,128,25,.4); cursor:pointer;
     }
     @media (max-width:480px) { .fab { right:20px; } }
     .fab i { width:24px; height:24px; }
-    #pantryTab .wrap { margin-bottom:70px; }
+    #pantryTab .wrap { margin-bottom:80px; }
 
     .shopping-panel { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:16px; padding:16px; margin-top:20px; }
     .shopping-panel h3 { font-size:14px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
@@ -600,6 +632,9 @@
         <button type="button" class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle light and dark mode">
           <i data-lucide="moon" id="themeToggleIcon"></i>
         </button>
+        <button type="button" class="theme-toggle" id="pantryToggleBtn" onclick="togglePantryPanel()" aria-label="Home Pantry" title="Home Pantry">
+          <i data-lucide="package"></i>
+        </button>
         <div class="auth-pill" id="authPill"></div>
       </div>
     </header>
@@ -616,6 +651,21 @@
         <div class="input-section">
           <label class="input-label" for="targetDish">I want to eat...</label>
           <input type="text" id="targetDish" class="dish-input" placeholder="e.g. Biryani, Pasta, Dal Makhani..." />
+        </div>
+
+        <!-- Servings selector -->
+        <div class="servings-section">
+          <label class="input-label">For how many people?</label>
+          <div class="servings-pills" id="servingsPills">
+            <button type="button" class="servings-pill" data-servings="1" onclick="setServings(1)">1</button>
+            <button type="button" class="servings-pill active" data-servings="2" onclick="setServings(2)">2</button>
+            <button type="button" class="servings-pill" data-servings="3" onclick="setServings(3)">3</button>
+            <button type="button" class="servings-pill" data-servings="4" onclick="setServings(4)">4</button>
+            <button type="button" class="servings-pill" data-servings="5" onclick="setServings(5)">5</button>
+            <button type="button" class="servings-pill" data-servings="6" onclick="setServings(6)">6</button>
+            <button type="button" class="servings-pill" data-servings="8" onclick="setServings(8)">8</button>
+            <button type="button" class="servings-pill" data-servings="10" onclick="setServings(10)">10</button>
+          </div>
         </div>
 
         <!-- Scan Photo / Use Pantry pills -->
@@ -717,6 +767,9 @@
             <div class="chips" id="ingredientChips"></div>
           </div>
 
+          <!-- Recipe checklist (only if the plan returned recipe_ingredients) -->
+          <div id="recipeChecklistSection"></div>
+
           <!-- Meals -->
           <div class="section-label"><i data-lucide="star"></i> Meal Suggestions</div>
           <div id="mealCards"></div>
@@ -768,14 +821,6 @@
 
       <button class="fab" id="fabAdd" onclick="openAddModal()"><i data-lucide="plus"></i></button>
     </div>
-
-    <!-- ═══════════════ BOTTOM NAV ═══════════════ -->
-    <nav class="bottom-nav">
-      <div class="bottom-nav-inner">
-        <button class="nav-tab active" id="navCook" onclick="switchTab('cook')"><i data-lucide="utensils"></i><span>Cook</span></button>
-        <button class="nav-tab" id="navPantry" onclick="switchTab('pantry')"><i data-lucide="package"></i><span>Pantry</span></button>
-      </div>
-    </nav>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -862,12 +907,17 @@
       const isCook = tab === 'cook';
       document.getElementById('cookTab').style.display = isCook ? '' : 'none';
       document.getElementById('pantryTab').style.display = isCook ? 'none' : '';
-      document.getElementById('navCook').classList.toggle('active', isCook);
-      document.getElementById('navPantry').classList.toggle('active', !isCook);
+      const pantryBtn = document.getElementById('pantryToggleBtn');
+      if (pantryBtn) pantryBtn.classList.toggle('active', !isCook);
       if (!isCook && !inventoryLoaded) {
         loadInventory();
       }
       try { lucide.createIcons(); } catch {}
+    }
+
+    function togglePantryPanel() {
+      const pantryVisible = document.getElementById('pantryTab').style.display !== 'none';
+      switchTab(pantryVisible ? 'cook' : 'pantry');
     }
 
     /* ═══════════════ COOK TAB — SCAN FLOW ═══════════════ */
@@ -881,6 +931,14 @@
 
     let selectedFile = null;
     let inventoryMode = false;
+    let servings = 2;
+
+    function setServings(n) {
+      servings = n;
+      document.querySelectorAll('.servings-pill').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.servings, 10) === n);
+      });
+    }
 
     function setMode(mode) {
       inventoryMode = mode === 'inventory';
@@ -1037,6 +1095,122 @@
     let currentMealName = null;
     let currentMissingIngredients = [];
     let currentTopUpSuggestions = [];
+    let currentFridgeIngredients = [];
+    let currentRecipeChecklist = [];
+    let currentRecipeDishName = '';
+    let currentRecipeServings = 2;
+
+    /* ═══════════════ RECIPE CART CHECKLIST ═══════════════ */
+    function matchRecipeToFridge(recipeIngredients, fridgeIngredients) {
+      const fridgeNames = fridgeIngredients.map(
+        i => i.name.toLowerCase()
+      );
+
+      return recipeIngredients.map(ing => {
+        const name = ing.name.toLowerCase();
+
+        // Check if any fridge ingredient name contains
+        // this ingredient name or vice versa
+        const found = fridgeNames.some(f =>
+          f.includes(name) || name.includes(f) ||
+          // Handle common aliases
+          (name.includes('onion') && f.includes('onion')) ||
+          (name.includes('tomato') && f.includes('tomato')) ||
+          (name.includes('garlic') && f.includes('garlic'))
+        );
+
+        return {
+          ...ing,
+          status: ing.is_staple ? 'have_it' :
+                  found ? 'have_it' : 'missing'
+        };
+      });
+    }
+
+    function renderRecipeChecklist(ev) {
+      const section = document.getElementById('recipeChecklistSection');
+      if (!section) return;
+      const recipeIngredients = ev.recipe_ingredients || [];
+      if (!recipeIngredients.length) {
+        section.innerHTML = '';
+        currentRecipeChecklist = [];
+        return;
+      }
+
+      currentRecipeDishName = ev.recommended_meal || (ev.suggestions[0] && ev.suggestions[0].name) || 'this dish';
+      currentRecipeServings = servings;
+      const matched = matchRecipeToFridge(recipeIngredients, currentFridgeIngredients);
+      currentRecipeChecklist = matched.map(ing => ({ ...ing, defaultStatus: ing.status }));
+      renderRecipeChecklistCard();
+    }
+
+    function renderRecipeChecklistCard() {
+      const section = document.getElementById('recipeChecklistSection');
+      if (!section) return;
+      if (!currentRecipeChecklist.length) { section.innerHTML = ''; return; }
+
+      const rows = currentRecipeChecklist.map((ing, idx) => {
+        const state = ing.status; // 'have_it' | 'missing' | 'unchecked'
+        const icon = state === 'unchecked' ? 'circle' : state === 'have_it' ? 'check-circle' : 'x-circle';
+        return `
+          <div class="recipe-row ${state}" onclick="toggleRecipeItem(${idx})">
+            <i data-lucide="${icon}" class="recipe-row-icon"></i>
+            <div class="recipe-row-info">
+              <div class="recipe-row-name">${escapeHtml(ing.name)}</div>
+              <div class="recipe-row-qty">${escapeHtml(ing.quantity)}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      const missingCount = currentRecipeChecklist.filter(i => i.status === 'missing').length;
+
+      section.innerHTML = `
+        <div class="card recipe-checklist-card">
+          <div class="recipe-checklist-header">🧾 Recipe — ${escapeHtml(currentRecipeDishName)} for ${currentRecipeServings} people</div>
+          <p class="recipe-checklist-sub">Tap to uncheck items you already have</p>
+          <div class="recipe-rows">${rows}</div>
+          ${missingCount > 0 ? `
+            <div class="recipe-checklist-footer">
+              <p class="recipe-order-count">${missingCount} ingredient${missingCount === 1 ? '' : 's'} to order from Instamart</p>
+              <button class="recipe-cart-btn" onclick="orderRecipeCart()">
+                <i data-lucide="shopping-cart"></i> Add ${missingCount} item${missingCount === 1 ? '' : 's'} to Instamart Cart
+              </button>
+            </div>` : ''}
+        </div>`;
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function toggleRecipeItem(idx) {
+      const item = currentRecipeChecklist[idx];
+      if (!item) return;
+      item.status = (item.status === 'unchecked') ? item.defaultStatus : 'unchecked';
+      renderRecipeChecklistCard();
+    }
+
+    function parseQuantityString(qtyStr) {
+      const match = (qtyStr || '').match(/^([\d.]+)\s*(.*)$/);
+      if (match) {
+        return { qty_needed: parseFloat(match[1]) || 1, unit: match[2].trim() || 'unit' };
+      }
+      return { qty_needed: 1, unit: qtyStr || 'unit' };
+    }
+
+    function orderRecipeCart() {
+      const missingItems = currentRecipeChecklist.filter(i => i.status === 'missing');
+      if (!missingItems.length) return;
+      const cartItems = missingItems.map((ing, idx) => {
+        const { qty_needed, unit } = parseQuantityString(ing.quantity);
+        return {
+          id: `recipe_${idx}_${Date.now()}`,
+          name: ing.name,
+          qty_needed,
+          unit,
+          threshold: qty_needed,
+          category: 'food',
+        };
+      });
+      openSmartCart(cartItems);
+    }
 
     function isInternalReasoning(text) {
       if (!text) return true;
@@ -1336,11 +1510,14 @@
       resultsEl.classList.remove('show');
       document.getElementById('ingredientChips').innerHTML = '';
       document.getElementById('mealCards').innerHTML = '';
+      document.getElementById('recipeChecklistSection').innerHTML = '';
       document.getElementById('choiceCard').innerHTML = '';
       document.getElementById('topUpSection').innerHTML = '';
       document.getElementById('orderCard').innerHTML = '';
       currentMealName = null;
       currentMissingIngredients = [];
+      currentFridgeIngredients = [];
+      currentRecipeChecklist = [];
 
       const form = new FormData();
       if (inventoryMode) {
@@ -1353,6 +1530,7 @@
       if (targetDish) {
         form.append('target_dish', targetDish);
       }
+      form.append('servings', servings);
 
       try {
         const res = await fetch('/api/scan', { method: 'POST', body: form });
@@ -1376,6 +1554,7 @@
 
       if (ev.type === 'step1') {
         setStep(1, 'done', `${ev.ingredients.length} ingredients found`);
+        currentFridgeIngredients = ev.ingredients || [];
         document.getElementById('fridgeDesc').textContent = ev.raw_description;
         const chips = ev.ingredients.map((i, idx) =>
           `<div class="chip ${confClass(i.confidence)}" style="animation-delay:${idx * 30}ms">
@@ -1417,6 +1596,7 @@
           </div>`;
         }).join('');
         document.getElementById('mealCards').innerHTML = cards;
+        renderRecipeChecklist(ev);
         try { lucide.createIcons(); } catch {}
         return;
       }
@@ -1875,38 +2055,46 @@
     }
 
     /* ═══════════════ SMART CART ═══════════════ */
-    async function openSmartCart() {
-      // Get low stock items from current inventory
-      const lowStockItems = inventoryItems.filter(
-        item => item.qty < item.threshold || item.qty === 0
-      ).map(item => ({
-        id: item.id,
-        name: item.name,
-        qty_needed: (() => {
-          const raw = Math.max(0, item.dailyUse * 14 - item.qty);
-          const countableUnits = [
-            'bottle', 'pack', 'piece', 'roll',
-            'box', 'dozen', 'bag', 'bunch'
-          ];
-          return countableUnits.includes(item.unit)
-            ? Math.ceil(raw)
-            : Math.round(raw * 10) / 10;
-        })(),
-        unit: item.unit,
-        threshold: item.threshold,
-        category: item.category
-      }));
+    async function openSmartCart(customItems) {
+      let items;
 
-      if (lowStockItems.length === 0) {
-        showToast("All items are well stocked!");
-        return;
+      if (customItems && customItems.length) {
+        // Called from the recipe checklist with a specific set of
+        // missing ingredients instead of low-stock pantry items.
+        items = customItems;
+      } else {
+        // Get low stock items from current inventory
+        items = inventoryItems.filter(
+          item => item.qty < item.threshold || item.qty === 0
+        ).map(item => ({
+          id: item.id,
+          name: item.name,
+          qty_needed: (() => {
+            const raw = Math.max(0, item.dailyUse * 14 - item.qty);
+            const countableUnits = [
+              'bottle', 'pack', 'piece', 'roll',
+              'box', 'dozen', 'bag', 'bunch'
+            ];
+            return countableUnits.includes(item.unit)
+              ? Math.ceil(raw)
+              : Math.round(raw * 10) / 10;
+          })(),
+          unit: item.unit,
+          threshold: item.threshold,
+          category: item.category
+        }));
+
+        if (items.length === 0) {
+          showToast("All items are well stocked!");
+          return;
+        }
       }
 
       // Check auth status
       const authRes = await fetch('/auth/status');
       const authData = await authRes.json();
 
-      showCartModal(lowStockItems, authData.authenticated);
+      showCartModal(items, authData.authenticated);
     }
 
     function showCartModal(items, isAuthenticated) {

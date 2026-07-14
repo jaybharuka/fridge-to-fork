@@ -23,7 +23,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion
+from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 
 load_dotenv()
 
@@ -232,6 +232,11 @@ Prefer ordering groceries when the user needs just 1-3 ingredients.
 
 """ + _MISSING_INGREDIENT_RULES + """
 
+Also return a complete ingredient list for cooking each suggested dish for {servings} people
+with exact quantities. Be specific: "2 medium onions", "200ml fresh cream", "3 cloves garlic",
+"1 tsp cumin seeds". Include every ingredient including pantry staples for this field
+(unlike missing_ingredients which skips staples).
+
 Return ONLY valid JSON (no markdown, no prose):
 {{
   "suggestions": [
@@ -241,7 +246,14 @@ Return ONLY valid JSON (no markdown, no prose):
       "can_cook_now": <true|false>,
       "missing_ingredients": ["<item>", ...],
       "cuisine": "<e.g. Indian, Italian, Mexican>",
-      "prep_time_minutes": <integer>
+      "prep_time_minutes": <integer>,
+      "recipe_ingredients": [
+        {{
+          "name": "<ingredient name>",
+          "quantity": "<exact amount e.g. '200ml', '2 medium'>",
+          "is_staple": <true|false>
+        }}
+      ]
     }}
   ],
   "decision": "<cook|order_dish|order_groceries>",
@@ -271,6 +283,11 @@ Recommend ONE best action:
 
 """ + _MISSING_INGREDIENT_RULES + """
 
+Also return a complete ingredient list for cooking "{target_dish}" for {servings} people
+with exact quantities. Be specific: "2 medium onions", "200ml fresh cream", "3 cloves garlic",
+"1 tsp cumin seeds". Include every ingredient including pantry staples for this field
+(unlike missing_ingredients which skips staples).
+
 Return ONLY valid JSON (no markdown, no prose) with a single suggestion representing the target dish:
 {{
   "suggestions": [
@@ -280,7 +297,14 @@ Return ONLY valid JSON (no markdown, no prose) with a single suggestion represen
       "can_cook_now": <true|false>,
       "missing_ingredients": ["<missing item 1>", ...],
       "cuisine": "<cuisine type>",
-      "prep_time_minutes": <integer>
+      "prep_time_minutes": <integer>,
+      "recipe_ingredients": [
+        {{
+          "name": "<ingredient name>",
+          "quantity": "<exact amount e.g. '200ml', '2 medium'>",
+          "is_staple": <true|false>
+        }}
+      ]
     }}
   ],
   "decision": "<cook|order_dish|order_groceries>",
@@ -333,6 +357,14 @@ def _call_text_model_with_retry(client: genai.Client, model: str, prompt: str) -
                     missing_ingredients=s.get("missing_ingredients", []),
                     cuisine=s.get("cuisine", ""),
                     prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+                    recipe_ingredients=[
+                        RecipeIngredient(
+                            name=ri.get("name", ""),
+                            quantity=ri.get("quantity", ""),
+                            is_staple=bool(ri.get("is_staple", False)),
+                        )
+                        for ri in s.get("recipe_ingredients", [])
+                    ] or None,
                 )
                 for s in payload.get("suggestions", [])
             ]
@@ -366,6 +398,7 @@ def plan_meals(
     target_dish: Optional[str] = None,
     model: str | None = None,
     client: Optional[genai.Client] = None,
+    servings: int = 2,
 ) -> MealPlan:
     """
     Suggest meals and decide cook-vs-order given fridge contents.
@@ -382,6 +415,9 @@ def plan_meals(
         TEXT_MODEL_FALLBACK_CHAIN in order until one succeeds.
     client:
         Optional pre-built Gemini client.
+    servings:
+        How many people the recipe_ingredients quantities should be
+        scaled for. Defaults to 2.
 
     Returns
     -------
@@ -404,10 +440,10 @@ def plan_meals(
 
     if target_dish:
         prompt = _TARGET_DISH_PROMPT.format(
-            ingredient_list=ingredient_list, target_dish=target_dish
+            ingredient_list=ingredient_list, target_dish=target_dish, servings=servings
         )
     else:
-        prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list)
+        prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list, servings=servings)
 
     chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
 
