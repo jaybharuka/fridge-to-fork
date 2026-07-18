@@ -28,7 +28,9 @@ class FridgeContents:
 class RecipeIngredient:
     name: str
     quantity: str
-    is_staple: bool = False
+    estimated_price_inr: int = 0
+    found_in_fridge: bool = False     # fuzzy-matched against a scanned fridge photo
+    is_staple: bool = False           # assumed available regardless of fridge photo
 
 
 @dataclass
@@ -40,6 +42,8 @@ class MealSuggestion:
     cuisine: str = ""
     prep_time_minutes: int = 0
     recipe_ingredients: list[RecipeIngredient] = None
+    cooking_steps: list[str] = field(default_factory=list)
+    total_order_price_inr: int = 0
 
 
 @dataclass
