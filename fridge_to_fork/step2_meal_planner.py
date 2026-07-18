@@ -14,6 +14,7 @@ Run standalone:
 import argparse
 import json
 import os
+import re
 import time
 from typing import Optional
 
@@ -28,6 +29,106 @@ from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggesti
 load_dotenv()
 
 console = Console()
+
+
+# ---------------------------------------------------------------------------
+# Fridge / staple matching — deterministic, Python-side (not left to the LLM
+# to self-report, since that proved unreliable in practice)
+# ---------------------------------------------------------------------------
+
+# Assumed available regardless of what's in the fridge photo (or when
+# there's no photo at all) — a normal Indian kitchen has these.
+_STAPLES = [
+    "salt", "oil", "ghee", "butter", "water", "flour", "sugar",
+    "cumin seeds", "mustard seeds", "turmeric", "red chilli powder",
+    "coriander powder", "garam masala", "onions", "garlic", "ginger",
+    "green chillies", "potatoes", "tomatoes", "lemon",
+]
+
+_DESCRIPTIVE_WORDS = {
+    "fresh", "chopped", "whole", "medium", "large", "small", "grated",
+    "sliced", "minced", "dried", "ripe", "raw", "boiled", "cooked",
+    "or", "and", "of", "the", "a",
+}
+
+# Spelling variants that the naive pluralization heuristic below turns
+# into different strings (e.g. "chili"/"chilies"/"chilly"/"chily" from
+# "chilli"/"chillies") — canonicalize them to one token so they still match.
+_SPELLING_VARIANTS = {
+    "chili": "chilli", "chilies": "chilli", "chily": "chilli", "chilly": "chilli",
+    "yogurt": "yoghurt", "curd": "yoghurt",
+}
+
+
+def _normalize_ingredient_words(name: str) -> set[str]:
+    """Lowercase, strip descriptive words, and naively singularize each
+    word so "Fresh Tomatoes" and "tomato" both reduce to {"tomato"}."""
+    words = re.findall(r"[a-z]+", name.lower())
+    result = set()
+    for word in words:
+        if word in _DESCRIPTIVE_WORDS:
+            continue
+        if word.endswith("ies") and len(word) > 4:
+            word = word[:-3] + "y"
+        elif word.endswith("es") and len(word) > 3:
+            word = word[:-2]
+        elif word.endswith("s") and len(word) > 3:
+            word = word[:-1]
+        word = _SPELLING_VARIANTS.get(word, word)
+        result.add(word)
+    return result
+
+
+def _fuzzy_ingredient_match(recipe_name: str, candidate_names: list[str]) -> bool:
+    """True if `recipe_name` fuzzy-matches any of `candidate_names` —
+    case/plural/descriptive-word insensitive. Uses subset containment
+    (not "any shared word") so e.g. "ginger-garlic paste" still matches
+    a plain "ginger", but "coriander leaves" does NOT falsely match a
+    "coriander powder" staple just because both mention coriander."""
+    recipe_words = _normalize_ingredient_words(recipe_name)
+    if not recipe_words:
+        return False
+    for candidate in candidate_names:
+        candidate_words = _normalize_ingredient_words(candidate)
+        if not candidate_words:
+            continue
+        if candidate_words <= recipe_words or recipe_words <= candidate_words:
+            return True
+    return False
+
+
+def _is_pantry_staple(recipe_name: str) -> bool:
+    return _fuzzy_ingredient_match(recipe_name, _STAPLES)
+
+
+def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPlan:
+    """
+    Deterministically (not via LLM self-report) fill in is_staple and
+    found_in_fridge on every recipe ingredient, then derive the
+    recommended meal's missing_ingredients (name + total price) from
+    whatever's left unchecked — neither a staple nor detected in the
+    fridge photo. No cook/order_groceries/order_dish decision is made
+    here; the user picks for themselves between ordering the missing
+    items or ordering the finished dish.
+    """
+    fridge_names = [ing.name for ing in fridge.ingredients]
+
+    for suggestion in plan.suggestions:
+        if not suggestion.recipe_ingredients:
+            continue
+        for ri in suggestion.recipe_ingredients:
+            ri.is_staple = _is_pantry_staple(ri.name)
+            ri.found_in_fridge = _fuzzy_ingredient_match(ri.name, fridge_names)
+
+    if plan.recommended_meal and plan.recommended_meal.recipe_ingredients:
+        missing = [
+            ri for ri in plan.recommended_meal.recipe_ingredients
+            if not (ri.is_staple or ri.found_in_fridge)
+        ]
+        plan.recommended_meal.missing_ingredients = [ri.name for ri in missing]
+        plan.recommended_meal.total_order_price_inr = sum(ri.estimated_price_inr for ri in missing)
+
+    return plan
 
 
 def _ascii_safe(value) -> str:
@@ -102,6 +203,11 @@ def _fallback_meal_plan(
                 missing_ingredients=missing or [],
                 cuisine="Various",
                 prep_time_minutes=30,
+                cooking_steps=[
+                    "Gather and prep all the ingredients listed above.",
+                    f"Follow your usual method for {target_dish}, adjusting seasoning to taste.",
+                    "Cook until done, then serve hot.",
+                ],
             )
         ]
         decision = Decision.COOK if len(missing) == 0 else Decision.ORDER_GROCERIES
@@ -156,86 +262,44 @@ def _fallback_meal_plan(
 # Prompts
 # ---------------------------------------------------------------------------
 
-_CRITICAL_PANTRY_RULE = """\
-CRITICAL RULE — read this first:
-The following items are ALWAYS assumed to be available in any Indian
-household. NEVER list them as missing ingredients, under any
-circumstances:
-- Oils and fats: cooking oil, vegetable oil, mustard oil, ghee, butter
-- Salt and basic spices: salt, sugar, black pepper, red chili powder,
-  turmeric (haldi), cumin (jeera), coriander powder, garam masala,
-  mustard seeds, curry leaves, bay leaves, cardamom, cloves, cinnamon
-- Pantry staples: flour (maida/atta), rice, dal, water, baking soda,
-  baking powder, vinegar, soy sauce, tomato ketchup
-- Non-fridge vegetables: onions, garlic, ginger, potatoes, tomatoes,
-  green chilies
-- Bread and grains: bread, roti, dry pasta, dry noodles
-- Tea and coffee
+_RECIPE_RULES = """\
+RECIPE INGREDIENTS — for the suggested dish, return every single
+ingredient needed to cook it — do not classify ingredients as staples,
+garnishes, "have", or "missing", and do not compare against the fridge
+contents. Just list everything the recipe requires; a separate process
+(not you) will determine what the user already has.
 
-If ALL missing items for a dish fall into the above categories, the
-decision MUST be "cook" not "order_groceries".
+QUANTITIES — scale every ingredient's quantity to the requested number
+of servings (see below), and include the unit in the same field, e.g.
+"200g", "2 medium", "1 tsp".
+
+PRICES — every ingredient must include a realistic estimated_price_inr
+as a plain integer in Indian Rupees, for the quantity listed. Never
+null, never "--", never omit this field.
 """
 
-_MISSING_INGREDIENT_RULES = """\
-IMPORTANT RULES FOR MISSING INGREDIENTS:
-
-1. PANTRY STAPLES — Never mark these as missing, assume the user has them:
-   Salt, sugar, black pepper, red chili powder, turmeric, cumin, coriander
-   powder, garam masala, mustard seeds, curry leaves, bay leaves, cooking oil
-   (any kind), ghee, butter, flour (maida/atta), rice, basic lentils (dal),
-   vinegar, soy sauce, baking soda, baking powder, water.
-
-2. NON-FRIDGE ITEMS — Never mark these as missing just because they aren't
-   in the fridge photo. These are commonly stored at room temperature:
-   Onions, garlic, ginger, potatoes, tomatoes, bananas, bread, dry pasta,
-   dry noodles, canned goods, packaged spices, tea, coffee.
-
-3. DECISION LOGIC — Apply this strictly:
-   - If the only "missing" items are pantry staples or non-fridge items
-     from the lists above → decision must be "cook", not "order_groceries"
-   - Only mark something as missing if it is a SPECIFIC ingredient that
-     is genuinely uncommon to have at home (e.g. arborio rice, saffron,
-     specific vegetables the dish is named after like bhindi/okra)
-   - For "order_groceries": only list items that are genuinely missing and
-     NOT on the pantry staples or non-fridge lists above
-   - The dish the user asked for is their TARGET — try hard to find a way
-     to cook it before deciding to order
-
-4. EXAMPLE — For "Bhindi Fry":
-   - Bhindi (okra) → check if in fridge. If not → missing (it's the main ingredient)
-   - Cooking oil → assume available (pantry staple) → NOT missing
-   - Salt → assume available (pantry staple) → NOT missing
-   - Onion → assume available (non-fridge item) → NOT missing
-   - Spices → assume available (pantry staples) → NOT missing
-   - Result: only missing item is bhindi itself → decision: order_groceries
-     (just order the bhindi), not order_dish
-"""
-
-_PROMPT_TEMPLATE = _CRITICAL_PANTRY_RULE + """
+_PROMPT_TEMPLATE = _RECIPE_RULES + """
 You are an expert chef and nutritionist helping a busy person decide what to eat.
 
-Available ingredients:
+Ingredients detected in their fridge (for inspiration only):
 {ingredient_list}
 
-Suggest 3 to 5 meals. For each meal state:
-- Whether it can be cooked right now with the listed ingredients
-- Which ingredients are missing (if any)
-
-Also recommend ONE best action:
-- "cook"             → cook the best available meal
-- "order_dish"       → order the finished dish from a food-delivery service
-- "order_groceries"  → order the 1-2 missing ingredients from a quick-commerce service and then cook
-
-Prefer cooking when ≥70% of ingredients are present and missing items are few.
-Prefer ordering the dish when the user would need to buy 5+ ingredients.
-Prefer ordering groceries when the user needs just 1-3 ingredients.
-
-""" + _MISSING_INGREDIENT_RULES + """
+Suggest 3 to 5 meals inspired by what's available. For each meal, give a
+complete recipe per the RECIPE INGREDIENTS rules above.
 
 Also return a complete ingredient list for cooking each suggested dish for {servings} people
-with exact quantities. Be specific: "2 medium onions", "200ml fresh cream", "3 cloves garlic",
-"1 tsp cumin seeds". Include every ingredient including pantry staples for this field
-(unlike missing_ingredients which skips staples).
+with exact quantities, SCALED to {servings} servings — do not use a fixed base-recipe amount
+regardless of the number of people. Work out the per-serving amount and multiply it by
+{servings}. Example: if a base recipe for 2 people needs "1 cup rice", for {servings} people
+that becomes roughly "{servings_half} cups rice" (i.e. 0.5 cup per person x {servings}). Apply
+that same scaling logic to every quantity. Be specific: "2 medium onions", "200ml fresh cream",
+"3 cloves garlic", "1 tsp cumin seeds".
+
+Also return clear step-by-step cooking instructions as a numbered "cooking_steps" array — one
+imperative sentence per step (e.g. "Heat oil in a pan over medium heat", "Add chopped onions
+and saute until golden"), enough steps to actually cook the dish start to finish. This is the
+recipe itself, so it must be complete and followable, not a summary. prep_time_minutes must be
+a realistic estimate for this specific dish, not a generic default like 30 for everything.
 
 Return ONLY valid JSON (no markdown, no prose):
 {{
@@ -243,50 +307,49 @@ Return ONLY valid JSON (no markdown, no prose):
     {{
       "name": "<meal name>",
       "description": "<one sentence>",
-      "can_cook_now": <true|false>,
-      "missing_ingredients": ["<item>", ...],
       "cuisine": "<e.g. Indian, Italian, Mexican>",
       "prep_time_minutes": <integer>,
       "recipe_ingredients": [
         {{
           "name": "<ingredient name>",
-          "quantity": "<exact amount e.g. '200ml', '2 medium'>",
-          "is_staple": <true|false>
+          "quantity": "<exact amount with unit, e.g. '200ml', '2 medium'>",
+          "estimated_price_inr": <integer>
         }}
-      ]
+      ],
+      "cooking_steps": ["<step 1>", "<step 2>", ...]
     }}
   ],
-  "decision": "<cook|order_dish|order_groceries>",
   "recommended_meal": "<meal name from the list above>",
-  "reasoning": "<one or two sentences explaining the decision>"
+  "reasoning": "<one or two sentences about the recommended dish>"
 }}
 """
 
 
-_TARGET_DISH_PROMPT = _CRITICAL_PANTRY_RULE + """
+_TARGET_DISH_PROMPT = _RECIPE_RULES + """
 You are an expert chef and nutritionist helping a busy person.
 
 The user explicitly wants to eat: "{target_dish}"
 
-Available ingredients in their fridge:
+Ingredients detected in their fridge (for inspiration only):
 {ingredient_list}
 
-Evaluate if they can make "{target_dish}" with what they have.
-State:
-- Whether it can be cooked right now
-- Exactly which ingredients are missing to make it
-
-Recommend ONE best action:
-- "cook"             → if they have everything needed to make "{target_dish}"
-- "order_groceries"  → if they are missing a few ingredients and should order them via quick-commerce to cook it
-- "order_dish"       → if they are missing almost everything and should just order the finished dish from a restaurant
-
-""" + _MISSING_INGREDIENT_RULES + """
+Give a complete recipe for "{target_dish}" per the RECIPE INGREDIENTS
+rules above.
 
 Also return a complete ingredient list for cooking "{target_dish}" for {servings} people
-with exact quantities. Be specific: "2 medium onions", "200ml fresh cream", "3 cloves garlic",
-"1 tsp cumin seeds". Include every ingredient including pantry staples for this field
-(unlike missing_ingredients which skips staples).
+with exact quantities, SCALED to {servings} servings — do not use a fixed base-recipe amount
+regardless of the number of people. Work out the per-serving amount and multiply it by
+{servings}. Example: if a base recipe for 2 people needs "1 cup rice", for {servings} people
+that becomes roughly "{servings_half} cups rice" (i.e. 0.5 cup per person x {servings}). Apply
+that same scaling logic to every quantity. Be specific: "2 medium onions", "200ml fresh cream",
+"3 cloves garlic", "1 tsp cumin seeds".
+
+Also return clear step-by-step cooking instructions as a numbered "cooking_steps" array — one
+imperative sentence per step (e.g. "Heat oil in a pan over medium heat", "Add chopped onions
+and saute until golden"), enough steps to actually cook "{target_dish}" start to finish. This
+is the recipe itself, so it must be complete and followable, not a summary. prep_time_minutes
+must be a realistic estimate for "{target_dish}" specifically, not a generic default like 30
+for everything.
 
 Return ONLY valid JSON (no markdown, no prose) with a single suggestion representing the target dish:
 {{
@@ -294,22 +357,20 @@ Return ONLY valid JSON (no markdown, no prose) with a single suggestion represen
     {{
       "name": "<name of the target dish>",
       "description": "<one sentence describing the dish>",
-      "can_cook_now": <true|false>,
-      "missing_ingredients": ["<missing item 1>", ...],
       "cuisine": "<cuisine type>",
       "prep_time_minutes": <integer>,
       "recipe_ingredients": [
         {{
           "name": "<ingredient name>",
-          "quantity": "<exact amount e.g. '200ml', '2 medium'>",
-          "is_staple": <true|false>
+          "quantity": "<exact amount with unit, e.g. '200ml', '2 medium'>",
+          "estimated_price_inr": <integer>
         }}
-      ]
+      ],
+      "cooking_steps": ["<step 1>", "<step 2>", ...]
     }}
   ],
-  "decision": "<cook|order_dish|order_groceries>",
   "recommended_meal": "<name of the target dish>",
-  "reasoning": "<one or two sentences explaining why they should cook, order groceries, or order the dish>"
+  "reasoning": "<one or two sentences about the dish>"
 }}
 """
 
@@ -353,18 +414,23 @@ def _call_text_model_with_retry(client: genai.Client, model: str, prompt: str) -
                 MealSuggestion(
                     name=s["name"],
                     description=s.get("description", ""),
-                    can_cook_now=bool(s.get("can_cook_now", False)),
-                    missing_ingredients=s.get("missing_ingredients", []),
+                    # No more have/missing classification, so this no longer
+                    # reflects fridge contents — it's unused by the UI.
+                    can_cook_now=True,
                     cuisine=s.get("cuisine", ""),
                     prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+                    # is_staple / found_in_fridge are filled in afterwards by
+                    # _enrich_recipe_ingredients() — deterministic Python
+                    # matching, not left to the LLM to self-report.
                     recipe_ingredients=[
                         RecipeIngredient(
                             name=ri.get("name", ""),
                             quantity=ri.get("quantity", ""),
-                            is_staple=bool(ri.get("is_staple", False)),
+                            estimated_price_inr=int(ri.get("estimated_price_inr", 0) or 0),
                         )
                         for ri in s.get("recipe_ingredients", [])
                     ] or None,
+                    cooking_steps=[step for step in s.get("cooking_steps", []) if step],
                 )
                 for s in payload.get("suggestions", [])
             ]
@@ -438,12 +504,19 @@ def plan_meals(
     if not ingredient_list:
         ingredient_list = "(no ingredients detected)"
 
+    servings_half = round(servings * 0.5, 1)
+    if servings_half == int(servings_half):
+        servings_half = int(servings_half)
+
     if target_dish:
         prompt = _TARGET_DISH_PROMPT.format(
-            ingredient_list=ingredient_list, target_dish=target_dish, servings=servings
+            ingredient_list=ingredient_list, target_dish=target_dish,
+            servings=servings, servings_half=servings_half,
         )
     else:
-        prompt = _PROMPT_TEMPLATE.format(ingredient_list=ingredient_list, servings=servings)
+        prompt = _PROMPT_TEMPLATE.format(
+            ingredient_list=ingredient_list, servings=servings, servings_half=servings_half
+        )
 
     chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
 
@@ -451,7 +524,7 @@ def plan_meals(
         try:
             result = _call_text_model_with_retry(client, chain_model, prompt)
             console.print(f"[green][OK] Meal planning succeeded with model: {chain_model}[/green]")
-            return result
+            return _enrich_recipe_ingredients(result, fridge)
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                 console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
@@ -459,7 +532,7 @@ def plan_meals(
                 console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
 
     console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
-    return _fallback_meal_plan(fridge, target_dish)
+    return _enrich_recipe_ingredients(_fallback_meal_plan(fridge, target_dish), fridge)
 
 
 # ---------------------------------------------------------------------------
@@ -472,10 +545,12 @@ delivery platform.
 
 The user is planning to make: {meal_name}
 Their fridge contains: {ingredient_list}
+Ingredients already missing for this dish (being ordered separately —
+never suggest these here): {missing_ingredients}
 AI decision: {decision}
 
-Suggest exactly 3 smart "upgrade" items that would genuinely improve
-this meal. These should be small, affordable, impulse purchases.
+Suggest at most 3 smart "upgrade" items that would genuinely improve
+this specific meal. These should be small, affordable, impulse purchases.
 
 RULES:
 - If decision is "cook" or "order_groceries": suggest items from
@@ -483,12 +558,21 @@ RULES:
   elevate the dish)
 - If decision is "order_dish": suggest complementary items from
   Swiggy Food (side dishes, drinks, desserts that pair well)
-- Each suggestion must be specific and relevant to {meal_name}
+- Never suggest anything already listed in the missing ingredients above
+- Never suggest a pantry staple: salt, sugar, water, cooking oil, ghee,
+  butter, cumin seeds, mustard seeds, turmeric powder, red chilli powder,
+  coriander powder, cumin powder, garam masala, hing, bay leaves, cloves,
+  cardamom, cinnamon, black pepper, dried red chillies, onions, garlic,
+  ginger, green chillies, tomatoes, potatoes, lemon, lime, wheat flour,
+  baking soda, vinegar
+- Never suggest something the user already has in their fridge
+- Every suggestion must be vegetarian
+- Each suggestion must be a genuine upgrade specific to {meal_name}, not
+  a generic add-on that would fit any dish
 - Price should be realistic for Indian market (₹30-₹200 range)
 - At least one suggestion should be under ₹60 (low friction)
-- Never suggest something the user already has in their fridge
 
-Return ONLY a valid JSON array with exactly 3 objects:
+Return ONLY a valid JSON array with at most 3 objects:
 [
   {{
     "name": "Fresh Strawberries",
@@ -561,23 +645,31 @@ def generate_top_up_suggestions(
         return []
 
     ingredient_list = ", ".join(ing.name for ing in fridge.ingredients) or "(nothing detected)"
+    missing_ingredients = ", ".join(meal.missing_ingredients) if meal and meal.missing_ingredients else "(none)"
     prompt = _TOP_UP_PROMPT.format(
         meal_name=meal.name if meal else "this meal",
         ingredient_list=ingredient_list,
+        missing_ingredients=missing_ingredients,
         decision=decision.value,
     )
 
     chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
+
+    missing_names = meal.missing_ingredients if meal and meal.missing_ingredients else []
 
     for chain_model in chain:
         print(f"[TOP_UP] Attempting with model: {chain_model}")
         try:
             response = client.models.generate_content(model=chain_model, contents=prompt)
             suggestions = _parse_top_up_response(response.text)
+            suggestions = [
+                s for s in suggestions
+                if not _fuzzy_ingredient_match(s["name"], missing_names)
+            ]
             print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
             if suggestions:
                 console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model}[/green]")
-                return suggestions
+                return suggestions[:3]
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                 console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model for top-up...[/yellow]")
