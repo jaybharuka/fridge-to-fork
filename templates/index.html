@@ -6,65 +6,79 @@
   <meta name="theme-color" content="#FFFFFF" />
   <title>Fridge to Fork</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Swiggy/Instamart-style palette: white surfaces, orange as the only
-       accent color. The dark/light toggle still works (existing JS is
-       untouched) but both states now render this same white look — the
-       app no longer has a dark theme, per the redesign brief. */
+    /* Enterprise palette: orange as the fixed primary accent (identical
+       in both themes), a neutral grey scale for surfaces/text, a real
+       success green for positive states. Dark mode is driven by
+       [data-theme="dark"] on the html element, toggled in JS, defaulting
+       to prefers-color-scheme. Legacy --swiggy- and --grey- prefixed
+       names are kept as aliases onto the canonical tokens below so every
+       existing component rule (and every var(--swiggy-...) reference
+       embedded in JS template strings) repaints automatically when the
+       theme flips. */
     :root {
-      --bg: #ffffff;
-      --bg-1: #f8f8f8;
-      --bg-2: #ffffff;
-      --bg-3: #f5f5f5;
-      --border: #eeeeee;
-      --border-2: #e2e2e2;
-      --text: #1c1c1c;
-      --text-2: #6b6b6b;
-      --text-3: #9b9b9b;
+      --bg: #FFFFFF;
+      --bg-secondary: #F8F8F8;
+      --bg-card: #FFFFFF;
+      --border: #E4E4E4;
+      --text-primary: #1A1A1A;
+      --text-secondary: #6B6B6B;
+      --text-muted: #757575;
+      --shadow: 0 2px 8px rgba(0,0,0,0.06);
       --orange: #FC8019;
-      --orange-dark: #E36F13;
-      --orange-dim: rgba(252,128,25,0.08);
+      --orange-light: #FFF3E8;
+      --orange-dark: #E8700A;
+      --bg-rgb: 255,255,255;
+      --success: #2ECC71;
+
+      --grey-50: var(--bg-secondary);
+      --grey-100: #F0F0F0;
+      --grey-200: var(--border);
+      --grey-400: var(--text-muted);
+      --grey-900: var(--text-primary);
+
+      --bg-1: var(--bg-secondary);
+      --bg-2: var(--bg-card);
+      --bg-3: var(--bg-secondary);
+      --border-2: var(--border);
+      --text: var(--text-primary);
+      --text-2: var(--text-secondary);
+      --text-3: var(--text-muted);
+      --orange-dim: var(--orange-light);
       --orange-border: rgba(252,128,25,0.3);
-      /* Orange is the only accent color — green/blue are neutralized to
-         plain text/near-black so nothing else reads as a second brand
-         color. --red is kept solely for genuine error states. */
-      --green: #1c1c1c;
-      --green-deep: #1c1c1c;
-      --green-dim: rgba(28,28,28,0.05);
-      --green-border: rgba(28,28,28,0.14);
+      --green: var(--success);
+      --green-deep: var(--success);
+      --green-dim: rgba(46,204,113,0.08);
+      --green-border: rgba(46,204,113,0.25);
       --red: #E02020;
       --red-dim: rgba(224,32,32,0.06);
       --red-border: rgba(224,32,32,0.2);
-      --blue: #1c1c1c;
+      --blue: var(--text-primary);
       --blue-dim: rgba(28,28,28,0.05);
       --blue-border: rgba(28,28,28,0.14);
       --yellow: #E0A32C;
-      --radius: 12px;
+      --radius: 14px;
       --radius-sm: 10px;
-      --radius-pill: 20px;
-      --placeholder: #bbbbbb;
-      --header-bg: rgba(255,255,255,.95);
-      --hairline: rgba(0,0,0,.06);
+      --radius-pill: 999px;
+      --placeholder: var(--text-muted);
+      --header-bg: rgba(255,255,255,.85);
+      --hairline: var(--border);
       --hover-overlay: rgba(0,0,0,.04);
-      --card-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-      --hint-faint: #e2e2e2;
+      --card-shadow: var(--shadow);
+      --hint-faint: var(--border);
 
-      /* Back-compat aliases: the component CSS/JS below this point was
-         written against --swiggy-*. Pointing those names at the new
-         tokens means the whole page repaints with the new design
-         system without needing every rule rewritten by hand. */
       --swiggy-orange: var(--orange);
       --swiggy-orange-dark: var(--orange-dark);
       --swiggy-bg: var(--bg);
-      --swiggy-surface: var(--bg-2);
-      --swiggy-surface-2: var(--bg-3);
+      --swiggy-surface: var(--bg-card);
+      --swiggy-surface-2: var(--bg-secondary);
       --swiggy-border: var(--border);
-      --swiggy-text: var(--text);
-      --swiggy-text-2: var(--text-2);
-      --swiggy-text-3: var(--text-3);
+      --swiggy-text: var(--text-primary);
+      --swiggy-text-2: var(--text-secondary);
+      --swiggy-text-3: var(--text-muted);
       --swiggy-green: var(--green);
       --swiggy-green-deep: var(--green-deep);
       --swiggy-blue: var(--blue);
@@ -79,48 +93,50 @@
       --swiggy-hint-faint: var(--hint-faint);
     }
 
-    /* The light-mode toggle class still exists functionally (JS
-       unchanged) but resolves to the same white palette — there is no
-       separate dark theme in this design. */
-    body.light-mode {
-      --bg: #ffffff;
-      --bg-1: #f8f8f8;
-      --bg-2: #ffffff;
-      --bg-3: #f5f5f5;
-      --border: #eeeeee;
-      --border-2: #e2e2e2;
-      --text: #1c1c1c;
-      --text-2: #6b6b6b;
-      --text-3: #9b9b9b;
-      --orange-dim: rgba(252,128,25,0.08);
-      --green-dim: rgba(28,28,28,0.05);
-      --red-dim: rgba(224,32,32,0.06);
-      --blue-dim: rgba(28,28,28,0.05);
-      --placeholder: #bbbbbb;
-      --header-bg: rgba(255,255,255,.95);
-      --hairline: rgba(0,0,0,.06);
-      --hover-overlay: rgba(0,0,0,.04);
-      --card-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-      --hint-faint: #e2e2e2;
+    [data-theme="dark"] {
+      --bg: #0F0F0F;
+      --bg-secondary: #1A1A1A;
+      --bg-card: #1E1E1E;
+      --border: #2A2A2A;
+      --text-primary: #F5F5F5;
+      --text-secondary: #A0A0A0;
+      --text-muted: #808080;
+      --shadow: 0 2px 8px rgba(0,0,0,0.3);
+      --orange: #FC8019;
+      --orange-light: rgba(252,128,25,0.12);
+      --orange-dark: #E8700A;
+      --bg-rgb: 15,15,15;
 
-      /* Re-declare aliases here too: a var() reference is resolved at
-         its declaration point, and :root's --swiggy-* already baked in
-         values before body.light-mode's overrides exist, so the
-         inherited alias would stay stuck without this. */
+      --grey-50: var(--bg-secondary);
+      --grey-100: #242424;
+      --grey-200: var(--border);
+      --grey-400: var(--text-muted);
+      --grey-900: var(--text-primary);
+
+      --bg-1: var(--bg-secondary);
+      --bg-2: var(--bg-card);
+      --bg-3: var(--bg-secondary);
+      --border-2: var(--border);
+      --text: var(--text-primary);
+      --text-2: var(--text-secondary);
+      --text-3: var(--text-muted);
+      --orange-dim: var(--orange-light);
+      --hover-overlay: rgba(255,255,255,.06);
+      --card-shadow: var(--shadow);
+      --header-bg: rgba(15,15,15,.85);
+      --hairline: var(--border);
+      --hint-faint: var(--border);
+      --placeholder: var(--text-muted);
+
       --swiggy-orange: var(--orange);
       --swiggy-orange-dark: var(--orange-dark);
       --swiggy-bg: var(--bg);
-      --swiggy-surface: var(--bg-2);
-      --swiggy-surface-2: var(--bg-3);
+      --swiggy-surface: var(--bg-card);
+      --swiggy-surface-2: var(--bg-secondary);
       --swiggy-border: var(--border);
-      --swiggy-text: var(--text);
-      --swiggy-text-2: var(--text-2);
-      --swiggy-text-3: var(--text-3);
-      --swiggy-green: var(--green);
-      --swiggy-green-deep: var(--green-deep);
-      --swiggy-blue: var(--blue);
-      --swiggy-red: var(--red);
-      --swiggy-yellow: var(--yellow);
+      --swiggy-text: var(--text-primary);
+      --swiggy-text-2: var(--text-secondary);
+      --swiggy-text-3: var(--text-muted);
       --swiggy-placeholder: var(--placeholder);
       --swiggy-header-bg: var(--header-bg);
       --swiggy-nav-bg: var(--header-bg);
@@ -130,22 +146,24 @@
       --swiggy-hint-faint: var(--hint-faint);
     }
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; min-width:0; }
+    html { scroll-behavior:smooth; }
+    button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid #FC8019; outline-offset: 2px;
+    }
     body {
-      font-family:'Inter',sans-serif; font-size:14px; line-height:1.5; font-weight:400;
+      font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; line-height:1.5; font-weight:400;
       background:var(--swiggy-bg); color:var(--swiggy-text); min-height:100vh; overflow-x:hidden;
       position:relative;
     }
-    body::before {
-      content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
-      background:radial-gradient(ellipse 60% 40% at 50% 30%, rgba(252,128,25,.04) 0%, transparent 70%);
-    }
-    i[data-lucide] { display:inline-block; width:18px; height:18px; }
-    svg.lucide { width:1em; height:1em; }
-    i[class*="ph-"] { line-height:1; }
+    .top-bar { height:1px; width:100%; background:linear-gradient(90deg, transparent, #FC8019, transparent); }
+    /* Lucide renders each icon as an inline <svg class="lucide">. Sizing it
+       at 1em lets every existing "icon-holder { font-size:Npx; color:... }"
+       rule in this file keep controlling icon size/color unchanged. */
+    svg.lucide { width:1em; height:1em; display:inline-block; vertical-align:middle; stroke-width:1.5; }
 
     /* Typography scale */
-    .eyebrow { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--orange); }
     .label-text { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
+    .section-label-text { font-size:0.65rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--grey-400); }
     .caption-text { font-size:12px; color:var(--text-3); }
     .mono-text { font-family:'SF Mono','Courier New',monospace; color:var(--text); }
 
@@ -155,46 +173,38 @@
       from { opacity:0; transform:translateY(12px); }
       to   { opacity:1; transform:translateY(0); }
     }
-    @keyframes pulse {
-      0%,100% { opacity:1; }
-      50%      { opacity:.4; }
-    }
 
     /* Layout */
     .page { max-width:480px; margin:0 auto; min-height:100vh; position:relative; z-index:1; }
-    .wrap { padding:16px 16px 32px; }
+    .wrap { padding:20px 20px 32px; }
 
     @media (min-width:481px) {
       .page { max-width:440px; box-shadow:0 0 60px rgba(0,0,0,.5); border-left:1px solid var(--swiggy-border); border-right:1px solid var(--swiggy-border); }
     }
 
     /* Header */
-    .app-header { position:sticky; top:0; z-index:30; height:56px; background:var(--header-bg); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+    .app-header {
+      position:sticky; top:0; z-index:30; height:56px; border-bottom:1px solid var(--border);
+      background:rgba(var(--bg-rgb),0.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      transition:background .2s ease;
+    }
     .app-header-inner { max-width:480px; margin:0 auto; height:100%; padding:0 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .brand { display:flex; align-items:center; gap:8px; color:var(--text); font-weight:700; font-size:16px; white-space:nowrap; }
-    .brand i { color:var(--orange); font-size:20px; }
+    .brand i { color:var(--text-muted); font-size:20px; }
     .header-actions { display:flex; align-items:center; gap:8px; }
 
     .theme-toggle {
-      width:32px; height:32px; background:none; border:none; cursor:pointer; border-radius:8px;
-      display:flex; align-items:center; justify-content:center; color:var(--text-3); flex-shrink:0;
+      width:44px; height:44px; background:var(--bg-secondary); border:1px solid var(--border); cursor:pointer; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; color:var(--text-secondary); flex-shrink:0;
+      transition:transform .3s ease, background .2s ease, color .2s ease;
     }
-    .theme-toggle i { font-size:18px; }
-    .theme-toggle:hover { color:var(--text); background:var(--hover-overlay); }
-    .theme-toggle.active { color:var(--green); background:var(--green-dim); }
-
-    .swiggy-pill {
-      display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
-      padding:6px 12px; border-radius:var(--radius-pill); white-space:nowrap; transition:.15s ease;
-      border:1px solid var(--border-2); color:var(--text-3); text-decoration:none; background:transparent;
-    }
-    .swiggy-pill i { font-size:14px; }
-    .swiggy-pill.connected { background:var(--orange-dim); border-color:var(--orange-border); color:var(--orange); }
-    .swiggy-pill .logout-link { margin-left:6px; text-decoration:underline; opacity:.85; font-weight:500; color:inherit; }
+    .theme-toggle i { font-size:16px; transition:opacity .2s ease, transform .2s ease; }
+    .theme-toggle:hover { color:var(--text-primary); background:var(--border); }
+    .theme-toggle.spinning { transform:rotate(180deg); }
 
     /* Hero */
     .hero { padding:24px 20px 16px; }
-    .hero-title { font-size:26px; font-weight:700; color:var(--text); line-height:1.2; margin-top:8px; overflow-wrap:break-word; word-break:normal; }
+    .hero-title { font-family:'Plus Jakarta Sans', sans-serif; font-size:2rem; font-weight:800; letter-spacing:-.02em; color:var(--text); line-height:1.15; margin-top:8px; overflow-wrap:break-word; word-break:normal; }
     .hero-sub { font-size:14px; color:var(--text-2); line-height:1.5; margin-top:6px; overflow-wrap:break-word; word-break:normal; }
 
     /* Input */
@@ -202,59 +212,91 @@
     .input-label { display:block; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--swiggy-text-3); margin-bottom:8px; }
     .dish-input {
       width:100%; height:52px; padding:0 16px; font-size:15px; font-family:inherit; font-weight:400;
-      background:var(--swiggy-surface); border:1.5px solid var(--swiggy-border); border-radius:14px;
-      color:var(--swiggy-text); outline:none; transition:.15s ease;
+      background:var(--bg-secondary); border:1px solid var(--border); border-radius:14px;
+      color:var(--text-primary); outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+      box-shadow:var(--shadow);
     }
-    .dish-input:focus { border-color:var(--swiggy-orange); box-shadow:0 0 0 3px rgba(252,128,25,.12); }
+    .dish-input:focus { border-color:var(--orange); box-shadow:0 0 0 2px var(--orange); }
     .dish-input::placeholder { color:var(--swiggy-placeholder); }
 
     /* Servings selector */
     .servings-section { margin:14px 0 4px; }
-    .servings-pills { display:flex; gap:8px; flex-wrap:wrap; }
-    .servings-pill {
-      min-width:40px; height:36px; padding:0 12px; border-radius:10px;
-      border:1px solid var(--swiggy-border); background:transparent; color:var(--swiggy-text-2);
-      font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s ease;
+    .servings-pills {
+      display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
     }
-    .servings-pill:hover { border-color:var(--swiggy-orange); }
+    .servings-pills::-webkit-scrollbar { display:none; }
+    .servings-pill {
+      flex-shrink:0; width:44px; height:44px; padding:0; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid var(--grey-200); background:transparent; color:var(--swiggy-text-2);
+      font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .servings-pill:hover { background:var(--bg-secondary); border-color:var(--text-secondary); color:var(--text-primary); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .servings-pill:active { transform:translateY(0) scale(.98); }
     .servings-pill.active { background:var(--swiggy-orange); border-color:var(--swiggy-orange); color:#fff; }
 
     /* Shared pill-style buttons, reused by the inline recipe fridge scan area */
     .pill-btn {
-      display:inline-flex; align-items:center; gap:6px; border-radius:20px; padding:8px 18px;
+      flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; height:48px; padding:0 18px;
       font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; background:transparent;
-      transition:.15s ease; pointer-events:auto;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+      pointer-events:auto;
     }
-    .pill-btn i { width:14px; height:14px; }
-    .pill-btn-primary { border:1px solid var(--swiggy-orange); color:var(--swiggy-orange); }
-    .pill-btn-primary:hover { background:rgba(252,128,25,.08); }
+    .pill-btn i { font-size:16px; }
+    .pill-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .pill-btn:active { transform:translateY(0) scale(.98); }
+    .pill-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+    .pill-btn-primary { border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); }
+    .pill-btn-primary:hover { background:var(--swiggy-hover-overlay); }
     .pill-btn-secondary { border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); font-weight:500; }
     .pill-btn-secondary:hover { background:var(--swiggy-hover-overlay); }
 
     /* Get Recipe primary button */
     .analyse-btn {
-      width:100%; height:52px; border-radius:var(--radius); margin-top:0;
+      position:relative; overflow:hidden;
+      width:100%; height:58px; border-radius:14px; margin-top:0;
       background:var(--bg-3); color:var(--text-3); border:none; cursor:not-allowed;
       display:flex; align-items:center; justify-content:center; gap:8px;
-      font-size:16px; font-weight:700; font-family:inherit; transition:all .2s ease;
+      font-size:16px; font-weight:600; font-family:inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
     }
-    .analyse-btn i { font-size:20px; }
-    .analyse-btn.ready { background:var(--orange); color:#fff; cursor:pointer; box-shadow:0 4px 20px rgba(252,128,25,.25); }
-    .analyse-btn.ready:hover:not(:disabled) { background:var(--orange-dark); transform:translateY(-1px); }
-    .analyse-btn.ready:active:not(:disabled) { transform:translateY(0); }
-    .analyse-btn.loading { background:var(--orange); color:#fff; opacity:.85; cursor:not-allowed; }
-    .analyse-btn:disabled:not(.ready):not(.loading) { cursor:not-allowed; }
+    .analyse-btn i { font-size:16px; }
+    .analyse-btn.ready { background:var(--orange); color:#fff; cursor:pointer; box-shadow:inset 0 1px 0 rgba(255,255,255,0.15); }
+    .analyse-btn.ready:hover:not(:disabled) { background:#E8700A; transform:translateY(-1px); box-shadow:inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 12px rgba(0,0,0,0.15); }
+    .analyse-btn.loading { background:var(--orange); color:#fff; opacity:.85; cursor:not-allowed; box-shadow:inset 0 1px 0 rgba(255,255,255,0.15); }
+    .analyse-btn:active:not(:disabled) { transform:translateY(0) scale(.98); background:#D4640A; }
+    /* Effect 1 — shimmer sweep across the Get Recipe button, loops every 3s */
+    .analyse-btn.ready::after {
+      content:''; position:absolute; top:0; left:0; width:40%; height:100%;
+      background:linear-gradient(120deg, transparent, rgba(255,255,255,0.2), transparent);
+      transform:translateX(-250%);
+      animation:btnShimmer 3s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes btnShimmer {
+      0% { transform:translateX(-250%); }
+      60%, 100% { transform:translateX(350%); }
+    }
+    .analyse-btn:disabled:not(.ready):not(.loading) { cursor:not-allowed; opacity:.45; }
 
     /* Secondary CTA row: Scan Fridge */
     .cta-secondary-row { display:flex; gap:8px; margin-top:8px; }
     .cta-secondary-btn {
-      flex:1; height:42px; display:flex; align-items:center; justify-content:center; gap:6px;
-      background:var(--bg-2); border:1px solid var(--border-2); color:var(--text-2);
-      border-radius:var(--radius-sm); font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; transition:.15s ease;
+      flex:1; height:52px; display:flex; align-items:center; justify-content:center; gap:8px;
+      background: rgba(252, 128, 25, 0.15); color: #FC8019;
+      border:none;
+      border-radius:14px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+    [data-theme="dark"] .cta-secondary-btn {
+      background: rgba(252, 128, 25, 0.12);
+      color: #FC8019;
+      border: 1.5px solid rgba(252, 128, 25, 0.3);
     }
     .cta-secondary-btn i { font-size:16px; }
-    .cta-secondary-btn:hover { border-color:var(--orange); color:var(--orange); }
-    .cta-secondary-btn.active { background:var(--orange-dim); border-color:var(--orange-border); color:var(--orange); }
+    .cta-secondary-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .cta-secondary-btn:active { transform:translateY(0) scale(.98); }
 
     /* Collapsible inline fridge photo capture on the landing screen */
     .landing-scan-area { max-height:0; overflow:hidden; transition:max-height .3s cubic-bezier(.4,0,.2,1); }
@@ -265,274 +307,563 @@
     .bottom-hint { margin-top:12px; text-align:center; font-size:11px; color:var(--hint-faint); }
     .bottom-hint .hint-dot { margin:0 6px; }
 
-    /* Pipeline steps — horizontal progress bar */
-    .steps {
-      display:none; align-items:flex-start; padding:16px 20px; background:var(--bg-1);
-      border-radius:var(--radius); margin:0 20px 16px;
-    }
-    .steps.show { display:flex; }
-    .step {
-      position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
-      background:none; border:none; padding:0; min-height:0;
-    }
-    .step-connector { flex:0 0 auto; width:auto; align-self:flex-start; margin-top:11px; }
-    .step-connector-line { height:1px; background:var(--border-2); width:100%; min-width:24px; transition:background .2s ease; }
-    .step-connector-line.done { background:var(--green); }
-    .step-num-wrap {
-      width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-      border:2px solid var(--border-2); color:var(--text-3); transition:.2s ease; box-sizing:border-box;
-    }
-    .step-num-wrap i { width:12px; height:12px; }
-    .step.active .step-num-wrap { background:var(--orange); border-color:var(--orange); color:#fff; animation:pulse 1.5s ease infinite; }
-    .step.done .step-num-wrap { background:var(--green); border-color:var(--green); color:#fff; }
-    .step.done .step-num-wrap i { animation:popIn .3s ease; width:14px; height:14px; }
-    @keyframes popIn { 0%{transform:scale(0)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
-    .step-label-sm { font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.03em; margin-top:4px; }
-    .step-sub-sm { font-size:11px; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 
     /* Section labels */
-    .section-label { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--swiggy-text-2); margin:20px 0 8px; }
-    .section-label i { width:14px; height:14px; color:var(--swiggy-orange); flex-shrink:0; }
+    .section-label { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); margin:32px 0 8px; }
+    .section-label i { font-size:16px; color:var(--text-muted); flex-shrink:0; }
     .section-label .spacer { flex:1; }
 
-    /* Cards */
-    .card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:16px; padding:16px; overflow-wrap:break-word; word-break:normal; opacity:0; animation:fadeSlideUp .35s ease forwards; }
-
-    /* Light mode gives real "cards" (as opposed to plain recessed
-       surfaces like inputs/pills) a subtle shadow instead of relying
-       only on a darker fill, matching how dark mode elevates them. */
-    .card, .meal-card, .topup-card, .modal-sheet,
-    .step, .recipe-checklist-card, .choice-btn {
-      box-shadow: var(--swiggy-card-shadow);
+    /* Cards — major result sections render on the plain page canvas now,
+       no boxed/bordered look; spacing between sections comes from
+       margin-bottom instead of a visible container. */
+    .card {
+      background:transparent; border:none; border-radius:0; box-shadow:none; padding:20px;
+      overflow-wrap:break-word; word-break:normal; opacity:0; animation:fadeSlideUp .35s ease forwards;
+      margin-bottom:32px;
     }
 
-    /* Ingredients */
-    .desc { font-size:13px; color:var(--swiggy-text-2); font-style:italic; line-height:1.6; margin-bottom:12px; overflow-wrap:break-word; word-break:normal; }
+    /* Ingredients — description paragraph removed per design (nobody
+       reads it), chips shown alone in a wrapped flex row. */
+    .desc { display:none; }
     .chips { display:flex; flex-wrap:wrap; gap:8px; }
-    .chip { display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:20px; font-size:12px; font-weight:600; opacity:0; animation:fadeSlideUp .3s ease forwards; }
-    .chip-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-    .chip.high { background:rgba(252,128,25,.12); border:1px solid rgba(252,128,25,.3); color:var(--swiggy-text); }
-    .chip.high .chip-dot { background:var(--swiggy-green); }
-    .chip.mid { background:rgba(252,128,25,.1); border:1px solid rgba(252,128,25,.25); color:var(--swiggy-text); }
-    .chip.mid .chip-dot { background:var(--swiggy-orange); }
-    .chip.low { background:var(--swiggy-hover-overlay); border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); }
-    .chip.low .chip-dot { background:var(--swiggy-text-3); }
-    .chip-pct { color:var(--swiggy-text-3); font-size:11px; }
-
-    /* Recipe checklist card — the hero result card */
-    .recipe-checklist-card {
-      padding:0; margin:0 20px 8px; border-radius:18px; overflow:hidden;
-      background:var(--bg-2); border:1px solid var(--border);
+    .chip {
+      display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px;
+      font-size:11px; font-weight:600; color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--border);
+      opacity:0; animation:fadeSlideUp .3s ease forwards;
     }
-    .recipe-dish-header { background:var(--bg-3); border-bottom:1px solid var(--border); padding:14px 16px; display:flex; align-items:center; gap:12px; }
+    .chip-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .chip.high .chip-dot { background:var(--success); }
+    .chip.mid .chip-dot { background:var(--orange); }
+    .chip.low .chip-dot { background:var(--grey-400); }
+    .chip-pct { color:var(--grey-400); font-size:10px; }
+
+    /* Recipe checklist card — the hero result section */
+    .recipe-checklist-card {
+      padding:0; margin-bottom:32px; border-radius:0; overflow:hidden;
+      background:transparent; border:none; box-shadow:none;
+    }
+    .recipe-dish-header { background:var(--bg-card); padding:20px 20px 16px; display:flex; align-items:center; gap:16px; }
     .recipe-dish-icon {
-      width:40px; height:40px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
-      background:var(--orange-dim); border:1px solid var(--orange-border); color:var(--orange); font-size:20px;
+      width:44px; height:44px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+      background:var(--orange-light); color:var(--text-muted); font-size:28px;
     }
     .recipe-dish-info { flex:1; min-width:0; }
-    .recipe-dish-name { font-size:17px; font-weight:700; color:var(--text); overflow-wrap:break-word; word-break:normal; }
-    .recipe-dish-meta { font-size:12px; color:var(--text-3); margin-top:2px; }
-    .recipe-ai-badge {
-      flex-shrink:0; background:var(--orange-dim); border:1px solid var(--orange-border); color:var(--orange);
-      font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 8px; border-radius:var(--radius-pill);
-    }
+    .recipe-dish-name { font-family:'Plus Jakarta Sans', sans-serif; font-size:16px; font-weight:600; color:var(--text); overflow-wrap:break-word; word-break:normal; }
+    .recipe-dish-meta { font-size:13px; color:var(--grey-400); margin-top:2px; }
+    .recipe-ai-spark { flex-shrink:0; color:var(--text-muted); font-size:14px; }
 
-    .recipe-stats-row { display:flex; border-bottom:1px solid var(--border); }
-    .recipe-stat { flex:1; padding:12px; text-align:center; border-right:1px solid var(--border); }
-    .recipe-stat:last-child { border-right:none; }
-    .recipe-stat-number { font-size:20px; font-weight:700; }
-    .recipe-stat-number.have { color:var(--green); }
-    .recipe-stat-label { font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+    .recipe-stats-row { padding:0; }
+    .recipe-stat-line { font-size:15px; font-weight:500; color:var(--text-secondary); padding:16px 20px; }
+    .recipe-stat-z { color:var(--orange); font-weight:700; }
 
-    .recipe-checklist-sub { font-size:12px; color:var(--text-3); padding:10px 16px 0; }
-    .recipe-rows { display:flex; flex-direction:column; gap:3px; padding:8px 12px; }
+    .recipe-checklist-sub { font-size:13px; font-style:italic; font-weight:400; color:var(--grey-400); padding:16px 20px; }
+    .recipe-rows { display:flex; flex-direction:column; }
     .recipe-row {
-      display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:var(--radius-sm); cursor:pointer;
-      border:1px solid var(--border); background:var(--bg-1); transition:all .12s ease;
+      display:flex; align-items:center; gap:10px; padding:16px 20px; cursor:pointer;
+      border-bottom:1px solid var(--border); background:var(--bg-card); transition:opacity .12s ease, background .1s ease;
     }
+    .recipe-rows .recipe-row:hover { background:var(--bg-secondary); }
+    .recipe-rows .recipe-row:last-child { border-bottom:none; }
     .recipe-row-checkbox {
-      width:18px; height:18px; border-radius:5px; flex-shrink:0; border:1.5px solid var(--border-2);
-      display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; transition:all .12s ease;
+      width:20px; height:20px; border-radius:6px; flex-shrink:0; border:1.5px solid var(--grey-200);
+      display:flex; align-items:center; justify-content:center; font-size:20px; transition:border-color .12s ease;
     }
+    .recipe-row-checkbox i { color:var(--success); }
     .recipe-row-info { flex:1; min-width:0; }
-    .recipe-row-name { font-size:13px; font-weight:500; color:var(--text); overflow-wrap:break-word; word-break:normal; }
-    .recipe-row-qty { font-size:11px; color:var(--text-3); margin-top:2px; overflow-wrap:break-word; word-break:normal; }
+    .recipe-row-name { font-size:15px; font-weight:500; color:var(--grey-900); overflow-wrap:break-word; word-break:normal; }
+    .recipe-row-qty { font-size:13px; font-weight:400; color:var(--grey-400); margin-top:6px; overflow-wrap:break-word; word-break:normal; }
 
-    .recipe-row.checked { opacity:.6; }
-    .recipe-row.checked .recipe-row-checkbox { background:var(--green); border-color:var(--green); }
+    @keyframes checkPop { 0% { transform:scale(.9); } 100% { transform:scale(1); } }
+    .recipe-row.checked .recipe-row-checkbox { border-color:transparent; animation:checkPop .15s ease; }
     .recipe-row.checked .recipe-row-name,
-    .recipe-row.checked .recipe-row-qty { text-decoration:line-through; }
+    .recipe-row.checked .recipe-row-qty { text-decoration:line-through; color:var(--grey-400); }
 
     .recipe-row-right { flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
     .recipe-row-tag {
-      flex-shrink:0; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;
-      color:var(--text-3); background:var(--bg-2); border:1px solid var(--border-2);
-      padding:3px 8px; border-radius:var(--radius-pill); white-space:nowrap;
+      flex-shrink:0; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--grey-400); background:var(--grey-100);
+      padding:3px 10px; border-radius:999px; white-space:nowrap;
     }
+    .recipe-row-tag i { font-size:12px; vertical-align:-1px; }
+    .recipe-row-tag-staple { color:var(--text-muted); background:var(--bg-secondary); }
+    .recipe-row-tag-fridge { color:#2E7D32; background:#E8F5E9; }
+    [data-theme="dark"] .recipe-row-tag-fridge { color:#81C784; background:rgba(46,125,50,0.2); }
 
-    .recipe-checklist-footer { padding:4px 12px 12px; }
-    .recipe-order-count { font-size:12px; color:var(--text-2); margin-bottom:10px; text-align:center; }
+    .recipe-checklist-footer { padding:12px 20px 20px; background:var(--bg-card); border-top:1px solid var(--border); position:sticky; bottom:0; }
+    .recipe-order-count { font-size:13px; color:var(--grey-400); margin-bottom:10px; text-align:center; }
     .recipe-cart-btn {
-      width:100%; height:48px; border-radius:var(--radius-sm); border:none; background:var(--orange); color:#fff;
+      width:100%; height:52px; border-radius:14px; border:none; background:var(--orange); color:#fff;
       font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
       display:flex; align-items:center; justify-content:center; gap:8px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
     }
-    .recipe-cart-btn:hover { background:var(--orange-dark); }
-    .recipe-cart-btn i { font-size:18px; }
+    .recipe-cart-btn:hover { background:#E8700A; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .recipe-cart-btn:active { background:#D4640A; transform:translateY(0) scale(.98); }
+    .recipe-cart-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+    .recipe-cart-btn i { font-size:16px; }
 
-    .recipe-steps-block { border-top:1px solid var(--border); }
+    .recipe-steps-block { border-top:1px solid var(--grey-200); }
     .recipe-steps-toggle {
       display:flex; align-items:center; gap:8px; width:100%;
-      background:none; border:none; color:var(--text); font-size:13px; font-weight:700;
-      cursor:pointer; font-family:inherit; padding:12px 16px;
+      background:none; border:none; color:var(--grey-900); font-size:14px; font-weight:700;
+      cursor:pointer; font-family:inherit; padding:16px 20px;
     }
-    .recipe-steps-toggle i:first-child { font-size:16px; color:var(--orange); }
-    .recipe-steps-toggle i:last-child { font-size:14px; color:var(--text-3); }
-    .recipe-steps-list { list-style:none; padding:0 16px 14px; display:flex; flex-direction:column; gap:10px; }
-    .recipe-steps-list li { display:flex; gap:10px; font-size:13px; line-height:1.5; color:var(--text-2); }
+    /* Lucide swaps <i data-lucide> for an <svg>, so these target
+       :first-child/:last-child without an "i" tag restriction — matches
+       both before and after createIcons() runs. */
+    .recipe-steps-toggle :first-child { font-size:16px; color:var(--text-muted); }
+    .recipe-steps-toggle :last-child { font-size:14px; color:var(--grey-400); transition:transform .2s ease; }
+    .recipe-steps-toggle :last-child.rotated { transform:rotate(180deg); }
+    .recipe-steps-list {
+      list-style:none; padding:0 20px 20px; display:flex; flex-direction:column; gap:14px;
+      max-height:2000px; overflow:hidden;
+      transition:max-height .35s cubic-bezier(.4,0,.2,1), padding .35s cubic-bezier(.4,0,.2,1);
+    }
+    .recipe-steps-list.collapsed { max-height:0; padding-top:0; padding-bottom:0; }
+    .recipe-steps-list li { display:flex; gap:12px; font-size:14px; line-height:1.6; color:var(--grey-900); padding:6px 8px; border-radius:8px; }
+    .recipe-steps-list li:nth-child(even) { background:var(--bg-secondary); }
+
+    /* Recipe video (YouTube embed) */
+    .yt-video-toggle {
+      display:flex; align-items:center; gap:8px; width:100%;
+      background:none; border:none; border-top:1px solid var(--border); color:var(--grey-900); font-size:14px; font-weight:700;
+      cursor:pointer; font-family:inherit; padding:16px 20px;
+    }
+    .yt-video-toggle :first-child { font-size:16px; color:var(--text-muted); }
+    .yt-video-toggle :last-child { font-size:14px; color:var(--grey-400); transition:transform .2s ease; }
+    .yt-video-toggle :last-child.rotated { transform:rotate(180deg); }
+    .yt-video-content {
+      max-height:2000px; overflow:hidden;
+      transition:max-height .35s cubic-bezier(.4,0,.2,1);
+    }
+    .yt-video-content.collapsed { max-height:0; }
+    .yt-video-wrap { padding:0 20px 16px; }
+
+    .yt-iframe-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+    .yt-active-info { padding: 10px 0 14px; }
+    .yt-channel { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+    .yt-title { font-size: 16px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+    .yt-thumbnails {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+    }
+    .yt-thumb-card {
+      flex-shrink: 0;
+      width: 140px;
+      cursor: pointer;
+      opacity: 0.75;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .yt-thumb-card:hover,
+    .yt-thumb-card.yt-thumb-active {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+    .yt-thumb-img-wrap {
+      position: relative;
+      width: 140px;
+      height: 80px;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .yt-thumb-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.2);
+    }
+    .yt-thumb-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .yt-thumb-channel { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
     .recipe-step-num {
-      flex-shrink:0; width:20px; height:20px; border-radius:50%; background:var(--orange-dim);
-      border:1px solid var(--orange-border); color:var(--orange); font-size:11px; font-weight:700;
+      flex-shrink:0; width:24px; height:24px; border-radius:50%; background:var(--orange-light);
+      border:1px solid var(--orange-light); color:var(--text-secondary); font-size:11px; font-weight:700;
       display:flex; align-items:center; justify-content:center;
     }
     .recipe-scan-area { padding:0 16px 14px; }
     .recipe-scan-actions { display:flex; gap:10px; justify-content:center; padding-top:12px; }
     .recipe-scan-status {
-      display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;
+      display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px;
       font-size:12px; color:var(--text-2); text-align:center;
     }
     .recipe-scan-status i { font-size:14px; color:var(--green); }
 
     /* Meal cards */
-    #mealCards { display:flex; flex-direction:column; gap:10px; }
-    .meal-card { background:var(--swiggy-surface); border:1px solid var(--swiggy-border); border-radius:16px; overflow:hidden; opacity:0; animation:fadeSlideUp .35s ease forwards; }
+    #mealCards { display:flex; flex-direction:column; gap:14px; }
+    .meal-card { background:var(--swiggy-surface); border:1px solid var(--border); border-radius:16px; overflow:hidden; opacity:0; animation:fadeSlideUp .35s ease forwards; transition:box-shadow .2s ease; }
+    .meal-card:hover { box-shadow:var(--shadow); }
     .meal-header-bar { background:var(--swiggy-orange); color:#fff; height:36px; display:flex; align-items:center; gap:6px; padding:0 14px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
     .meal-header-bar i { width:14px; height:14px; }
     .meal-body { padding:14px; }
-    .meal-name { font-size:17px; font-weight:700; color:var(--swiggy-text); overflow-wrap:break-word; word-break:normal; }
+    .meal-name { font-size:16px; font-weight:600; color:var(--swiggy-text); overflow-wrap:break-word; word-break:normal; }
     .meal-desc {
-      font-size:12px; color:var(--swiggy-text-2); margin:4px 0; line-height:1.5;
+      font-size:13px; color:var(--swiggy-text-2); margin:4px 0; line-height:1.5;
       display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
       overflow-wrap:break-word; word-break:normal; white-space:normal;
     }
     .missing-bar {
-      display:flex; align-items:flex-start; gap:6px; background:rgba(252,128,25,.1); border:1px solid rgba(252,128,25,.25);
-      border-radius:8px; padding:8px 10px; font-size:12px; color:var(--swiggy-orange); margin:8px 0;
+      display:flex; align-items:flex-start; gap:8px; background:var(--orange-dim); border:1px solid var(--border);
+      border-radius:8px; padding:8px 10px; font-size:12px; color:var(--text-muted); margin:8px 0;
       white-space:normal; word-wrap:break-word; overflow:hidden; overflow-wrap:break-word;
     }
     .missing-bar i { width:14px; height:14px; flex-shrink:0; margin-top:1px; }
     .meal-tags-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
-    .meal-tag { display:inline-flex; align-items:center; gap:4px; background:var(--swiggy-surface-2); color:var(--swiggy-text-3); font-size:10px; border-radius:20px; padding:4px 10px; }
+    .meal-tag { display:inline-flex; align-items:center; gap:4px; background:var(--swiggy-surface-2); color:var(--swiggy-text-3); font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; border-radius:20px; padding:4px 10px; }
     .meal-tag i { width:11px; height:11px; }
     .meal-tag.ready { color:var(--swiggy-green); }
     .meal-tag.ready i { color:var(--swiggy-green); }
 
     /* Choice card */
     .choice-header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .choice-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--swiggy-text-3); }
-    .choice-subtitle { font-size:12px; color:var(--swiggy-text-2); font-style:italic; line-height:1.5; margin:10px 0 12px; overflow-wrap:break-word; word-break:normal; }
-    .choice-buttons { display:flex; flex-direction:column; gap:8px; }
-    /* Both choice buttons are solid full-width orange CTAs, stacked,
-       styled identically — no color-coding one over the other. */
+    .choice-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); }
+    .choice-subtitle { font-size:13px; font-weight:400; color:var(--grey-400); font-style:italic; line-height:1.5; margin:10px 0 12px; overflow-wrap:break-word; word-break:normal; }
+    .choice-buttons { display:flex; flex-direction:column; gap:14px; }
+    /* Visual hierarchy: Instamart is the primary filled CTA, Swiggy is a
+       secondary outline. */
     .choice-btn {
-      display:flex; align-items:center; gap:12px; width:100%; text-align:left;
-      background:var(--orange); border:none; border-radius:var(--radius); padding:16px;
-      cursor:pointer; font-family:inherit; color:#fff; transition:all .15s ease; overflow:visible;
-      box-shadow:0 2px 8px rgba(252,128,25,.3);
+      position:relative; overflow:hidden;
+      display:flex; align-items:center; gap:16px; width:100%; text-align:left;
+      border-radius:var(--radius); padding:16px;
+      cursor:pointer; font-family:inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+      --spot-x:50%; --spot-y:50%;
     }
-    .choice-btn:hover:not(:disabled) { background:var(--orange-dark); }
-    .choice-btn:disabled:not(.loading) { opacity:.4; cursor:not-allowed; }
+    .choice-btn:hover:not(:disabled):not(.loading) { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .choice-btn:active:not(:disabled):not(.loading) { transform:translateY(0) scale(.98); }
+
+    /* Effect 3 — spotlight glow that follows the cursor, tracked via JS mousemove */
+    .choice-btn::before {
+      content:''; position:absolute; inset:0; opacity:0; transition:opacity .2s ease; pointer-events:none;
+    }
+    .choice-btn.spotlight-active::before { opacity:1; }
+    .choice-btn-primary::before {
+      background:radial-gradient(circle 140px at var(--spot-x) var(--spot-y), rgba(255,255,255,0.25), transparent 70%);
+    }
+    .choice-btn-outline::before {
+      background:radial-gradient(circle 140px at var(--spot-x) var(--spot-y), rgba(252,128,25,0.15), transparent 70%);
+    }
+    .choice-btn:disabled:not(.loading) { opacity:.45; cursor:not-allowed; }
     .choice-btn.loading { opacity:.7; cursor:not-allowed; }
-    .choice-icon-circle { width:40px; height:40px; min-width:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:rgba(255,255,255,.2); color:#fff; }
+    .choice-btn-primary {
+      background:var(--orange); border:none; color:#fff;
+    }
+    .choice-btn-primary:hover:not(:disabled) { background:#E8700A; }
+    .choice-btn-primary:active:not(:disabled) { background:#D4640A; }
+    .choice-btn-outline {
+      background:var(--bg-card); border:1.5px solid var(--orange); color:var(--orange);
+    }
+    .choice-btn-outline:hover:not(:disabled) { background:var(--orange-light); }
+    .choice-icon-circle { width:44px; height:44px; min-width:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:20px; }
+    .choice-btn-primary .choice-icon-circle { background:var(--orange-dark); color:#fff; }
+    .choice-btn-outline .choice-icon-circle { background:var(--orange-light); color:var(--orange); }
     .choice-text { flex:1; min-width:0; }
-    .choice-btn-title { font-size:14px; font-weight:700; color:#fff; overflow-wrap:break-word; word-break:normal; }
-    .choice-btn-sub { font-size:12px; color:rgba(255,255,255,.85); margin-top:2px; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; }
-    .choice-meta { flex-shrink:0; white-space:nowrap; font-size:13px; font-weight:700; text-align:right; color:#fff; }
+    .choice-btn-title { font-size:16px; font-weight:600; overflow-wrap:break-word; word-break:normal; }
+    .choice-btn-primary .choice-btn-title { color:#fff; }
+    .choice-btn-outline .choice-btn-title { color:var(--orange); }
+    .choice-btn-sub { font-size:13px; margin-top:6px; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; }
+    .choice-btn-primary .choice-btn-sub { color:rgba(255,255,255,.85); }
+    .choice-btn-outline .choice-btn-sub { color:var(--grey-400); }
+    .choice-meta { flex-shrink:0; white-space:nowrap; font-size:13px; font-weight:700; text-align:right; }
+    .choice-btn-primary .choice-meta { color:#fff; }
+    .choice-btn-outline .choice-meta { color:var(--orange); }
 
     /* Top up */
     .topup-header-row { margin:20px 0 4px; }
+    .topup-toggle {
+      width:100%; min-height:44px; background:none; border:none; font-family:inherit; cursor:pointer;
+      text-align:left;
+    }
+    .topup-toggle :last-child { color:var(--text-muted); transition:transform .2s ease; }
+    .topup-toggle :last-child.rotated { transform:rotate(180deg); }
+    .topup-content { max-height:2000px; overflow:hidden; transition:max-height .35s cubic-bezier(.4,0,.2,1); }
+    .topup-content.collapsed { max-height:0; }
     .topup-header-row .spacer { flex:1; }
-    .topup-powered { font-size:10px; color:var(--swiggy-text-3); text-transform:none; letter-spacing:0; font-weight:500; }
+    .topup-powered { font-size:11px; color:var(--text-muted); text-transform:none; letter-spacing:0; font-weight:700; }
     .topup-subtitle { font-size:12px; color:var(--swiggy-text-2); margin-bottom:10px; }
     /* Instamart-style product cards: image placeholder, name, price,
-       orange Add button — scroll horizontally as a row. */
-    .topup-scroll { display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; }
+       orange Add button — scroll horizontally as a row, no visible scrollbar. */
+    .topup-scroll { display:flex; gap:14px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
+    .topup-scroll::-webkit-scrollbar { display:none; }
     .topup-product-card {
-      flex:0 0 132px; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--radius);
-      box-shadow:var(--card-shadow); padding:10px; opacity:0; animation:fadeSlideUp .4s ease forwards;
+      flex:0 0 156px; width:156px; background:var(--bg-card); border:1px solid var(--border); border-radius:16px;
+      overflow:hidden; opacity:0; animation:fadeSlideUp .4s ease forwards;
+      cursor:pointer; transition:transform 0.2s ease, box-shadow 0.2s ease;
     }
+    .topup-product-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.12); }
+    .topup-product-card:active { transform:translateY(0); }
     .topup-img-placeholder {
-      width:100%; aspect-ratio:1; border-radius:var(--radius-sm); background:var(--bg-1);
-      display:flex; align-items:center; justify-content:center; font-size:32px; margin-bottom:8px;
+      width:100%; height:100px; background:transparent;
+      display:flex; align-items:center; justify-content:center; font-size:36px;
     }
-    .topup-name { font-size:12px; font-weight:600; color:var(--text); overflow-wrap:break-word; word-break:normal; }
-    .topup-reason {
-      font-size:10px; color:var(--text-3); margin-top:2px; overflow:hidden; display:-webkit-box;
-      -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;
+    /* Grey only while empty (loading); once an <img> or letter-avatar is
+       inserted the container goes transparent so a white-background photo
+       blends into the white card instead of showing a visible box edge. */
+    .topup-img-placeholder:empty { background:var(--grey-50); }
+    .topup-img-placeholder img { mix-blend-mode:multiply; }
+    [data-theme="dark"] .topup-img-placeholder img { mix-blend-mode:normal; }
+    .topup-body { padding:12px; }
+    .topup-name {
+      font-size:13px; font-weight:700; color:var(--grey-900); line-height:1.3; min-height:2.4em;
+      overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;
+      overflow-wrap:break-word; word-break:normal;
     }
+    .topup-bottom-row { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px; }
+    .topup-price { font-size:15px; font-weight:700; color:var(--orange); }
     .topup-add-btn {
-      display:flex; align-items:center; justify-content:center; gap:3px; width:100%; padding:6px 10px;
-      border-radius:var(--radius-pill); margin-top:8px;
+      position:relative;
+      display:flex; align-items:center; justify-content:center; gap:3px; height:28px; padding:0 12px;
+      border-radius:999px;
       font-size:11px; font-weight:700; background:var(--orange); color:#fff; border:none;
       cursor:pointer; font-family:inherit; white-space:nowrap;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
     }
-    .topup-add-btn:hover { background:var(--orange-dark); }
+    /* Invisible expanded hit area — keeps the visible pill compact (28px)
+       while still meeting the 44x44 minimum touch target. */
+    .topup-add-btn::after {
+      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:max(44px, 100%); height:max(44px, 100%);
+    }
+    .topup-add-btn:hover { background:#E8700A; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .topup-add-btn:active { background:#D4640A; transform:translateY(0) scale(.98); }
     .topup-add-btn i { font-size:12px; }
-    .topup-add-btn.added { background:var(--text-3); cursor:default; }
+    .topup-add-btn.added { background:var(--grey-400); cursor:default; }
 
     /* Secondary/cancel button, reused by the Top Up and order-preview sheets */
     .modal-cancel-btn {
       width:100%; height:48px; border-radius:14px; background:transparent; color:var(--swiggy-text-2);
       border:1px solid var(--swiggy-border); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
     }
+    .modal-cancel-btn:hover { background:var(--swiggy-hover-overlay); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .modal-cancel-btn:active { transform:translateY(0) scale(.98); }
 
-    /* Auth required card */
-    .auth-card { background:rgba(252,128,25,.06); border:1px solid rgba(252,128,25,.2); border-radius:16px; padding:20px; text-align:center; }
-    .auth-card-icon { width:56px; height:56px; border-radius:50%; background:rgba(252,128,25,.15); color:var(--swiggy-orange); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; }
-    .auth-card-icon i { font-size:28px; }
-    .auth-card-title { font-weight:700; font-size:15px; color:var(--swiggy-text); }
-    .auth-card-sub { font-size:12px; color:var(--swiggy-text-2); margin-top:6px; margin-bottom:16px; overflow-wrap:break-word; word-break:normal; }
-    .auth-cta { width:100%; height:48px; border-radius:14px; background:var(--swiggy-orange); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; font-size:14px; border:none; cursor:pointer; transition:.15s ease; }
-    .auth-cta:hover { background:var(--swiggy-orange-dark); }
-    .auth-cta i { font-size:16px; }
+    /* Connect Swiggy section */
+    .auth-card { background:transparent; border:none; box-shadow:none; border-radius:0; padding:20px; margin-bottom:32px; text-align:center; }
+    .auth-card-icon { width:56px; height:56px; border-radius:50%; background:var(--orange-light); border:1px solid var(--border); color:var(--text-muted); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; }
+    .auth-card-icon i { font-size:32px; }
+    .auth-card-title { font-weight:700; font-size:18px; color:var(--swiggy-text); }
+    .auth-card-sub { font-size:13px; color:var(--grey-400); margin-top:6px; margin-bottom:16px; overflow-wrap:break-word; word-break:normal; }
+    .auth-cta {
+      width:100%; height:52px; border-radius:14px; background:var(--swiggy-orange); color:#fff; font-weight:700;
+      display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; font-size:14px; border:none; cursor:pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    }
+    .auth-cta:hover { background:#E8700A; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .auth-cta:active { background:#D4640A; transform:translateY(0) scale(.98); }
+    .auth-cta i { font-size:20px; }
 
-    /* Order confirmed card */
-    .order-card { background:rgba(252,128,25,.06); border:1px solid rgba(252,128,25,.3); border-radius:16px; padding:20px; }
+    /* Order confirmed section */
+    .order-card { background:transparent; border:none; box-shadow:none; border-radius:0; padding:20px; margin-bottom:32px; }
     .order-icon-wrap { text-align:center; margin-bottom:8px; }
-    .order-icon-wrap i { font-size:24px; color:var(--swiggy-green); display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; background:rgba(252,128,25,.2); }
+    .order-icon-wrap i { font-size:24px; color:var(--swiggy-green); display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; background:var(--orange-light); }
     .order-title { text-align:center; color:var(--swiggy-green); font-size:18px; font-weight:700; }
-    .order-id { text-align:center; font-family:'Courier New',monospace; color:var(--swiggy-text-2); font-size:12px; margin-top:4px; overflow-wrap:break-word; word-break:break-all; }
+    .order-id { text-align:center; font-family:'Courier New',monospace; color:var(--swiggy-text-2); font-size:13px; margin-top:6px; overflow-wrap:break-word; word-break:break-all; }
     .order-details { margin-top:14px; }
-    .order-row { display:flex; justify-content:space-between; gap:8px; font-size:13px; padding:6px 0; border-top:1px solid var(--swiggy-hairline); flex-wrap:wrap; }
+    .order-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-top:1px solid var(--swiggy-hairline); flex-wrap:wrap; }
     .order-row:first-child { border-top:none; }
-    .order-label { color:var(--swiggy-text-3); flex-shrink:0; }
-    .order-value { color:var(--swiggy-text); text-align:right; min-width:0; overflow-wrap:break-word; word-break:normal; }
+    .order-label { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--swiggy-text-3); flex-shrink:0; }
+    .order-value { font-size:13px; font-weight:400; color:var(--swiggy-text); text-align:right; min-width:0; overflow-wrap:break-word; word-break:normal; }
     .order-value.eta { color:var(--swiggy-orange); font-weight:700; }
 
-    /* Cook confirmed card */
-    .cook-card { background:rgba(252,128,25,.06); border:1px solid rgba(252,128,25,.3); border-radius:16px; padding:20px; text-align:center; }
+    /* Cook confirmed section */
+    .cook-card { background:transparent; border:none; box-shadow:none; border-radius:0; padding:20px; margin-bottom:32px; text-align:center; }
     .cook-card i { font-size:24px; color:var(--swiggy-green); margin-bottom:8px; display:inline-block; }
-    .cook-card .title { color:var(--swiggy-green); font-weight:700; font-size:16px; }
-    .cook-card .sub { color:var(--swiggy-text-2); font-size:12px; margin-top:4px; }
+    .cook-card .title { color:var(--swiggy-green); font-weight:600; font-size:16px; }
+    .cook-card .sub { color:var(--swiggy-text-2); font-size:13px; margin-top:6px; }
 
     /* Error card */
-    .error-card { background:rgba(231,76,60,.1); border:1px solid rgba(231,76,60,.3); border-radius:16px; padding:16px; font-size:13px; color:var(--swiggy-red); overflow-wrap:break-word; word-break:normal; display:flex; align-items:flex-start; gap:8px; }
-    .error-card i { width:16px; height:16px; flex-shrink:0; margin-top:1px; }
+    .error-card { background:var(--red-dim); border:1px solid var(--red-border); border-radius:16px; padding:16px; font-size:13px; color:var(--swiggy-red); overflow-wrap:break-word; word-break:normal; display:flex; align-items:flex-start; gap:8px; }
+    .error-card .error-retry-btn {
+      position:relative;
+      margin-top:10px; height:36px; padding:0 16px; border-radius:10px; border:1px solid var(--red-border);
+      background:transparent; color:var(--swiggy-red); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    }
+    /* Invisible expanded hit area — same technique as .topup-add-btn */
+    .error-card .error-retry-btn::after {
+      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:max(44px, 100%); height:max(44px, 100%);
+    }
+    .error-card .error-retry-btn:hover { background:var(--red-dim); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    .error-card .error-retry-btn:active { transform:translateY(0) scale(.98); }
+    .error-card i { width:14px; height:14px; flex-shrink:0; margin-top:1px; }
 
     /* Results */
     .results { display:none; }
     .results.show { display:block; }
+    #resultsSection { opacity:0; transition:opacity .35s ease; }
+    #resultsSection.fade-in { opacity:1; }
+    #landingSection { opacity:1; transition:opacity .2s ease; }
+    #landingSection.fade-out { opacity:0; }
+
+    /* Full-overlay loading state, shown while /api/scan streams. Fixed,
+       full-screen takeover — independent of the light/dark theme tokens
+       by design (always the same dark, focused surface). */
+    .loading-overlay {
+      position:fixed; inset:0; z-index:9999;
+      background:#0a0a0a; overflow:hidden;
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:opacity .3s ease;
+    }
+    .loading-overlay.show { opacity:1; pointer-events:auto; }
+
+    /* Background particles */
+    .loading-particles { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+    .loading-particle {
+      position:absolute; bottom:0; width:3px; height:3px; border-radius:50%;
+      background:rgba(252,128,25,0.1);
+      animation-name:particleFloat; animation-timing-function:linear; animation-iteration-count:infinite;
+    }
+    @keyframes particleFloat {
+      0%   { transform:translateY(100vh) translateX(0); opacity:0; }
+      8%   { opacity:0.10; }
+      92%  { opacity:0.10; }
+      100% { transform:translateY(-40px) translateX(var(--drift)); opacity:0; }
+    }
+
+    /* Zone 1 — fridge illustration */
+    .loading-fridge-zone {
+      position:relative; z-index:1; width:100%;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .loading-fridge {
+      position:relative; width:110px; height:150px; border-radius:16px; margin:0 auto;
+      background:#141414; border:1.5px solid rgba(252,128,25,0.25); overflow:hidden;
+    }
+    .loading-fridge-freezer-line {
+      position:absolute; top:30%; left:0; right:0; height:2px; background:rgba(255,255,255,0.1);
+    }
+    .loading-fridge-shelf {
+      position:absolute; left:0; right:0; height:1px; background:rgba(255,255,255,0.06);
+    }
+    .loading-fridge-handle {
+      position:absolute; top:50%; right:10px; transform:translateY(-50%);
+      width:3px; height:24px; border-radius:999px; background:rgba(255,255,255,0.15);
+    }
+    .loading-fridge-scanline {
+      position:absolute; left:0; right:0; top:0; height:1.5px;
+      background:linear-gradient(90deg, transparent, rgba(252,128,25,0.8), transparent);
+      animation:scanSweep 2.4s ease-in-out infinite;
+    }
+    @keyframes scanSweep {
+      0%   { top:0%;   opacity:0; }
+      8%   { opacity:1; }
+      92%  { opacity:1; }
+      100% { top:100%; opacity:0; }
+    }
+    .loading-fridge-dots { position:absolute; inset:0; }
+    .loading-fridge-dot {
+      position:absolute; width:5px; height:5px; border-radius:50%; background:#FC8019;
+      opacity:0; animation:dotPop 0.4s ease forwards;
+    }
+    @keyframes dotPop {
+      0%   { transform:scale(0);   opacity:0; }
+      60%  { transform:scale(1.3); opacity:1; }
+      100% { transform:scale(1);   opacity:0.9; }
+    }
+
+    /* Zone 2 — status lines */
+    .loading-status-zone {
+      position:relative; z-index:1; max-width:320px; width:100%; margin:36px auto 0; text-align:center;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .loading-status-lines {
+      display:flex; flex-direction:column; align-items:center;
+      max-width:320px; width:100%; margin:0 auto; text-align:center;
+    }
+    .loading-status-line {
+      font-family:'Plus Jakarta Sans',sans-serif; font-size:15px; font-weight:400; letter-spacing:0.01em;
+      line-height:1.4; width:100%; text-align:center; word-break:break-word; white-space:normal; padding:0 16px;
+      color:rgba(255,255,255,0.45);
+      opacity:0; transform:translateY(6px);
+      transition:opacity .35s ease-out, transform .35s ease-out, color .35s ease-out, font-weight .35s ease-out;
+    }
+    .loading-status-line.entered { opacity:1; transform:translateY(0); }
+    .loading-status-line.active {
+      color:rgba(255,255,255,0.95); font-weight:600;
+    }
+    .loading-status-sub {
+      margin-top:6px; font-size:12px; font-weight:400; font-style:italic; color:rgba(255,255,255,0.45);
+      min-height:16px; opacity:0; transition:opacity .3s ease;
+      width:100%; text-align:center;
+    }
+    .loading-status-sub.visible { opacity:1; }
+
+    /* Zone 3 — progress */
+    .loading-progress-zone {
+      position:relative; z-index:1; width:100%; margin-top:40px;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .loading-percent {
+      font-family:'Plus Jakarta Sans',sans-serif; font-size:36px; font-weight:800; color:#FC8019;
+      text-align:center; width:100%;
+    }
+    .loading-progress-bar-track {
+      width:240px; height:5px; border-radius:999px; background:rgba(255,255,255,0.07);
+      margin:10px auto; overflow:hidden;
+    }
+    .loading-progress-bar-fill {
+      display:block; height:100%; width:0%; border-radius:999px;
+      background:linear-gradient(90deg, #E8700A, #FC8019, #FFB347, #FC8019, #E8700A);
+      background-size:300% 100%;
+      animation:shimmerBar 2s linear infinite;
+      transition:width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes shimmerBar {
+      0%   { background-position:200% center; }
+      100% { background-position:-200% center; }
+    }
+    .loading-step-dots { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; }
+    .loading-step-dot {
+      display:inline-block; width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.12);
+      transition:width .2s ease, height .2s ease, background .2s ease;
+    }
+    .loading-step-dot.active {
+      width:9px; height:9px; background:#FC8019;
+      animation:activeDotPulse 1.2s ease-in-out infinite;
+    }
+    .loading-step-dot.done { background:#FC8019; }
+    @keyframes activeDotPulse {
+      0%, 100% { box-shadow:0 0 0 0   rgba(252,128,25,0.5); }
+      50%       { box-shadow:0 0 0 5px rgba(252,128,25,0);   }
+    }
 
     /* Spinner */
     .spin { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
     @keyframes spin { to{transform:rotate(360deg)} }
+    /* Distinct from @keyframes spin above — this one preserves the input
+       spinner's vertical-centering translateY through the rotation, which
+       reusing "spin" would clobber for every other .spin usage in the app. */
+    @keyframes spinCentered { to { transform: translateY(-50%) rotate(360deg); } }
 
     /* Toast */
     .toast {
       position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
       background:var(--swiggy-surface-2); border:1px solid var(--swiggy-border); color:var(--swiggy-text);
       padding:12px 18px; border-radius:12px; font-size:13px; z-index:60; opacity:0;
-      transition:.3s ease; pointer-events:none; max-width:90%; text-align:center;
+      transition:opacity .3s ease, transform .3s ease; pointer-events:none; max-width:90%; text-align:center;
     }
     .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
@@ -541,7 +872,7 @@
     .shopping-list-item:last-child { border-bottom:none; }
 
     .order-launched-card {
-      background:rgba(252,128,25,.08); border:1px solid rgba(252,128,25,.3); border-radius:16px; padding:16px; margin-top:14px; text-align:center;
+      background:var(--orange-dim); border:1px solid var(--border); border-radius:16px; padding:16px; margin-top:14px; text-align:center;
     }
     .order-launched-card i { width:28px; height:28px; color:var(--swiggy-green); margin-bottom:6px; }
     .order-launched-card .title { font-weight:700; font-size:14px; color:var(--swiggy-green); }
@@ -552,9 +883,12 @@
     .modal-sheet { width:100%; max-width:480px; background:var(--swiggy-surface); border-radius:20px 20px 0 0; padding:20px; max-height:85vh; overflow-y:auto; }
     @media (min-width:481px) { .modal-sheet { border-radius:20px; } }
     .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-    .modal-header h3 { font-size:16px; font-weight:700; }
-    .modal-close { background:none; border:none; color:var(--swiggy-text-2); cursor:pointer; }
-    .modal-close i { width:20px; height:20px; }
+    .modal-header h3 { font-size:18px; font-weight:700; }
+    .modal-close {
+      background:none; border:none; color:var(--swiggy-text-2); cursor:pointer;
+      width:44px; height:44px; display:flex; align-items:center; justify-content:center; margin:-12px;
+    }
+    .modal-close i { width:16px; height:16px; }
     .field { margin-bottom:12px; }
     .field label { display:block; font-size:11px; font-weight:600; color:var(--swiggy-text-3); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
     .field input, .field select {
@@ -570,34 +904,45 @@
     }
     .empty-state { text-align:center; padding:40px 16px; color:var(--swiggy-text-3); font-size:13px; }
 
+    /* Scan empty/error states — "no ingredients detected" and "scan
+       failed". Rendered either inside an existing .card (no ingredients,
+       nested in fridgeIngredientsSection's card) or as a standalone .card
+       (scan failed, dropped straight into #orderCard) — same border-radius/
+       background/padding as every other result card either way. */
+    .scan-state-card { text-align:center; padding:8px 4px; }
+    .scan-state-icon { display:block; margin:0 auto 12px; font-size:40px; color:var(--text-muted); }
+    .scan-state-heading { font-size:16px; font-weight:600; color:var(--text-primary); }
+    .scan-state-sub { font-size:13px; color:var(--grey-400); margin-top:6px; line-height:1.5; }
+    .scan-state-card .cta-secondary-btn { margin-top:16px; }
+
     /* ── Smart Cart modal ─────────────────────────────────────────── */
     .cart-header { margin-bottom: 16px; }
-    .cart-title { color: var(--swiggy-text); font-size: 17px; font-weight: 700;
-        font-family: Inter, sans-serif; margin-bottom: 4px; }
+    .cart-title { color: var(--swiggy-text); font-size: 18px; font-weight: 700;
+        font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 4px; }
     .cart-subtitle { color: var(--swiggy-text-2); font-size: 13px;
-        font-family: Inter, sans-serif; }
+        font-family: 'Plus Jakarta Sans', sans-serif; }
 
     .cart-items-list { display: flex; flex-direction: column;
-        gap: 2px; margin-bottom: 16px; }
+        gap: 14px; margin-bottom: 16px; }
     .cart-item-row { display: flex; align-items: center; gap: 12px;
         padding: 10px 12px; background: var(--swiggy-surface-2); border-radius: 12px;
-        margin-bottom: 6px; box-shadow: var(--swiggy-card-shadow); }
+        box-shadow: var(--swiggy-card-shadow); }
     .cart-item-icon { width: 36px; height: 36px; border-radius: 50%;
-        background: rgba(252,128,25,0.15); display: flex;
+        background: var(--orange-light); display: flex;
         align-items: center; justify-content: center;
         font-size: 16px; flex-shrink: 0; }
     .cart-item-info { flex: 1; min-width: 0; }
     .cart-item-name { color: var(--swiggy-text); font-size: 13px; font-weight: 600;
-        font-family: Inter, sans-serif; white-space: nowrap;
+        font-family: 'Plus Jakarta Sans', sans-serif; white-space: nowrap;
         overflow: hidden; text-overflow: ellipsis; }
-    .cart-item-qty { color: var(--swiggy-text-3); font-size: 11px;
-        font-family: Inter, sans-serif; margin-top: 2px; }
+    .cart-item-qty { color: var(--swiggy-text-3); font-size: 13px;
+        font-family: 'Plus Jakarta Sans', sans-serif; margin-top: 6px; }
     .cart-item-price { color: var(--swiggy-text-2); font-size: 12px;
-        font-weight: 600; font-family: Inter, sans-serif;
+        font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif;
         flex-shrink: 0; }
 
     .cart-item-status { font-size: 11px; margin-top: 2px;
-        font-family: Inter, sans-serif; }
+        font-family: 'Plus Jakarta Sans', sans-serif; }
     .cart-item-status.searching { color: var(--swiggy-orange); }
     .cart-item-status.added { color: var(--swiggy-green); }
     .cart-item-status.failed { color: var(--swiggy-red); }
@@ -607,30 +952,34 @@
         padding: 12px 14px; margin-bottom: 14px; box-shadow: var(--swiggy-card-shadow); }
     .cart-summary-row { display: flex; justify-content: space-between;
         color: var(--swiggy-text-2); font-size: 13px;
-        font-family: Inter, sans-serif; }
+        font-family: 'Plus Jakarta Sans', sans-serif; }
 
     .cart-connect-btn { width: 100%; padding: 15px;
         background: var(--swiggy-orange); color: #fff; border: none;
         border-radius: 14px; font-size: 15px; font-weight: 700;
-        font-family: Inter, sans-serif; cursor: pointer;
+        font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer;
         display: flex; align-items: center; justify-content: center;
         gap: 8px; margin-bottom: 10px; }
     .cart-connect-hint { text-align: center; color: var(--swiggy-text-3);
-        font-size: 11px; font-family: Inter, sans-serif;
+        font-size: 11px; font-family: 'Plus Jakarta Sans', sans-serif;
         margin-bottom: 12px; line-height: 1.4; }
     .cart-manual-link { display: block; text-align: center;
         color: var(--swiggy-text-2); font-size: 12px;
-        font-family: Inter, sans-serif;
+        font-family: 'Plus Jakarta Sans', sans-serif;
         text-decoration: underline; cursor: pointer; }
 
     .cart-progress-footer { margin-top: 16px; }
     .cart-complete { display: flex; align-items: center; gap: 8px;
         color: var(--swiggy-green); font-size: 14px; font-weight: 600;
-        font-family: Inter, sans-serif; margin-bottom: 12px; }
+        font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 12px; }
     .cart-checkout-btn { width: 100%; padding: 15px;
         background: var(--swiggy-orange); color: #fff; border: none;
         border-radius: 14px; font-size: 15px; font-weight: 700;
-        font-family: Inter, sans-serif; cursor: pointer; }
+        font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease; }
+    .cart-checkout-btn:hover { background:#E8700A; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .cart-checkout-btn:active { background:#D4640A; transform:translateY(0) scale(.98); }
+    .cart-checkout-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
@@ -638,23 +987,23 @@
   </style>
 </head>
 <body>
+  <div class="top-bar"></div>
   <div class="page">
     <header class="app-header">
       <div class="app-header-inner">
-        <div class="brand"><i class="ph ph-fork-knife"></i><span>Fridge to Fork</span></div>
+        <div class="brand"><i data-lucide="utensils"></i><span>Fridge to Fork</span></div>
         <div class="header-actions">
           <button type="button" class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle light and dark mode">
-            <i class="ph ph-moon" id="themeToggleIcon"></i>
+            <i data-lucide="moon" id="themeToggleIcon"></i>
           </button>
-          <div id="authPill"></div>
         </div>
       </div>
     </header>
 
     <!-- ═══════════════ COOK TAB ═══════════════ -->
     <div id="cookTab">
+      <div id="landingSection">
       <div class="hero">
-        <div class="eyebrow">AI Kitchen Assistant</div>
         <h1 class="hero-title">What do you want to eat?</h1>
         <p class="hero-sub">Type a dish. We'll find what's missing and get it delivered.</p>
       </div>
@@ -662,8 +1011,7 @@
       <div class="wrap">
         <!-- Target Dish Input -->
         <div class="input-section">
-          <label class="input-label" for="targetDish">I want to eat...</label>
-          <input type="text" id="targetDish" class="dish-input" placeholder="e.g. Biryani, Pasta, Dal Makhani..." />
+          <input type="text" id="targetDish" class="dish-input" placeholder="What do you want to eat?" />
         </div>
 
         <!-- Servings selector -->
@@ -676,65 +1024,86 @@
             <button type="button" class="servings-pill" data-servings="4" onclick="setServings(4)">4</button>
             <button type="button" class="servings-pill" data-servings="5" onclick="setServings(5)">5</button>
             <button type="button" class="servings-pill" data-servings="6" onclick="setServings(6)">6</button>
+            <button type="button" class="servings-pill" data-servings="7" onclick="setServings(7)">7</button>
             <button type="button" class="servings-pill" data-servings="8" onclick="setServings(8)">8</button>
-            <button type="button" class="servings-pill" data-servings="10" onclick="setServings(10)">10</button>
           </div>
         </div>
 
         <!-- Get Recipe -->
         <button class="analyse-btn ready" id="analyseBtn" onclick="startScan('recipe')">
-          <span id="btnIcon"><i class="ph ph-sparkle"></i></span>
+          <span id="btnIcon"><i data-lucide="sparkles"></i></span>
           <span id="btnText">Get Recipe</span>
         </button>
 
         <div class="cta-secondary-row">
           <button type="button" class="cta-secondary-btn" id="scanFridgeBtn" onclick="toggleLandingScanArea()">
-            <i class="ph ph-camera"></i> Scan Fridge
+            <i data-lucide="camera"></i> Scan Fridge
           </button>
         </div>
 
-        <!-- Collapsible fridge photo capture, hidden until "Scan Fridge" is tapped -->
-        <div class="landing-scan-area" id="landingScanArea">
-          <div class="landing-scan-inner">
-            <input type="file" id="landingScanFileInput" accept="image/*" capture="environment" style="display:none;" />
-            <div class="recipe-scan-actions">
-              <button type="button" class="pill-btn pill-btn-primary" onclick="triggerLandingScanCamera()"><i class="ph ph-camera"></i> Take Photo</button>
-              <button type="button" class="pill-btn pill-btn-secondary" onclick="triggerLandingScanGallery()"><i class="ph ph-image"></i> Choose Photo</button>
+        <!-- Fridge scanning section — hidden entirely once results are in (see hideScanning()) -->
+        <div id="scanSectionWrapper">
+          <!-- Collapsible fridge photo capture, hidden until "Scan Fridge" is tapped -->
+          <div class="landing-scan-area" id="landingScanArea">
+            <div class="landing-scan-inner">
+              <input type="file" id="landingScanFileInput" accept="image/*" capture="environment" class="hidden" />
+              <div class="recipe-scan-actions">
+                <button type="button" class="pill-btn pill-btn-primary" onclick="triggerLandingScanCamera()"><i data-lucide="camera"></i> Take Photo</button>
+                <button type="button" class="pill-btn pill-btn-secondary" onclick="triggerLandingScanGallery()"><i data-lucide="image"></i> Choose Photo</button>
+              </div>
+              <div id="landingScanStatus" class="recipe-scan-status"></div>
             </div>
-            <div id="landingScanStatus" class="recipe-scan-status"></div>
+          </div>
+
+          <div class="section-divider"></div>
+        </div>
+      </div>
+      </div>
+
+      <!-- Full-overlay loading state — sits between landingSection and
+           resultsSection; shown/hidden independently of either. -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-particles" id="loadingParticles"></div>
+
+        <div class="loading-fridge-zone" id="loadingFridgeZone">
+          <div class="loading-fridge">
+            <div class="loading-fridge-freezer-line"></div>
+            <div class="loading-fridge-shelf" style="top:33%"></div>
+            <div class="loading-fridge-shelf" style="top:55%"></div>
+            <div class="loading-fridge-shelf" style="top:75%"></div>
+            <div class="loading-fridge-handle"></div>
+            <div class="loading-fridge-scanline" id="loadingScanline"></div>
+            <div class="loading-fridge-dots" id="loadingFridgeDots"></div>
           </div>
         </div>
 
-        <p class="bottom-hint">Powered by Gemini Vision <span class="hint-dot">·</span> Swiggy MCP</p>
-
-        <div class="section-divider"></div>
-
-        <!-- Progress steps -->
-        <div class="steps" id="steps">
-          <div class="step" id="s1">
-            <div class="step-num-wrap" id="n1"></div>
-            <div class="step-label-sm">Vision</div>
-            <div class="step-sub-sm" id="sub1">Waiting</div>
-          </div>
-          <div class="step-connector"><div class="step-connector-line" id="connector1"></div></div>
-          <div class="step" id="s2">
-            <div class="step-num-wrap" id="n2"></div>
-            <div class="step-label-sm">Planner</div>
-            <div class="step-sub-sm" id="sub2">Waiting</div>
-          </div>
-          <div class="step-connector"><div class="step-connector-line" id="connector2"></div></div>
-          <div class="step" id="s3">
-            <div class="step-num-wrap" id="n3"></div>
-            <div class="step-label-sm">Order</div>
-            <div class="step-sub-sm" id="sub3">Waiting</div>
-          </div>
+        <div class="loading-status-zone">
+          <div class="loading-status-lines" id="loadingStatusLines"></div>
+          <div class="loading-status-sub" id="loadingStatusSub"></div>
         </div>
 
-        <!-- Results -->
+        <div class="loading-progress-zone">
+          <div class="loading-percent" id="loadingPercent">0%</div>
+          <div class="loading-progress-bar-track">
+            <div class="loading-progress-bar-fill" id="loadingProgressBar"></div>
+          </div>
+          <div class="loading-step-dots" id="loadingStepDots">
+            <span class="loading-step-dot" data-dot="1"></span>
+            <span class="loading-step-dot" data-dot="2"></span>
+            <span class="loading-step-dot" data-dot="3"></span>
+            <span class="loading-step-dot" data-dot="4"></span>
+            <span class="loading-step-dot" data-dot="5"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="resultsSection" style="display:none;">
+      <div class="wrap">
         <div class="results" id="results">
           <!-- Ingredients (hidden when there's no fridge scan to show, e.g. recipe mode) -->
-          <div id="fridgeIngredientsSection" style="display:none;">
-            <div class="section-label"><i data-lucide="list"></i> What's in your fridge</div>
+          <div id="fridgeIngredientsSection" class="hidden">
+            <div class="section-label"><i data-lucide="refrigerator"></i> What's in your fridge</div>
             <div class="card">
               <p class="desc" id="fridgeDesc"></p>
               <div class="chips" id="ingredientChips"></div>
@@ -748,7 +1117,7 @@
                compare (e.g. scanning the fridge without naming a dish). A
                single target-dish result would just duplicate the recipe
                checklist card below it. -->
-          <div id="mealSuggestionsSection" style="display:none;">
+          <div id="mealSuggestionsSection" class="hidden">
             <div class="section-label"><i data-lucide="star"></i> Meal Suggestions</div>
             <div id="mealCards"></div>
           </div>
@@ -763,6 +1132,7 @@
           <div id="orderCard"></div>
         </div>
       </div>
+      </div>
     </div>
 
   </div>
@@ -770,78 +1140,79 @@
   <div class="toast" id="toast"></div>
   <div id="orderPreviewModalContainer"></div>
 
-  <div id="smartCartModal" style="display:none;position:fixed;
-       inset:0;z-index:2000;background:rgba(0,0,0,0.7);
-       backdrop-filter:blur(8px);align-items:flex-end;
-       justify-content:center;" onclick="closeCartModal()">
-      <div style="width:100%;max-width:480px;background:var(--swiggy-surface);
-           border-radius:24px 24px 0 0;max-height:85vh;
-           display:flex;flex-direction:column;
-           box-shadow:0 -8px 40px rgba(0,0,0,0.4);"
+  <div id="smartCartModal" class="hidden fixed inset-0 z-[2000] bg-black/70 backdrop-blur-md items-end justify-center" onclick="closeCartModal()">
+      <div class="w-full max-w-[480px] bg-[var(--swiggy-surface)] rounded-t-3xl max-h-[85vh] flex flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.4)]"
            onclick="event.stopPropagation()">
-          <div style="padding:16px 20px;border-bottom:
-               1px solid var(--swiggy-border);display:flex;
-               align-items:center;justify-content:space-between;
-               flex-shrink:0;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                  <i data-lucide="shopping-cart"
-                     style="color:var(--swiggy-orange);width:18px;
-                     height:18px;"></i>
-                  <span style="color:var(--swiggy-text);font-weight:700;
-                        font-size:16px;font-family:Inter,sans-serif;">
+          <div class="px-5 py-4 border-b border-[var(--swiggy-border)] flex items-center justify-between shrink-0">
+              <div class="flex items-center gap-2">
+                  <i data-lucide="shopping-cart" class="text-[var(--swiggy-orange)] text-[18px]"></i>
+                  <span class="text-[var(--swiggy-text)] font-bold text-base font-['Plus_Jakarta_Sans',sans-serif]">
                       Instamart Cart
                   </span>
               </div>
-              <button onclick="closeCartModal()"
-                      style="background:var(--swiggy-surface-2);border:none;
-                      color:var(--swiggy-text-2);border-radius:8px;
-                      width:32px;height:32px;cursor:pointer;
-                      font-size:16px;">&times;</button>
+              <button onclick="closeCartModal()" aria-label="Close"
+                      class="bg-[var(--swiggy-surface-2)] border-none text-[var(--swiggy-text-2)] rounded-lg w-11 h-11 cursor-pointer text-base">&times;</button>
           </div>
-          <div id="cartModalBody" style="overflow-y:auto;
-               flex:1;padding:16px 20px 32px;">
+          <div id="cartModalBody" class="overflow-y-auto flex-1 px-5 pt-4 pb-8">
           </div>
       </div>
   </div>
 
   <script>
     /* ═══════════════ THEME TOGGLE ═══════════════ */
-    function applyTheme(isLight) {
-      document.body.classList.toggle('light-mode', isLight);
+    function applyTheme(isDark) {
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
       const icon = document.getElementById('themeToggleIcon');
       if (icon) {
-        icon.className = isLight ? 'ph ph-sun' : 'ph ph-moon';
+        // Lucide replaces the source <i> with an <svg> once createIcons()
+        // runs, so re-toggling needs a fresh <i data-lucide="..."> each time
+        // rather than swapping a class name on the (by-then-gone) <i>.
+        icon.outerHTML = `<i data-lucide="${isDark ? 'moon' : 'sun'}" id="themeToggleIcon"></i>`;
+        try { lucide.createIcons(); } catch {}
       }
     }
 
     function toggleTheme() {
-      const isLight = !document.body.classList.contains('light-mode');
-      localStorage.setItem('theme', isLight ? 'light' : 'dark');
-      applyTheme(isLight);
-    }
-
-    applyTheme(localStorage.getItem('theme') === 'light');
-
-    const stepIcons = { 1: 'scan-eye', 2: 'chef-hat', 3: 'truck' };
-
-    async function checkAuth() {
-      const pill = document.getElementById('authPill');
-      try {
-        const res = await fetch('/auth/status');
-        const data = await res.json();
-        pill.innerHTML = data.authenticated
-          ? '<a class="swiggy-pill connected" href="/auth/logout" title="Click to log out"><i class="ph ph-check-circle"></i> Connected</a>'
-          : '<a class="swiggy-pill" href="/auth/login"><i class="ph ph-link"></i> Connect Swiggy</a>';
-      } catch {
-        pill.innerHTML = '<a class="swiggy-pill" href="/auth/login"><i class="ph ph-link"></i> Connect Swiggy</a>';
+      const isDark = document.documentElement.getAttribute('data-theme') !== 'dark';
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      const btn = document.getElementById('themeToggle');
+      if (btn) {
+        btn.classList.add('spinning');
+        setTimeout(() => btn.classList.remove('spinning'), 300);
       }
-      try { lucide.createIcons(); } catch {}
+      applyTheme(isDark);
     }
-    checkAuth();
+
+    const storedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(storedTheme ? storedTheme === 'dark' : systemPrefersDark);
+
+    const stepIcons = { 1: 'eye', 2: 'list-checks', 3: 'truck' };
+    const INSTAMART_URL = 'https://www.swiggy.com/instamart';
+
+    // Effect 3 — spotlight glow on the two choice buttons (Instamart /
+    // Swiggy), following the pointer. Delegated on document since the
+    // buttons are re-created via innerHTML on every renderChoiceCard() call.
+    function updateChoiceSpotlight(clientX, clientY) {
+      document.querySelectorAll('#choiceCard .choice-btn').forEach(btn => {
+        const rect = btn.getBoundingClientRect();
+        const inside = clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+        if (inside) {
+          btn.style.setProperty('--spot-x', (clientX - rect.left) + 'px');
+          btn.style.setProperty('--spot-y', (clientY - rect.top) + 'px');
+          btn.classList.add('spotlight-active');
+        } else {
+          btn.classList.remove('spotlight-active');
+        }
+      });
+    }
+    document.addEventListener('mousemove', e => updateChoiceSpotlight(e.clientX, e.clientY));
+    document.addEventListener('touchmove', e => {
+      if (e.touches && e.touches[0]) updateChoiceSpotlight(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
 
     /* ═══════════════ COOK TAB — SCAN FLOW ═══════════════ */
     const analyseBtn = document.getElementById('analyseBtn');
-    const stepsEl = document.getElementById('steps');
     const resultsEl = document.getElementById('results');
 
     let servings = 2;
@@ -853,35 +1224,211 @@
       });
     }
 
+    // Which fridge/dish info the current scan has — set at the top of
+    // startScan(), read by addStatusLine() to pick the right copy.
+    let currentScanHasPhoto = false;
+    let currentScanDish = '';
+
+    let subLineTimer = null;
+    let subLineShowTimer = null;
+    const SUB_LINE_MESSAGES = [
+      'Takes about 10 seconds',
+      'Checking ingredient by ingredient',
+      'Finding the best options for you',
+      'Hang tight',
+    ];
+    let subLineIndex = 0;
+
+    // Eases from `from` to `to` over `duration` ms — used for the percent
+    // counter so it never jumps instantly, always counts up smoothly.
+    function animatePercent(from, to, duration, el) {
+      const start = performance.now();
+      function tick(now) {
+        const t = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = Math.round(from + (to - from) * eased) + '%';
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    let currentLoadingPercent = 0;
+    const DOT_FOR_PERCENT = { 5: 1, 30: 2, 70: 3, 90: 4, 100: 5 };
+
+    function activateDot(n) {
+      document.querySelectorAll('.loading-step-dot').forEach(dot => {
+        const i = parseInt(dot.dataset.dot, 10);
+        dot.classList.toggle('active', i === n);
+        dot.classList.toggle('done', i < n);
+      });
+    }
+
+    // Drives Zone 3 — bar width, the counting percentage, and which step
+    // dot is active — from the real SSE progress checkpoints (5/30/70/90/100).
+    function setProgress(percent) {
+      const bar = document.getElementById('loadingProgressBar');
+      if (bar) bar.style.width = percent + '%';
+      const percentEl = document.getElementById('loadingPercent');
+      if (percentEl) animatePercent(currentLoadingPercent, percent, 600, percentEl);
+      currentLoadingPercent = percent;
+      if (DOT_FOR_PERCENT[percent]) activateDot(DOT_FOR_PERCENT[percent]);
+    }
+
+    // Appends a new Zone 2 status line, dims every line shown before it,
+    // and restarts the cycling italic sub-line underneath.
+    function addStatusLine(text) {
+      const container = document.getElementById('loadingStatusLines');
+      if (!container) return;
+      container.querySelectorAll('.loading-status-line').forEach(line => {
+        line.classList.remove('active');
+      });
+      const line = document.createElement('div');
+      line.className = 'loading-status-line';
+      line.textContent = text;
+      container.appendChild(line);
+      requestAnimationFrame(() => {
+        line.classList.add('entered', 'active');
+      });
+
+      clearTimeout(subLineShowTimer);
+      clearInterval(subLineTimer);
+      const subEl = document.getElementById('loadingStatusSub');
+      if (subEl) {
+        subEl.classList.remove('visible');
+        subLineShowTimer = setTimeout(() => {
+          subLineIndex = 0;
+          subEl.textContent = SUB_LINE_MESSAGES[subLineIndex];
+          subEl.classList.add('visible');
+          subLineTimer = setInterval(() => {
+            subEl.classList.remove('visible');
+            setTimeout(() => {
+              subLineIndex = (subLineIndex + 1) % SUB_LINE_MESSAGES.length;
+              subEl.textContent = SUB_LINE_MESSAGES[subLineIndex];
+              subEl.classList.add('visible');
+            }, 300);
+          }, 2500);
+        }, 400);
+      }
+    }
+
+    // Pops up to 10 dots at random shelf positions once the fridge scan
+    // returns real ingredients — purely decorative, photo-mode only.
+    function triggerFridgeDots(count) {
+      const container = document.getElementById('loadingFridgeDots');
+      if (!container) return;
+      container.innerHTML = '';
+      const n = Math.min(count || 0, 10);
+      for (let i = 0; i < n; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'loading-fridge-dot';
+        dot.style.left = (10 + Math.random() * 75) + '%';
+        dot.style.top = (35 + Math.random() * 55) + '%';
+        dot.style.animationDelay = (i * 120) + 'ms';
+        container.appendChild(dot);
+      }
+    }
+
+    function initLoadingParticles() {
+      const container = document.getElementById('loadingParticles');
+      if (!container || container.childElementCount) return;
+      for (let i = 0; i < 8; i++) {
+        const p = document.createElement('div');
+        p.className = 'loading-particle';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.setProperty('--drift', (Math.random() * 100 - 50) + 'px');
+        p.style.animationDuration = (12 + Math.random() * 8) + 's';
+        p.style.animationDelay = (Math.random() * 10) + 's';
+        container.appendChild(p);
+      }
+    }
+
+    function showLoadingOverlay(hasPhoto) {
+      const overlay = document.getElementById('loadingOverlay');
+      if (!overlay) return;
+      initLoadingParticles();
+
+      document.getElementById('loadingStatusLines').innerHTML = '';
+      const subEl = document.getElementById('loadingStatusSub');
+      if (subEl) { subEl.classList.remove('visible'); subEl.textContent = ''; }
+      clearTimeout(subLineShowTimer);
+      clearInterval(subLineTimer);
+
+      document.getElementById('loadingFridgeZone').style.display = hasPhoto ? '' : 'none';
+      document.getElementById('loadingFridgeDots').innerHTML = '';
+
+      currentLoadingPercent = 0;
+      document.getElementById('loadingPercent').textContent = '0%';
+      document.getElementById('loadingProgressBar').style.width = '0%';
+      activateDot(0);
+
+      overlay.style.display = 'flex';
+      requestAnimationFrame(() => overlay.classList.add('show'));
+    }
+
+    function hideLoadingOverlay() {
+      clearTimeout(subLineShowTimer);
+      clearInterval(subLineTimer);
+      const overlay = document.getElementById('loadingOverlay');
+      if (!overlay) return;
+      overlay.classList.remove('show');
+      setTimeout(() => { overlay.style.display = 'none'; }, 300);
+    }
+
     function setAnalyseReady(text) {
+      // Loading overlay is hidden explicitly (with its 500ms-after-'complete'
+      // delay + fade) from handleEvent/startScan's error paths — not here,
+      // since this runs the instant the SSE stream closes, before that delay.
       analyseBtn.disabled = false;
       analyseBtn.classList.remove('loading');
       analyseBtn.classList.add('ready');
-      document.getElementById('btnIcon').innerHTML = '<i class="ph ph-sparkle"></i>';
+      document.getElementById('btnIcon').innerHTML = '<i data-lucide="sparkles"></i>';
       document.getElementById('btnText').textContent = text || 'Get Recipe';
       try { lucide.createIcons(); } catch {}
     }
 
-    function setAnalyseLoading() {
+    function setAnalyseLoading(hasPhoto) {
       analyseBtn.disabled = true;
       analyseBtn.classList.remove('ready');
       analyseBtn.classList.add('loading');
       document.getElementById('btnIcon').innerHTML = '<div class="spin"></div>';
       document.getElementById('btnText').textContent = 'Getting recipe...';
+      showLoadingOverlay(hasPhoto);
     }
 
     function setStep(n, status, msg) {
       const s = document.getElementById('s'+n);
+      if (!s) return;
       const num = document.getElementById('n'+n);
       const sub = document.getElementById('sub'+n);
       s.className = 'step ' + status;
       num.innerHTML = status === 'done'
-        ? '<i class="ph ph-check"></i>'
+        ? '<i data-lucide="check"></i>'
         : `<i data-lucide="${stepIcons[n]}"></i>`;
+      try { lucide.createIcons(); } catch {}
       const connector = document.getElementById('connector'+n);
       if (connector) connector.classList.toggle('done', status === 'done');
-      try { lucide.createIcons(); } catch {}
       if (msg) sub.textContent = msg;
+    }
+
+    // Vertical progressive-loading list — each of the 5 steps fills in as
+    // its corresponding SSE event arrives (see handleEvent).
+    function resetProgressSteps() {
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById('pstep-' + i);
+        if (el) el.classList.remove('done');
+      }
+    }
+    function markProgressStepDone(n) {
+      const el = document.getElementById('pstep-' + n);
+      if (el) el.classList.add('done');
+    }
+
+    // Hides the whole fridge-scanning section (Take/Choose Photo, the
+    // Gemini Vision footer, and the progress steps card) once results
+    // have loaded — called from the 'complete' SSE event.
+    function hideScanning() {
+      const el = document.getElementById('scanSectionWrapper');
+      if (el) el.style.display = 'none';
     }
 
     function confClass(pct) {
@@ -892,6 +1439,166 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
       ));
+    }
+
+    // Resolves a Top Up product image via the backend's /api/ingredient-image
+    // (Spoonacular-backed) and falls back to a TheMealDB guess if that
+    // returns nothing. Never throws — the caller falls back further to a
+    // letter avatar if the returned URL itself fails to load.
+    async function getTopUpImageUrl(itemName) {
+      // Simplify name for better API matching
+      const stopWords = ['fresh','dried','roasted','grated','sliced','chopped',
+        'ground','whole','raw','cubes','paste','powder','leaves','seeds',
+        'pieces','extract','syrup','sweet','spicy','tangy','classic'];
+
+      const simplified = itemName
+        .replace(/\(.*?\)/g, '')
+        .split(' ')
+        .filter(w => !stopWords.includes(w.toLowerCase()) && w.length > 2)
+        .join(' ')
+        .trim() || itemName;
+
+      try {
+        const res = await fetch(`/api/ingredient-image?name=${encodeURIComponent(simplified)}`);
+        const data = await res.json();
+        if (data.imageUrl) return data.imageUrl;
+      } catch (e) {}
+
+      // TheMealDB fallback with simplified name
+      const word = simplified.split(' ')[0];
+      const cap = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      return `https://www.themealdb.com/images/ingredients/${cap}-Small.png`;
+    }
+
+    const FOOD_EMOJI_MAP = {
+      // Dairy & Paneer
+      'paneer': '🧀', 'cheese': '🧀', 'cream': '🥛', 'butter': '🧈',
+      'milk': '🥛', 'yogurt': '🥛', 'curd': '🥛', 'ghee': '🧈',
+      'lassi': '🥤', 'chaas': '🥤', 'raita': '🥣',
+
+      // Vegetables
+      'spinach': '🥬', 'palak': '🥬', 'tomato': '🍅', 'onion': '🧅',
+      'potato': '🥔', 'aloo': '🥔', 'garlic': '🧄', 'ginger': '🫚',
+      'chilli': '🌶️', 'chili': '🌶️', 'pepper': '🌶️', 'capsicum': '🫑',
+      'mushroom': '🍄', 'carrot': '🥕', 'corn': '🌽', 'broccoli': '🥦',
+      'cauliflower': '🥦', 'gobi': '🥦', 'pea': '🫛', 'matar': '🫛',
+      'cucumber': '🥒', 'avocado': '🥑', 'eggplant': '🍆', 'baingan': '🍆',
+      'bhindi': '🫛', 'okra': '🫛', 'beans': '🫘', 'rajma': '🫘',
+      'chana': '🫘', 'dal': '🫘', 'lentil': '🫘', 'chickpea': '🫘',
+
+      // Fruits
+      'lemon': '🍋', 'lime': '🍋', 'mango': '🥭', 'coconut': '🥥',
+      'pomegranate': '🍎', 'apple': '🍎', 'banana': '🍌',
+      'strawberry': '🍓', 'blueberry': '🫐', 'cherry': '🍒',
+      'pineapple': '🍍', 'orange': '🍊', 'grape': '🍇',
+      'watermelon': '🍉', 'peach': '🍑', 'pear': '🍐',
+
+      // Spices & Condiments
+      'saffron': '🌸', 'turmeric': '🟡', 'cumin': '🌿', 'jeera': '🌿',
+      'coriander': '🌿', 'methi': '🌿', 'fenugreek': '🌿',
+      'masala': '🫙', 'spice': '🫙', 'powder': '🫙', 'paste': '🫙',
+      'chutney': '🫙', 'pickle': '🫙', 'achaar': '🫙', 'sauce': '🫙',
+      'salt': '🧂', 'sugar': '🍚', 'jaggery': '🟫', 'honey': '🍯',
+      'oil': '🫙', 'vinegar': '🫙', 'tamarind': '🟤',
+
+      // Grains & Breads
+      'rice': '🍚', 'basmati': '🍚', 'biryani': '🍛', 'pulao': '🍛',
+      'roti': '🫓', 'naan': '🫓', 'bread': '🍞', 'pav': '🍞',
+      'paratha': '🫓', 'kulcha': '🫓', 'dosa': '🫓', 'idli': '⚪',
+      'pasta': '🍝', 'noodle': '🍜', 'flour': '🌾', 'atta': '🌾',
+      'wheat': '🌾', 'oat': '🌾', 'semolina': '🌾', 'rava': '🌾',
+      'sooji': '🌾', 'poha': '🍚', 'upma': '🍚',
+
+      // Proteins
+      'chicken': '🍗', 'mutton': '🥩', 'fish': '🐟', 'prawn': '🦐',
+      'egg': '🥚', 'tofu': '🟡', 'peanut': '🥜', 'cashew': '🥜',
+      'almond': '🥜', 'walnut': '🥜', 'pistachio': '🥜', 'nut': '🥜',
+
+      // Snacks & Street Food
+      'samosa': '🥟', 'pakora': '🥜', 'vada': '🍩', 'bhaji': '🥬',
+      'sev': '🟡', 'papad': '💿', 'chips': '🍟', 'nachos': '🌮',
+      'momos': '🥟', 'dumpling': '🥟', 'spring roll': '🌯',
+
+      // Desserts
+      'kheer': '🍮', 'halwa': '🟠', 'ladoo': '🟡', 'barfi': '🟧',
+      'gulab jamun': '🟤', 'rasgulla': '⚪', 'jalebi': '🟡',
+      'kulfi': '🍦', 'ice cream': '🍦', 'cake': '🎂', 'cookie': '🍪',
+      'chocolate': '🍫', 'sweet': '🍬', 'candy': '🍬',
+      'tiramisu': '🍮', 'pudding': '🍮', 'mousse': '🍮',
+
+      // Drinks
+      'chai': '☕', 'tea': '🍵', 'coffee': '☕', 'juice': '🧃',
+      'water': '💧', 'soda': '🥤', 'smoothie': '🥤', 'shake': '🥤',
+      'wine': '🍷', 'beer': '🍺', 'cocktail': '🍹',
+
+      // Meal Types
+      'soup': '🍲', 'curry': '🍛', 'stew': '🫕', 'salad': '🥗',
+      'sandwich': '🥪', 'burger': '🍔', 'pizza': '🍕', 'taco': '🌮',
+      'wrap': '🌯', 'bowl': '🥣', 'rice bowl': '🍛',
+
+      // Herbs & Garnish
+      'mint': '🌿', 'basil': '🌿', 'parsley': '🌿', 'oregano': '🌿',
+      'rosemary': '🌿', 'thyme': '🌿', 'leaf': '🌿', 'herb': '🌿',
+
+      // Cooking Items
+      'maple syrup': '🍁', 'maple': '🍁', 'syrup': '🍯',
+      'jam': '🍓', 'marmalade': '🍊', 'pesto': '🫙',
+      'tahini': '🫙', 'hummus': '🫙', 'mayo': '🫙',
+      'ketchup': '🍅', 'mustard': '💛',
+    };
+
+    // Last-resort visual when neither image source can be loaded — an
+    // emoji matched from the ingredient name, falling back through
+    // word-level substring matches then category keywords.
+    function getEmojiForIngredient(name) {
+      const lower = name.toLowerCase();
+
+      if (FOOD_EMOJI_MAP[lower]) return FOOD_EMOJI_MAP[lower];
+
+      let bestMatch = null;
+      let bestLength = 0;
+      for (const [key, emoji] of Object.entries(FOOD_EMOJI_MAP)) {
+        if (lower.includes(key) && key.length > bestLength) {
+          bestMatch = emoji;
+          bestLength = key.length;
+        }
+      }
+      if (bestMatch) return bestMatch;
+
+      if (lower.includes('veg')) return '🥗';
+      if (lower.includes('non-veg') || lower.includes('meat')) return '🥩';
+      if (lower.includes('drink') || lower.includes('beverage')) return '🥤';
+      if (lower.includes('dessert') || lower.includes('sweet')) return '🍮';
+      if (lower.includes('snack')) return '🍿';
+      if (lower.includes('sauce') || lower.includes('dip')) return '🫙';
+      if (lower.includes('fresh')) return '🌿';
+      if (lower.includes('roasted') || lower.includes('grilled')) return '🔥';
+      if (lower.includes('fried')) return '🍳';
+      if (lower.includes('baked')) return '🫓';
+
+      return '🍽️';
+    }
+
+    // Generic "the request failed entirely" state — network errors, non-2xx
+    // responses, timeouts. Fixed copy (no raw error text) plus a retry
+    // button that replays whatever action just failed.
+    let lastFailedRetry = null;
+    function renderApiErrorCard(containerId, retryFn) {
+      lastFailedRetry = retryFn;
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML =
+        `<div class="error-card">
+          <i data-lucide="wifi-off"></i>
+          <div style="flex:1">
+            <div>Something went wrong. Try again.</div>
+            <button type="button" class="error-retry-btn" onclick="retryFailedAction()">Retry</button>
+          </div>
+        </div>`;
+      try { lucide.createIcons(); } catch {}
+    }
+    function retryFailedAction() {
+      if (lastFailedRetry) lastFailedRetry();
     }
 
     let toastTimer = null;
@@ -986,20 +1693,21 @@
       section.innerHTML = `
         <div class="recipe-checklist-card">
           <div class="recipe-dish-header">
-            <div class="recipe-dish-icon"><i class="ph ph-cooking-pot"></i></div>
+            <div class="recipe-dish-icon"><i data-lucide="chef-hat"></i></div>
             <div class="recipe-dish-info">
               <div class="recipe-dish-name">${escapeHtml(currentRecipeDishName)}</div>
               <div class="recipe-dish-meta">${escapeHtml(metaParts.join(' · '))}</div>
             </div>
-            <div class="recipe-ai-badge">AI</div>
+            <i data-lucide="sparkles" class="recipe-ai-spark"></i>
           </div>
           <div class="recipe-stats-row" id="recipeStatsRow">${buildRecipeStatsHtml()}</div>
-          <p class="recipe-checklist-sub">Select the items you need to order</p>
+          <p class="recipe-checklist-sub" id="recipeHookLine">${buildRecipeHookText()}</p>
           <div class="recipe-rows" id="recipeRowsContainer">${buildRecipeRowsHtml()}</div>
           <div id="recipeChecklistFooter">${buildRecipeFooterHtml()}</div>
           ${buildRecipeStepsHtml()}
         </div>`;
 
+      animateStatNumbers(document.getElementById('recipeStatsRow'));
       try { lucide.createIcons(); } catch {}
     }
 
@@ -1011,35 +1719,167 @@
       return `
         <div class="recipe-steps-block">
           <button type="button" class="recipe-steps-toggle" onclick="toggleRecipeSteps()">
-            <i class="ph ph-book-open"></i> How to make it
-            <i class="ph ${recipeStepsExpanded ? 'ph-caret-up' : 'ph-caret-down'}" style="margin-left:auto;"></i>
+            <i data-lucide="book-open"></i> How to make it
+            <i data-lucide="chevron-down" class="ml-auto ${recipeStepsExpanded ? 'rotated' : ''}"></i>
           </button>
-          <ol class="recipe-steps-list" id="recipeStepsList" style="display:${recipeStepsExpanded ? '' : 'none'};">
+          <div id="youtubeVideoSection"></div>
+          <ol class="recipe-steps-list ${recipeStepsExpanded ? '' : 'collapsed'}" id="recipeStepsList">
             ${stepsList}
           </ol>
         </div>`;
     }
 
+    // Best-effort recipe video lookup — shows a clean empty-state placeholder
+    // on any failure or empty result, never an error message. Collapsed by
+    // default — the header row alone is visible until tapped.
+    let youtubeSectionExpanded = true;
+    function renderYouTubeEmbed(data) {
+      const section = document.getElementById('youtubeVideoSection');
+      if (!section) return;
+      const videos = (data && data.videos) || [];
+      const inner = !videos.length
+        ? `<div class="yt-video-wrap">
+            <div class="empty-state">
+              <i data-lucide="youtube" class="text-[32px]" style="color:var(--text-muted);display:block;margin-bottom:8px;"></i>
+              No video found for this dish
+            </div>
+          </div>`
+        : `<div class="yt-video-wrap">${buildYouTubeCarouselHtml(videos)}</div>`;
+      section.innerHTML = `
+        <button type="button" class="yt-video-toggle" onclick="toggleYoutubeSection()">
+          <i data-lucide="youtube"></i> Watch recipe video
+          <i data-lucide="chevron-down" class="ml-auto ${youtubeSectionExpanded ? 'rotated' : ''}" id="ytCaret"></i>
+        </button>
+        <div class="yt-video-content ${youtubeSectionExpanded ? '' : 'collapsed'}" id="ytVideoContent">${inner}</div>`;
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function buildYouTubeCarouselHtml(videos) {
+      const [first, ...rest] = videos;
+      return `
+        <div class="yt-active-player">
+          <div class="yt-iframe-wrap">
+            <iframe
+              id="ytMainFrame"
+              src="https://www.youtube.com/embed/${encodeURIComponent(first.videoId)}?rel=0&modestbranding=1&color=white"
+              frameborder="0"
+              allowfullscreen
+              style="width:100%;height:100%;border-radius:12px;display:block;"
+            ></iframe>
+          </div>
+          <div class="yt-active-info">
+            <div class="yt-channel">${escapeHtml(first.channel || '')}</div>
+            <div class="yt-title">${escapeHtml(first.title || '')}</div>
+          </div>
+        </div>
+        ${videos.length > 1 ? `
+        <div class="yt-thumbnails">
+          ${videos.map((v, i) => `
+            <div class="yt-thumb-card ${i === 0 ? 'yt-thumb-active' : ''}"
+                 data-video-id="${escapeHtml(v.videoId)}"
+                 data-title="${escapeHtml(v.title || '')}"
+                 data-channel="${escapeHtml(v.channel || '')}"
+                 role="button" tabindex="0"
+                 aria-label="Play ${escapeHtml(v.title || 'recipe video')}"
+                 onclick="switchYouTubeVideo(this)"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+              <div class="yt-thumb-img-wrap">
+                <img src="${v.thumbnail}" alt="${escapeHtml(v.title || '')}"
+                     style="width:100%;height:100%;object-fit:cover;border-radius:8px;"/>
+                <div class="yt-thumb-overlay ${i === 0 ? 'yt-thumb-playing' : ''}">
+                  ${i === 0
+                    ? '<span style="font-size:10px;font-weight:700;color:#fff;background:var(--orange);padding:2px 6px;border-radius:4px;">PLAYING</span>'
+                    : '<div style="width:24px;height:24px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="play" style="width:14px;height:14px;color:#fff;margin-left:1px;"></i></div>'
+                  }
+                </div>
+              </div>
+              <div class="yt-thumb-title">${escapeHtml(v.title || '')}</div>
+              <div class="yt-thumb-channel">${escapeHtml(v.channel || '')}</div>
+            </div>
+          `).join('')}
+        </div>` : ''}`;
+    }
+
+    function switchYouTubeVideo(card) {
+      const videoId = card.dataset.videoId;
+      const title = card.dataset.title;
+      const channel = card.dataset.channel;
+
+      const frame = document.getElementById('ytMainFrame');
+      if (frame) frame.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?rel=0&modestbranding=1&color=white&autoplay=1`;
+
+      const titleEl = document.querySelector('.yt-title');
+      const channelEl = document.querySelector('.yt-channel');
+      if (titleEl) titleEl.textContent = title;
+      if (channelEl) channelEl.textContent = channel;
+
+      document.querySelectorAll('.yt-thumb-card').forEach(c => {
+        c.classList.remove('yt-thumb-active');
+        const overlay = c.querySelector('.yt-thumb-overlay');
+        if (overlay) overlay.innerHTML = '<div style="width:24px;height:24px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="play" style="width:14px;height:14px;color:#fff;margin-left:1px;"></i></div>';
+      });
+      card.classList.add('yt-thumb-active');
+      const activeOverlay = card.querySelector('.yt-thumb-overlay');
+      if (activeOverlay) activeOverlay.innerHTML = '<span style="font-size:10px;font-weight:700;color:#fff;background:var(--orange);padding:2px 6px;border-radius:4px;">PLAYING</span>';
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function toggleYoutubeSection() {
+      youtubeSectionExpanded = !youtubeSectionExpanded;
+      const content = document.getElementById('ytVideoContent');
+      const caret = document.getElementById('ytCaret');
+      if (content) content.classList.toggle('collapsed', !youtubeSectionExpanded);
+      if (caret) caret.classList.toggle('rotated', youtubeSectionExpanded);
+    }
+
+    let topUpSectionExpanded = true;
+    function toggleTopUpSection() {
+      topUpSectionExpanded = !topUpSectionExpanded;
+      const content = document.getElementById('topupContent');
+      const caret = document.getElementById('topupCaret');
+      if (content) content.classList.toggle('collapsed', !topUpSectionExpanded);
+      if (caret) caret.classList.toggle('rotated', topUpSectionExpanded);
+    }
+
     function toggleRecipeSteps() {
       recipeStepsExpanded = !recipeStepsExpanded;
       const list = document.getElementById('recipeStepsList');
-      const toggleBtn = document.querySelector('.recipe-steps-toggle i:last-child');
-      if (list) list.style.display = recipeStepsExpanded ? '' : 'none';
-      if (toggleBtn) toggleBtn.className = recipeStepsExpanded ? 'ph ph-caret-up' : 'ph ph-caret-down';
+      const toggleBtn = document.querySelector('.recipe-steps-toggle :last-child');
+      if (list) list.classList.toggle('collapsed', !recipeStepsExpanded);
+      if (toggleBtn) toggleBtn.classList.toggle('rotated', recipeStepsExpanded);
+    }
+
+    function buildRecipeHookText() {
+      const missingCount = currentRecipeChecklist.filter(i => !i.checked).length;
+      if (missingCount === 0) return "Your kitchen is fully stocked for this. Time to cook.";
+      if (missingCount === 1) return "Almost there. Just one thing standing between you and this dish.";
+      if (missingCount <= 3) return "You're 80% ready. Here's what's missing.";
+      return "A few key ingredients away. Let's get them.";
     }
 
     function buildRecipeStatsHtml() {
       const haveCount = currentRecipeChecklist.filter(i => i.checked).length;
-      const toOrderCount = currentRecipeChecklist.filter(i => !i.checked).length;
-      return `
-        <div class="recipe-stat">
-          <div class="recipe-stat-number have">${haveCount}</div>
-          <div class="recipe-stat-label">You have</div>
-        </div>
-        <div class="recipe-stat">
-          <div class="recipe-stat-number" style="color:var(--orange)">${toOrderCount}</div>
-          <div class="recipe-stat-label">To order</div>
-        </div>`;
+      const total = currentRecipeChecklist.length;
+      const toOrderCount = total - haveCount;
+      return `<p class="recipe-stat-line">You already have <span class="stat-num" data-target="${haveCount}">0</span> of <span class="stat-num" data-target="${total}">0</span> ingredient${total === 1 ? '' : 's'}. Just <span class="recipe-stat-z stat-num" data-target="${toOrderCount}">0</span> item${toOrderCount === 1 ? '' : 's'} to order.</p>`;
+    }
+
+    // Effect 2 — count the stat numbers up from 0 to their target over 600ms,
+    // eased. Pure requestAnimationFrame, no dependencies.
+    function animateStatNumbers(root) {
+      if (!root) return;
+      root.querySelectorAll('.stat-num').forEach(el => {
+        const target = parseInt(el.dataset.target, 10) || 0;
+        const duration = 600;
+        const start = performance.now();
+        function tick(now) {
+          const progress = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.round(eased * target);
+          if (progress < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
     }
 
     function buildRecipeRowsHtml() {
@@ -1049,12 +1889,12 @@
         // (not manually toggled on by the user) get an explanatory tag.
         let tag = '';
         if (ing.checked) {
-          if (ing.foundInFridge) tag = '<span class="recipe-row-tag">📷 in fridge</span>';
-          else if (ing.isStaple) tag = '<span class="recipe-row-tag">Staple</span>';
+          if (ing.foundInFridge) tag = '<span class="recipe-row-tag recipe-row-tag-fridge"><i data-lucide="camera"></i> in fridge</span>';
+          else if (ing.isStaple) tag = '<span class="recipe-row-tag recipe-row-tag-staple">Staple</span>';
         }
         return `
           <div class="recipe-row ${ing.checked ? 'checked' : ''}" onclick="toggleRecipeItem(${idx})">
-            <span class="recipe-row-checkbox">${ing.checked ? '<i class="ph ph-check"></i>' : ''}</span>
+            <span class="recipe-row-checkbox">${ing.checked ? '<i data-lucide="circle-check"></i>' : ''}</span>
             <div class="recipe-row-info">
               <div class="recipe-row-name">${escapeHtml(ing.name)}</div>
               <div class="recipe-row-qty">${escapeHtml(ing.quantity)}</div>
@@ -1073,7 +1913,7 @@
         <div class="recipe-checklist-footer">
           <p class="recipe-order-count">${toOrderCount} ingredient${toOrderCount === 1 ? '' : 's'} to order</p>
           <button class="recipe-cart-btn" onclick="orderRecipeCart()">
-            <i class="ph ph-shopping-cart"></i> Add ${toOrderCount} item${toOrderCount === 1 ? '' : 's'} to Instamart
+            <i data-lucide="shopping-cart"></i> Add ${toOrderCount} item${toOrderCount === 1 ? '' : 's'} to Instamart
           </button>
         </div>`;
     }
@@ -1082,9 +1922,11 @@
       const rowsEl = document.getElementById('recipeRowsContainer');
       const footerEl = document.getElementById('recipeChecklistFooter');
       const statsEl = document.getElementById('recipeStatsRow');
+      const hookEl = document.getElementById('recipeHookLine');
       if (rowsEl) rowsEl.innerHTML = buildRecipeRowsHtml();
       if (footerEl) footerEl.innerHTML = buildRecipeFooterHtml();
-      if (statsEl) statsEl.innerHTML = buildRecipeStatsHtml();
+      if (statsEl) { statsEl.innerHTML = buildRecipeStatsHtml(); animateStatNumbers(statsEl); }
+      if (hookEl) hookEl.textContent = buildRecipeHookText();
       try { lucide.createIcons(); } catch {}
     }
 
@@ -1106,18 +1948,38 @@
     function orderRecipeCart() {
       const toOrderItems = currentRecipeChecklist.filter(i => !i.checked);
       if (!toOrderItems.length) return;
-      const cartItems = toOrderItems.map((ing, idx) => {
-        const { qty_needed, unit } = parseQuantityString(ing.quantity);
-        return {
-          id: `recipe_${idx}_${Date.now()}`,
-          name: ing.name,
-          qty_needed,
-          unit,
-          threshold: qty_needed,
-          category: 'food',
-        };
-      });
-      openSmartCart(cartItems);
+      showMockOrderConfirmation(toOrderItems);
+    }
+
+    // Staging demo only — no real Instamart order is placed. Shows a fake
+    // order ID and ETA so the flow feels complete without depending on the
+    // live cart-fill agent.
+    function showMockOrderConfirmation(items) {
+      const orderId = 'FTF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const modal = document.getElementById('smartCartModal');
+      modal.style.display = 'flex';
+      document.getElementById('cartModalBody').innerHTML = `
+        <div class="cart-header">
+          <div class="cart-title">Order confirmed</div>
+          <div class="cart-subtitle">Staging demo — no real order was placed</div>
+        </div>
+        <div class="cart-items-list">
+          ${items.map(item => `
+            <div class="cart-item-row">
+              <div class="cart-item-icon">${getCategoryEmoji('food')}</div>
+              <div class="cart-item-info">
+                <div class="cart-item-name">${escapeHtml(item.name)}</div>
+                <div class="cart-item-qty">${escapeHtml(item.quantity || '')}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="cart-summary">
+          <div class="cart-summary-row"><span>Order ID</span><span class="mono-text">${orderId}</span></div>
+          <div class="cart-summary-row"><span>Estimated delivery</span><span class="order-value eta">22 minutes</span></div>
+        </div>
+        <div class="cart-connect-hint">STAGING DEMO — this screen does not place a real Instamart order.</div>
+      `;
+      try { lucide.createIcons(); } catch {}
     }
 
     function addTopUpToCart(idx) {
@@ -1140,19 +2002,26 @@
       return blocked.some(b => lower.includes(b));
     }
 
+    function firstSentence(text) {
+      const idx = text.indexOf('.');
+      return idx === -1 ? text : text.slice(0, idx + 1);
+    }
+
     function renderChoiceCard(ev) {
       const missing = (ev.missing_ingredients || []).map(escapeHtml);
-      const missingText = missing.length ? missing.join(', ') : 'Nothing — you have everything';
+      const missingText = missing.length
+        ? (missing.length > 3 ? `${missing.slice(0, 3).join(', ')} + ${missing.length - 3} more` : missing.join(', '))
+        : 'Nothing — you have everything';
       const mealName = escapeHtml(ev.recommended_meal || 'this dish');
       const rawReasoning = ev.reasoning || '';
       const showReasoning = rawReasoning && !isInternalReasoning(rawReasoning);
-      const reasoning = escapeHtml(rawReasoning);
+      const reasoning = escapeHtml(firstSentence(rawReasoning));
 
-      // Both options are shown as equal choices — no AI recommendation
-      // or "best choice" badge steering the user toward either one.
+      // Instamart is the primary filled CTA; Swiggy is a secondary
+      // outline button — creates hierarchy instead of two identical CTAs.
       const groceriesBtn = `
-        <button class="choice-btn order_groceries" data-action="order_groceries" onclick="confirmOrderGroceries(this)">
-          <div class="choice-icon-circle"><i class="ph ph-shopping-cart"></i></div>
+        <button class="choice-btn choice-btn-primary order_groceries" data-action="order_groceries" onclick="confirmOrderGroceries(this)">
+          <div class="choice-icon-circle"><i data-lucide="shopping-cart"></i></div>
           <div class="choice-text">
             <div class="choice-btn-title">Order missing items from Instamart</div>
             <div class="choice-btn-sub">${missingText}</div>
@@ -1160,8 +2029,8 @@
         </button>`;
 
       const dishBtn = `
-        <button class="choice-btn order_dish" data-action="order_dish" onclick="chooseAction('order_dish', this)">
-          <div class="choice-icon-circle"><i class="ph ph-motorcycle"></i></div>
+        <button class="choice-btn choice-btn-outline order_dish" data-action="order_dish" onclick="chooseAction('order_dish', this)">
+          <div class="choice-icon-circle"><i data-lucide="bike"></i></div>
           <div class="choice-text">
             <div class="choice-btn-title">Order the dish from Swiggy</div>
             <div class="choice-btn-sub">Get ${mealName} delivered</div>
@@ -1171,7 +2040,7 @@
 
       document.getElementById('choiceCard').innerHTML =
         `<div class="card choice-card">
-          <div class="choice-header-row"><span class="choice-label">What do you want to do?</span></div>
+          <div class="choice-header-row"><span class="choice-label">How do you want to handle this?</span></div>
           ${showReasoning ? `<p class="choice-subtitle">${reasoning}</p>` : ''}
           <div class="choice-buttons">
             ${groceriesBtn}
@@ -1189,8 +2058,8 @@
         const iconEl = b.querySelector('.choice-icon-circle');
         if (iconEl && iconEl.querySelector('.spin')) {
           const action = b.dataset.action;
-          const iconName = action === 'order_groceries' ? 'ph-shopping-cart' : 'ph-motorcycle';
-          iconEl.innerHTML = `<i class="ph ${iconName}"></i>`;
+          const iconName = action === 'order_groceries' ? 'shopping-cart' : 'bike';
+          iconEl.innerHTML = `<i data-lucide="${iconName}"></i>`;
         }
       });
       try { lucide.createIcons(); } catch {}
@@ -1221,9 +2090,7 @@
         await readSSEStream(res, handleEvent);
       } catch (err) {
         setStep(3, '', 'Error');
-        document.getElementById('orderCard').innerHTML =
-          `<div class="error-card"><i data-lucide="triangle-alert"></i><span>${escapeHtml(err.message)}</span></div>`;
-        try { lucide.createIcons(); } catch {}
+        renderApiErrorCard('orderCard', () => chooseAction(action, btnEl));
         resetChoiceButtons();
       } finally {
         orderInFlight = false;
@@ -1269,7 +2136,7 @@
           <div class="modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-header">
               <h3>Order missing items</h3>
-              <button class="modal-close" onclick="closeOrderPreviewModal()"><i data-lucide="x"></i></button>
+              <button class="modal-close" onclick="closeOrderPreviewModal()" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
             <div class="cart-items-list">${rows}</div>
             <button class="modal-submit" onclick="confirmAndOrderGroceries()">Confirm and Order</button>
@@ -1291,13 +2158,27 @@
     }
 
     async function startScan(mode, file) {
-      // UI state
-      setAnalyseLoading();
-      stepsEl.classList.add('show');
+      // UI state — landing hides and the loading overlay takes over the
+      // instant the scan starts; resultsSection only reappears once the
+      // 'complete' SSE event fires (or on error/auth_required, so the
+      // failure state is visible instead of a blank screen).
+      currentScanHasPhoto = mode === 'photo' && !!file;
+      currentScanDish = document.getElementById('targetDish').value.trim();
+      const landingEl = document.getElementById('landingSection');
+      landingEl.classList.add('fade-out');
+      setTimeout(() => { landingEl.style.display = 'none'; }, 200);
+      document.getElementById('resultsSection').classList.remove('fade-in');
+      document.getElementById('resultsSection').style.display = 'none';
+      setAnalyseLoading(currentScanHasPhoto);
+      setProgress(5);
+      addStatusLine(currentScanHasPhoto ? 'Reading your fridge' : `Looking up ${currentScanDish}`);
       resultsEl.classList.remove('show');
+      const scanSectionWrapperEl = document.getElementById('scanSectionWrapper');
+      if (scanSectionWrapperEl) scanSectionWrapperEl.style.display = '';
+      resetProgressSteps();
       document.getElementById('ingredientChips').innerHTML = '';
       document.getElementById('mealCards').innerHTML = '';
-      document.getElementById('mealSuggestionsSection').style.display = 'none';
+      document.getElementById('mealSuggestionsSection').classList.add('hidden');
       document.getElementById('recipeChecklistSection').innerHTML = '';
       document.getElementById('choiceCard').innerHTML = '';
       document.getElementById('topUpSection').innerHTML = '';
@@ -1327,13 +2208,37 @@
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         await readSSEStream(res, handleEvent);
       } catch (err) {
-        document.getElementById('orderCard').innerHTML =
-          `<div class="error-card"><i data-lucide="triangle-alert"></i><span>${escapeHtml(err.message)}</span></div>`;
-        try { lucide.createIcons(); } catch {}
+        renderApiErrorCard('orderCard', () => startScan(mode, file));
         resultsEl.classList.add('show');
+        hideLoadingOverlay();
+        revealResultsSection();
       } finally {
         setAnalyseReady('Get Recipe');
       }
+    }
+
+    // Fades resultsSection in (used once the loading overlay is dismissed,
+    // whether via 'complete', an SSE 'error'/'auth_required', or a network
+    // failure caught in startScan).
+    function revealResultsSection() {
+      const el = document.getElementById('resultsSection');
+      if (!el) return;
+      el.style.display = 'block';
+      requestAnimationFrame(() => el.classList.add('fade-in'));
+    }
+
+    // Used by the "Try again" button on the two scan empty/error states —
+    // hides resultsSection and brings the landing form back, without a
+    // page refresh. startScan() clears out any leftover result content
+    // the next time it runs.
+    function resetToLanding() {
+      hideLoadingOverlay();
+      const resultsSectionEl = document.getElementById('resultsSection');
+      resultsSectionEl.classList.remove('fade-in');
+      resultsSectionEl.style.display = 'none';
+      const landingEl = document.getElementById('landingSection');
+      landingEl.style.display = '';
+      requestAnimationFrame(() => landingEl.classList.remove('fade-out'));
     }
 
     /* ── Landing "Scan Fridge" secondary button ── */
@@ -1357,42 +2262,316 @@
       input.click();
     }
 
-    document.getElementById('landingScanFileInput').addEventListener('change', e => {
+    // Mobile camera photos are commonly 8-12MB at full resolution, which can
+    // crash the browser (out-of-memory) when processed/uploaded as-is.
+    // Downscaling to a max of 1200x1200 and re-encoding as JPEG keeps the
+    // image sharp enough for Gemini vision while staying well under 300KB.
+    function compressImage(file, maxWidth, maxHeight, quality) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth) {
+              height = Math.round(height * maxWidth / width);
+              width = maxWidth;
+            }
+            if (height > maxHeight) {
+              width = Math.round(width * maxHeight / height);
+              height = maxHeight;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(resolve, 'image/jpeg', quality);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    document.getElementById('landingScanFileInput').addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
       const statusEl = document.getElementById('landingScanStatus');
       statusEl.innerHTML = '<div class="spin"></div> Scanning your fridge…';
-      startScan('photo', file);
+      const compressed = await compressImage(file, 1200, 1200, 0.82);
+      const compressedFile = new File([compressed], file.name, { type: 'image/jpeg' });
+      startScan('photo', compressedFile);
+    });
+
+    /* ═══════════════ DISH AUTOCOMPLETE ═══════════════ */
+    const INSTANT_DISHES = [
+      // Indian Breakfast
+      "Poha","Upma","Idli","Dosa","Masala Dosa","Rava Dosa","Set Dosa",
+      "Uttapam","Medu Vada","Idli Sambar","Sabudana Khichdi","Aloo Paratha",
+      "Gobi Paratha","Paneer Paratha","Methi Paratha","Stuffed Paratha",
+      "Puri Bhaji","Chole Bhature","Kachori","Bedmi Puri","Misal Pav",
+      "Poha Jalebi","Dhokla","Handvo","Thepla","Muthia",
+
+      // Indian Lunch / Dinner — Vegetarian
+      "Palak Paneer","Paneer Butter Masala","Paneer Tikka Masala","Shahi Paneer",
+      "Kadai Paneer","Matar Paneer","Paneer Bhurji","Saag Paneer",
+      "Dal Makhani","Dal Tadka","Dal Fry","Dal Baati Churma","Panchmel Dal",
+      "Chana Masala","Chole Kulche","Rajma Chawal","Kadala Curry",
+      "Aloo Gobi","Aloo Matar","Aloo Jeera","Aloo Tamatar","Dum Aloo",
+      "Baingan Bharta","Bharwa Baingan","Baingan Masala",
+      "Matar Mushroom","Mushroom Masala","Kadai Mushroom",
+      "Mix Veg Curry","Navratan Korma","Vegetable Jalfrezi",
+      "Bhindi Masala","Bhindi Do Pyaza","Stuffed Bhindi",
+      "Lauki Ki Sabzi","Lauki Chana Dal","Turai Ki Sabzi",
+      "Sarson Ka Saag","Makki Ki Roti","Bathua Raita",
+      "Pav Bhaji","Vada Pav","Sev Puri","Bhel Puri","Pani Puri","Dahi Puri",
+      "Samosa","Samosa Chaat","Aloo Tikki Chaat","Papdi Chaat",
+      "Rajasthani Dal","Laal Maas","Gatte Ki Sabzi","Ker Sangri",
+      "Avial","Kootu","Olan","Erissery","Thoran","Pulissery",
+      "Vangi Bath","Bisi Bele Bath","Puliyogare","Curd Rice",
+
+      // Indian Rice Dishes
+      "Biryani","Vegetable Biryani","Paneer Biryani","Mushroom Biryani",
+      "Jeera Rice","Matar Pulao","Vegetable Pulao","Kashmiri Pulao",
+      "Tamarind Rice","Lemon Rice","Coconut Rice","Tomato Rice",
+      "Khichdi","Moong Dal Khichdi","Sabudana Khichdi",
+
+      // Indian Non-Veg
+      "Chicken Biryani","Mutton Biryani","Egg Biryani","Fish Biryani",
+      "Butter Chicken","Chicken Curry","Chicken Masala","Chicken Do Pyaza",
+      "Chicken Tikka Masala","Chicken Kadai","Chicken Korma","Chicken Saag",
+      "Chicken Tikka","Chicken Kebab","Chicken Tandoori","Chicken 65",
+      "Chicken Lollipop","Chicken Manchurian","Chilli Chicken",
+      "Mutton Curry","Mutton Rogan Josh","Mutton Keema","Mutton Korma",
+      "Keema Matar","Keema Pav","Egg Curry","Egg Bhurji","Egg Masala",
+      "Fish Curry","Fish Fry","Fish Masala","Prawn Curry","Prawn Masala",
+      "Goan Fish Curry","Kerala Fish Curry","Malabar Fish Curry",
+
+      // Indian Breads
+      "Naan","Butter Naan","Garlic Naan","Tandoori Roti","Missi Roti",
+      "Bhatura","Kulcha","Amritsari Kulcha","Lachha Paratha","Rumali Roti",
+
+      // Indian Street Food
+      "Dahi Vada","Raj Kachori","Golgappa","Dabeli","Kathi Roll",
+      "Frankie","Bread Pakora","Onion Pakora","Paneer Pakora","Corn Pakora",
+
+      // Indian Desserts
+      "Gulab Jamun","Rasgulla","Kheer","Gajar Halwa","Suji Halwa",
+      "Moong Dal Halwa","Besan Halwa","Ladoo","Besan Ladoo","Motichoor Ladoo",
+      "Barfi","Kaju Katli","Peda","Sandesh","Mishti Doi",
+      "Shahi Tukda","Rasmalai","Rabri","Phirni","Sewai Kheer",
+      "Kulfi","Mango Kulfi","Falooda","Jalebi","Imarti",
+      "Paan","Thandai","Shrikhand","Basundi","Puran Poli",
+
+      // Indian Drinks
+      "Lassi","Sweet Lassi","Salted Lassi","Mango Lassi","Rose Lassi",
+      "Chaas","Masala Chai","Cutting Chai","Kadak Chai","Masala Milk",
+      "Aam Panna","Jaljeera","Nimbu Pani","Sugarcane Juice","Coconut Water",
+
+      // South Indian
+      "Idli Vada","Rasam","Sambhar","Kosamalli","Pesarattu","Appam",
+      "Puttu","Kadala Curry","Kerala Parotta","Malabar Parotta",
+      "Chettinad Chicken","Chettinad Curry","Pongal","Ven Pongal",
+      "Keerai Masiyal","Mor Kuzhambu","Kolhapuri Chicken",
+
+      // North Indian Specials
+      "Amritsari Kulcha","Amritsari Fish","Pindi Chole","Langarwali Dal",
+      "Kashmiri Dum Aloo","Kashmiri Rogan Josh","Yakhni Pulao",
+
+      // Chinese / Indo-Chinese
+      "Fried Rice","Egg Fried Rice","Chicken Fried Rice","Veg Fried Rice",
+      "Hakka Noodles","Schezwan Noodles","Chowmein","Singapore Noodles",
+      "Manchurian","Veg Manchurian","Chicken Manchurian","Gobi Manchurian",
+      "Chilli Paneer","Chilli Mushroom","Chilli Potato","Spring Rolls",
+      "Momos","Veg Momos","Chicken Momos","Pan Fried Momos","Soup Momos",
+      "Hot and Sour Soup","Sweet Corn Soup","Manchow Soup","Wonton Soup",
+
+      // Italian
+      "Pasta","White Sauce Pasta","Red Sauce Pasta","Aglio e Olio",
+      "Penne Arrabbiata","Spaghetti Carbonara","Fettuccine Alfredo",
+      "Lasagna","Pesto Pasta","Mushroom Pasta","Pizza","Margherita Pizza",
+      "Pepperoni Pizza","BBQ Pizza","Garlic Bread","Bruschetta","Risotto",
+      "Tiramisu","Panna Cotta",
+
+      // Continental / Western
+      "Burger","Veggie Burger","Chicken Burger","Beef Burger",
+      "Sandwich","Club Sandwich","Grilled Cheese","BLT Sandwich",
+      "Omelette","French Toast","Pancakes","Waffles","Crepes",
+      "Caesar Salad","Greek Salad","Pasta Salad","Coleslaw",
+      "Soup","Tomato Soup","Mushroom Soup","French Onion Soup",
+      "Mac and Cheese","Grilled Chicken","Steak","Fish and Chips",
+
+      // Asian
+      "Sushi","Ramen","Udon","Pad Thai","Tom Yum Soup","Green Curry",
+      "Red Curry","Massaman Curry","Bibimbap","Kimchi Fried Rice",
+      "Dim Sum","Baozi","Pho","Banh Mi","Laksa","Nasi Goreng",
+      "Miso Soup","Tempura","Teriyaki Chicken","Kung Pao Chicken",
+
+      // Mexican
+      "Tacos","Burrito","Quesadilla","Nachos","Guacamole","Enchiladas",
+      "Fajitas","Churros","Salsa",
+
+      // Healthy / Trendy
+      "Smoothie Bowl","Acai Bowl","Overnight Oats","Avocado Toast",
+      "Quinoa Salad","Buddha Bowl","Grain Bowl","Protein Bowl",
+    ];
+
+    let activeSuggestionIndex = -1;
+
+    const dishInput = document.getElementById('targetDish');
+    const suggestionBox = document.createElement('div');
+    suggestionBox.id = 'dishSuggestions';
+    suggestionBox.style.cssText = `
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 999;
+      overflow: hidden;
+      display: none;
+      margin-top: 6px;
+    `;
+    dishInput.parentElement.style.position = 'relative';
+    dishInput.parentElement.appendChild(suggestionBox);
+
+    function escapeRegExp(s) {
+      return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function renderSuggestions(suggestions, query) {
+      if (!suggestions.length) {
+        suggestionBox.style.display = 'none';
+        return;
+      }
+      const queryRegex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+      suggestionBox.innerHTML = suggestions.map((s, i) => {
+        const safe = escapeHtml(s);
+        const highlighted = safe.replace(queryRegex, '<span style="color:var(--orange);font-weight:700">$1</span>');
+        return `<div class="suggestion-row" data-index="${i}" data-value="${safe}"
+          style="padding:14px 16px;cursor:pointer;font-size:14px;
+          font-family:'Plus Jakarta Sans',sans-serif;
+          border-bottom:1px solid var(--border);
+          transition:background 0.1s ease;"
+          onmouseenter="this.style.background='var(--orange-light)'"
+          onmouseleave="this.style.background='transparent'"
+          onclick="selectSuggestion(this.dataset.value)">
+          ${highlighted}
+        </div>`;
+      }).join('');
+      suggestionBox.style.display = 'block';
+      activeSuggestionIndex = -1;
+    }
+
+    function selectSuggestion(value) {
+      dishInput.value = value;
+      suggestionBox.style.display = 'none';
+      activeSuggestionIndex = -1;
+      dishInput.focus();
+    }
+
+    dishInput.addEventListener('input', () => {
+      const q = dishInput.value.trim();
+      if (q.length < 2) {
+        suggestionBox.style.display = 'none';
+        return;
+      }
+
+      const qLower = q.toLowerCase();
+      const startsWith = [];
+      const contains = [];
+      for (const d of INSTANT_DISHES) {
+        const dLower = d.toLowerCase();
+        if (dLower.startsWith(qLower)) startsWith.push(d);
+        else if (dLower.includes(qLower)) contains.push(d);
+      }
+      renderSuggestions([...startsWith, ...contains].slice(0, 7), q);
+    });
+
+    dishInput.addEventListener('keydown', (e) => {
+      const rows = suggestionBox.querySelectorAll('.suggestion-row');
+      if (!rows.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, rows.length - 1);
+        rows.forEach((r, i) => r.style.background = i === activeSuggestionIndex ? 'var(--orange-light)' : 'transparent');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
+        rows.forEach((r, i) => r.style.background = i === activeSuggestionIndex ? 'var(--orange-light)' : 'transparent');
+      } else if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
+        e.preventDefault();
+        selectSuggestion(rows[activeSuggestionIndex].dataset.value);
+      } else if (e.key === 'Escape') {
+        suggestionBox.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!dishInput.parentElement.contains(e.target)) {
+        suggestionBox.style.display = 'none';
+      }
     });
 
     function handleEvent(ev) {
       if (ev.type === 'progress') {
         setStep(ev.step, 'active', ev.message);
+        if (ev.step === 2) { markProgressStepDone(2); }
         return;
       }
 
       if (ev.type === 'step1') {
+        markProgressStepDone(1);
+        setProgress(30);
+        const stepCount = (ev.ingredients || []).length;
+        addStatusLine(currentScanHasPhoto ? `Found ${stepCount} ingredients` : 'Getting the full ingredient list');
+        if (currentScanHasPhoto) triggerFridgeDots(stepCount);
         const hasIngredients = (ev.ingredients || []).length > 0;
-        setStep(1, 'done', hasIngredients ? `${ev.ingredients.length} ingredients found` : 'No fridge scan');
+        const isPhotoScan = ev.source !== 'recipe';
+        setStep(1, 'done', hasIngredients ? `${ev.ingredients.length} ingredients found` : 'Ready to scan');
         currentFridgeIngredients = ev.ingredients || [];
-        document.getElementById('fridgeIngredientsSection').style.display = hasIngredients ? '' : 'none';
-        document.getElementById('fridgeDesc').textContent = ev.raw_description;
-        const chips = ev.ingredients
-          .filter(i => i.name && i.name.trim() !== '')
-          .map((i, idx) =>
-          `<div class="chip ${confClass(i.confidence)}" style="animation-delay:${idx * 30}ms">
-            <div class="chip-dot"></div>
-            ${escapeHtml(i.name)}
-            <span class="chip-pct">${i.confidence}%</span>
-          </div>`
-        ).join('');
-        document.getElementById('ingredientChips').innerHTML = chips;
+        const fridgeSection = document.getElementById('fridgeIngredientsSection');
+        // Recipe mode starts with an intentionally empty fridge — nothing
+        // to show. A photo scan that comes back empty is a real failure
+        // to detect anything, so surface it instead of hiding silently.
+        if (!hasIngredients && isPhotoScan) {
+          fridgeSection.classList.remove('hidden');
+          document.getElementById('fridgeDesc').textContent = '';
+          document.getElementById('ingredientChips').innerHTML =
+            `<div class="scan-state-card">
+              <i data-lucide="refrigerator" class="scan-state-icon"></i>
+              <div class="scan-state-heading">Nothing detected in your fridge</div>
+              <div class="scan-state-sub">Try a clearer photo with better lighting, or continue without a photo</div>
+              <button type="button" class="cta-secondary-btn" onclick="resetToLanding()">Try again</button>
+            </div>`;
+        } else {
+          fridgeSection.classList.toggle('hidden', !hasIngredients);
+          document.getElementById('fridgeDesc').textContent = ev.raw_description;
+          const chips = ev.ingredients
+            .filter(i => i.name && i.name.trim() !== '')
+            .map((i, idx) =>
+            `<div class="chip ${confClass(i.confidence)} [animation-delay:${idx * 30}ms]">
+              <div class="chip-dot"></div>
+              ${escapeHtml(i.name)}
+              <span class="chip-pct">${i.confidence}%</span>
+            </div>`
+          ).join('');
+          document.getElementById('ingredientChips').innerHTML = chips;
+        }
         resultsEl.classList.add('show');
         try { lucide.createIcons(); } catch {}
         return;
       }
 
       if (ev.type === 'step2') {
+        markProgressStepDone(3);
+        setProgress(70);
+        addStatusLine(currentScanHasPhoto ? `Checking what you need for ${currentScanDish}` : 'Checking your kitchen staples');
         setStep(2, 'done', ev.recommended_meal ? `Recommend: ${ev.recommended_meal}` : 'Done');
 
         const cards = ev.suggestions.map(s => {
@@ -1410,19 +2589,40 @@
           </div>`;
         }).join('');
         document.getElementById('mealCards').innerHTML = cards;
-        document.getElementById('mealSuggestionsSection').style.display =
-          ev.suggestions.length > 1 ? '' : 'none';
+        document.getElementById('mealSuggestionsSection').classList.toggle('hidden', ev.suggestions.length <= 1);
         renderRecipeChecklist(ev);
         try { lucide.createIcons(); } catch {}
+
+        if (ev.recommended_meal) {
+          fetch(`/api/youtube?dish=${encodeURIComponent(ev.recommended_meal)}`)
+            .then(r => r.json())
+            .then(data => renderYouTubeEmbed(data))
+            .catch(() => renderYouTubeEmbed(null));
+        }
         return;
       }
 
       if (ev.type === 'awaiting_user_choice') {
+        markProgressStepDone(4);
+        setProgress(90);
+        addStatusLine('Figuring out what to order');
         currentMealName = ev.recommended_meal || '';
         currentMissingIngredients = ev.missing_ingredients || [];
         setStep(3, '', 'Waiting for your choice');
         renderChoiceCard(ev);
         resultsEl.classList.add('show');
+        return;
+      }
+
+      if (ev.type === 'complete') {
+        markProgressStepDone(5);
+        setProgress(100);
+        addStatusLine('Done');
+        hideScanning();
+        setTimeout(() => {
+          hideLoadingOverlay();
+          revealResultsSection();
+        }, 500);
         return;
       }
 
@@ -1432,21 +2632,63 @@
         currentTopUpSuggestions = suggestions;
 
         const cards = suggestions.map((s, i) => `
-            <div class="topup-product-card" style="animation-delay:${i * 80}ms">
-              <div class="topup-img-placeholder">${escapeHtml(s.emoji || '🛒')}</div>
-              <div class="topup-name">${escapeHtml(s.name)}</div>
-              <div class="topup-reason">${escapeHtml(s.reason)}</div>
-              <button class="topup-add-btn" id="topupAddBtn-${i}" onclick="addTopUpToCart(${i})">
-                <i class="ph ph-plus"></i> Add
-              </button>
+            <div class="topup-product-card [animation-delay:${i * 80}ms]">
+              <div class="topup-img-placeholder" id="topupImg-${i}"></div>
+              <div class="topup-body">
+                <div class="topup-name">${escapeHtml(s.name)}</div>
+                <div class="topup-bottom-row">
+                  <span class="topup-price">₹${s.estimated_price || 0}</span>
+                  <button class="topup-add-btn" id="topupAddBtn-${i}" onclick="addTopUpToCart(${i})">
+                    <i data-lucide="plus"></i> Add
+                  </button>
+                </div>
+              </div>
             </div>`
         ).join('');
 
         document.getElementById('topUpSection').innerHTML =
-          `<div class="section-label topup-header-row"><i class="ph ph-lightning"></i> Top up your meal <span class="spacer"></span><span class="topup-powered">Powered by Instamart</span></div>
-          <p class="topup-subtitle">Small additions, big upgrade</p>
-          <div class="topup-scroll">${cards}</div>`;
+          `<button type="button" class="section-label topup-header-row topup-toggle" onclick="toggleTopUpSection()">
+            <i data-lucide="sparkles"></i> Top up your meal <span class="spacer"></span><span class="topup-powered">instamart</span>
+            <i data-lucide="chevron-down" class="ml-2 ${topUpSectionExpanded ? 'rotated' : ''}" id="topupCaret"></i>
+          </button>
+          <div class="topup-content ${topUpSectionExpanded ? '' : 'collapsed'}" id="topupContent">
+            <p class="topup-subtitle">Small additions, big upgrade</p>
+            <div class="topup-scroll">${cards}</div>
+          </div>`;
         try { lucide.createIcons(); } catch {}
+
+        // Placeholder shows first (grey square, via .topup-img-placeholder's
+        // own background) — each card's real image resolves independently
+        // and asynchronously, falling back to a letter avatar if it 404s.
+        suggestions.forEach((s, i) => {
+          getTopUpImageUrl(s.name).then(url => {
+            const container = document.getElementById(`topupImg-${i}`);
+            if (!container) return;
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = '';
+            img.style.width = '80px';
+            img.style.height = '80px';
+            img.style.objectFit = 'contain';
+            const emojiDiv = document.createElement('div');
+            emojiDiv.style.cssText = `
+              display:none;
+              width:100%;
+              height:100%;
+              align-items:center;
+              justify-content:center;
+              font-size:48px;
+              line-height:1;
+            `;
+            img.onerror = function() {
+              this.style.display = 'none';
+              emojiDiv.style.display = 'flex';
+              emojiDiv.textContent = getEmojiForIngredient(s.name);
+            };
+            container.appendChild(img);
+            container.appendChild(emojiDiv);
+          });
+        });
         return;
       }
 
@@ -1454,7 +2696,7 @@
         setStep(3, 'done', 'Ready to cook!');
         document.getElementById('orderCard').innerHTML =
           `<div class="cook-card">
-            <i class="ph ph-cooking-pot"></i>
+            <i data-lucide="chef-hat"></i>
             <div class="title">You're all set!</div>
             <div class="sub">All ingredients are ready in your kitchen.</div>
           </div>`;
@@ -1469,7 +2711,7 @@
         if (ev.placed) {
           document.getElementById('orderCard').innerHTML =
             `<div class="order-card">
-              <div class="order-icon-wrap"><i class="ph ph-check-fat"></i></div>
+              <div class="order-icon-wrap"><i data-lucide="circle-check-big"></i></div>
               <div class="order-title">Order confirmed!</div>
               <div class="order-id">${escapeHtml(ev.order_id)}</div>
               <div class="order-details">
@@ -1481,7 +2723,7 @@
         } else if (ev.decision === 'cook') {
           document.getElementById('orderCard').innerHTML =
             `<div class="cook-card">
-              <i class="ph ph-cooking-pot"></i>
+              <i data-lucide="chef-hat"></i>
               <div class="title">Time to cook!</div>
               <div class="sub">All ingredients are in your fridge.</div>
             </div>`;
@@ -1491,26 +2733,41 @@
       }
 
       if (ev.type === 'error') {
-        [1,2,3].forEach(i => { if(document.getElementById('s'+i).classList.contains('active')) setStep(i,'','Error'); });
-        document.getElementById('orderCard').innerHTML =
-          `<div class="error-card"><i data-lucide="triangle-alert"></i><span>${escapeHtml(ev.message)}</span></div>`;
+        [1,2,3].forEach(i => { const el = document.getElementById('s'+i); if(el && el.classList.contains('active')) setStep(i,'','Error'); });
+        // Distinguishes the initial scan failing outright (results never
+        // shown yet — full scan-failed state takes over #orderCard, the
+        // only content slot in an otherwise-empty results area) from a
+        // later action (e.g. placing the order) failing after results are
+        // already visible, which keeps the small inline error-card instead.
+        const resultsAlreadyShown = document.getElementById('resultsSection').classList.contains('fade-in');
+        document.getElementById('orderCard').innerHTML = resultsAlreadyShown
+          ? `<div class="error-card"><i data-lucide="circle-alert"></i><span>${escapeHtml(ev.message)}</span></div>`
+          : `<div class="card scan-state-card">
+              <i data-lucide="circle-alert" class="scan-state-icon"></i>
+              <div class="scan-state-heading">Something went wrong</div>
+              <div class="scan-state-sub">The scan didn't complete. Please try again.</div>
+              <button type="button" class="cta-secondary-btn" onclick="resetToLanding()">Try again</button>
+            </div>`;
         resultsEl.classList.add('show');
-        try { lucide.createIcons(); } catch {}
+        hideLoadingOverlay();
+        revealResultsSection();
         resetChoiceButtons();
+        try { lucide.createIcons(); } catch {}
       }
 
       if (ev.type === 'auth_required') {
         setStep(3, '', 'Login required');
         document.getElementById('orderCard').innerHTML =
           `<div class="auth-card">
-            <div class="auth-card-icon"><i class="ph ph-motorcycle"></i></div>
+            <div class="auth-card-icon"><i data-lucide="bike"></i></div>
             <div class="auth-card-title">Connect your Swiggy account</div>
             <div class="auth-card-sub">${escapeHtml(ev.message || 'Login to place this order instantly')}</div>
-            <a class="auth-cta" href="/auth/login"><i class="ph ph-link"></i> Connect with Swiggy</a>
+            <a class="auth-cta" href="/auth/login"><i data-lucide="link-2"></i> Connect with Swiggy</a>
           </div>`;
         resultsEl.classList.add('show');
+        hideLoadingOverlay();
+        revealResultsSection();
         try { lucide.createIcons(); } catch {}
-        checkAuth();
         resetChoiceButtons();
       }
     }
@@ -1575,7 +2832,7 @@
             </div>
             <button class="cart-connect-btn"
                     onclick="window.location.href='/auth/login'">
-                <i data-lucide="link"></i>
+                <i data-lucide="link-2"></i>
                 Connect Swiggy to order
             </button>
             <div class="cart-connect-hint">
@@ -1587,6 +2844,7 @@
                 Open Instamart manually →
             </a>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
       } else {
         // State B — start cart fill agent
         body.innerHTML = `
@@ -1612,9 +2870,7 @@
                             </div>
                         </div>
                         <div class="cart-item-status-icon">
-                            <i data-lucide="clock"
-                               style="color:var(--swiggy-text-3);width:16px;
-                               height:16px;"></i>
+                            <i data-lucide="clock" class="text-[var(--swiggy-text-3)] text-[16px]"></i>
                         </div>
                     </div>
                 `).join('')}
@@ -1673,8 +2929,7 @@
         row.querySelector('.cart-item-status').className =
           'cart-item-status added';
         row.querySelector('.cart-item-status-icon').innerHTML =
-          '<i data-lucide="circle-check" style="color:var(--swiggy-green);' +
-          'width:16px;height:16px;"></i>';
+          '<i data-lucide="circle-check" class="text-[var(--swiggy-green)] text-[16px]"></i>';
         if (typeof lucide !== 'undefined') lucide.createIcons();
       }
 
@@ -1684,8 +2939,7 @@
         row.querySelector('.cart-item-status').className =
           'cart-item-status failed';
         row.querySelector('.cart-item-status-icon').innerHTML =
-          '<i data-lucide="x-circle" style="color:var(--swiggy-red);' +
-          'width:16px;height:16px;"></i>';
+          '<i data-lucide="circle-x" class="text-[var(--swiggy-red)] text-[16px]"></i>';
         if (typeof lucide !== 'undefined') lucide.createIcons();
       }
 
@@ -1702,14 +2956,12 @@
         if (footer) {
           footer.innerHTML = `
                 <div class="cart-complete">
-                    <i data-lucide="circle-check"
-                       style="color:var(--swiggy-green);width:20px;
-                       height:20px;"></i>
+                    <i data-lucide="circle-check" class="text-[var(--swiggy-green)] text-[20px]"></i>
                     <span>Cart ready — ${added} items added</span>
                 </div>
                 <button class="cart-checkout-btn"
                     onclick="window.open(
-                        'https://www.swiggy.com/instamart','_blank'
+                        INSTAMART_URL,'_blank'
                     )">
                     Open Instamart to checkout →
                 </button>
@@ -1729,7 +2981,7 @@
       } catch(e) {}
       const firstName = items[0]?.name || '';
       window.open(
-        `https://www.swiggy.com/instamart/search?query=` +
+        `${INSTAMART_URL}/search?query=` +
         encodeURIComponent(firstName),
         '_blank'
       );

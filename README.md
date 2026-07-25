@@ -1,63 +1,63 @@
 # Fridge to Fork
 
-Fridge to Fork is an AI kitchen assistant that closes the loop between what you want to eat, what you already have, and getting the rest delivered. Point a phone camera at your fridge (or skip the camera and use a live household inventory instead), tell it what you want to cook, and Google Gemini identifies your ingredients, decides whether you can cook it now or need to order something, and hands off to a real Google ADK agent that talks to Swiggy's Food, Instamart, and Dineout MCP servers to place the order. A second tab turns the same inventory into a running pantry tracker with barcode-ready item entry, low stock alerts, and a one tap "Smart Cart" that fills an Instamart cart automatically once you connect your Swiggy account.
+Fridge to Fork is an AI kitchen assistant: tell it what you want to eat, optionally show it your fridge, and it gives you a full recipe with a checklist of what you need — then hands off to a real Google ADK agent that talks to Swiggy's Food, Instamart, and Dineout MCP servers to order whatever's missing, or the finished dish itself.
 
 GitHub: https://github.com/jaybharuka/fridge-to-fork
 
 ```
-[Target Dish] + [Fridge Photo or Pantry Inventory]
-        -> Gemini Vision (or live inventory read)
-        -> Gemini Meal Planner (cook / order groceries / order dish)
-        -> Google ADK Agent -> Swiggy Food / Instamart / Dineout MCP
+[Dish name] + [optional Fridge Photo]
+        -> Gemini generates the recipe (ingredients, quantities, steps)
+        -> Deterministic matching marks pantry staples + fridge-photo items as "have"
+        -> You check off anything else you already have
+        -> Google ADK Agent -> Swiggy Instamart (missing items) or Swiggy Food (the dish)
 ```
 
 ---
 
 ## 1. What this is
 
-A FastAPI backend with a single mobile web page (`templates/index.html`) split into two tabs. The Cook tab runs the vision -> planner -> agent pipeline against either a fridge photo or a live household inventory. The Pantry tab is a persistent SQLite backed inventory tracker for the same household, with its own low stock alerts and a Smart Cart flow that fills an Instamart cart through the same Swiggy agent used for meal ordering.
+A FastAPI backend with a single mobile web page (`templates/index.html`), styled after the Swiggy/Instamart app (white background, orange accent, no dark theme). There's one flow: type a dish, optionally scan your fridge, get a real recipe with a checklist, decide for yourself what you're missing, and order it.
 
-## 2. The two tabs
+There is no separate pantry/inventory tab or database — that entire feature was removed. Nothing is guessed on your behalf beyond pantry staples and whatever your fridge photo actually shows; everything else is a manual checkbox.
 
-### Cook tab
+## 2. The flow
 
-- Text input for a target dish ("Dal Makhani", "Biryani", etc), or leave it blank for open ended meal suggestions.
-- Two source pills: **Scan Photo** (camera or gallery upload, analyzed by Gemini Vision) and **Use Pantry** (skips vision entirely and reads live quantities from the Pantry tab's inventory).
-- Renders the three pipeline stages live over Server-Sent Events: detected ingredients as confidence-colored chips, meal suggestions as cards, then a cook / order groceries / order dish choice with the AI's recommendation highlighted.
-- A "top up" strip suggests three small Instamart or Swiggy Food add-ons for whichever meal you land on.
-- After confirming "cook" (in pantry mode), the app posts a consumption event to `/api/inventory/consume` so the pantry reflects what was used.
+- Text input for a target dish ("Dal Makhani", "Biryani", etc.), a servings picker (1–10), and a **Get Recipe** button that works with no photo at all.
+- A secondary **Scan Fridge** button (camera or gallery) is optional — if you skip it, every non-staple ingredient just starts unchecked.
+- The pipeline streams live over Server-Sent Events: a 3-step progress bar (vision → planner → order), then a recipe card with:
+  - Dish name, cuisine, prep time, and a numbered "How to make it" recipe (collapsible).
+  - An ingredient checklist, Instamart-style: checkbox, name, quantity per row.
+    - **Pantry staples** (salt, oil, onions, rice, spices, etc. — see `_STAPLES` in `step2_meal_planner.py`) are pre-checked as "have," greyed out, and tagged `Staple`.
+    - **Fridge-photo matches** (fuzzy-matched against whatever the scan detected) are pre-checked and tagged `📷 in fridge`.
+    - Everything else starts unchecked. Tap any row to toggle it either way — the app never assumes you're out of something, and never assumes you have something it didn't actually detect.
+- A **"What do you want to do?"** card shows two equal, un-ranked options — there's no AI recommendation or "best choice" badge:
+  - **Order missing items from Instamart** — the unchecked ingredients, added to your Instamart cart via the Swiggy agent.
+  - **Order the dish from Swiggy** — the finished dish, ordered from Swiggy Food.
+- A **Top Up** row suggests small Instamart add-ons (as Instamart-style product cards with an emoji placeholder and an Add button) that pair well with the meal — filtered so nothing already on your missing-items list gets suggested twice.
+- Prices are computed throughout (`estimated_price_inr` on every ingredient) but are not shown anywhere in the UI by design — they stay in the data, not on screen.
 
-### Pantry tab
+## 3. The pipeline: Vision → Meal Planner → Swiggy ADK Agent
 
-- Full CRUD inventory grid seeded with 64 default household items (food, bathroom, cosmetics, household) backed by SQLite (`fridge_to_fork/inventory_db.py`).
-- Category filter pills, a "Running out soon" horizontal strip sorted by days of stock remaining, and per-item +/- quantity controls with a "Purchased" button that restocks to a 14 day supply.
-- "What can I cook?" jumps straight to the Cook tab in pantry mode.
-- **Smart Cart**: a button showing the live count of items below their restock threshold. Tapping it opens a bottom sheet that checks `/auth/status` and branches:
-  - Not connected: a priced preview list and a "Connect Swiggy to order" button, plus a manual fallback that copies the list to the clipboard and opens Instamart's search for the first item.
-  - Connected: streams live per-item progress (searching / added / not found) from `/api/inventory/cart-fill`, which drives the same `run_swiggy_agent` used by meal ordering, one item at a time.
-- A floating add button opens a modal for manually adding items, including barcode entry via the browser's `BarcodeDetector` API where supported.
-
-## 3. The pipeline: Vision -> Meal Planner -> Swiggy ADK Agent
-
-**Step 1, Vision (`fridge_to_fork/step1_fridge_vision.py`)**
-Sends the fridge photo to Gemini with a strict JSON prompt and gets back a list of ingredients, each with a rough quantity and a 0 to 1 confidence score, plus a one paragraph description of the fridge. Tries a chain of models (`gemini-2.5-flash` down through `gemini-2.0-flash-lite`) so one model's exhausted quota does not stop the request, and falls back to a small hardcoded ingredient list if every model fails.
-
-In pantry mode (`mode=inventory` on `/api/scan`), this step is skipped entirely: `app.py` reads `get_food_items()` from the inventory database and builds the same `FridgeContents` shape directly from live quantities.
+**Step 1, Vision (`fridge_to_fork/step1_fridge_vision.py`)** — optional.
+Sends the fridge photo to Gemini with a strict JSON prompt and gets back a list of ingredients, each with a rough quantity and a 0–1 confidence score, plus a one-paragraph description of the fridge. Tries a chain of models (`gemini-2.5-flash` down through `gemini-2.0-flash-lite`) so one model's exhausted quota doesn't stop the request, and falls back to a small hardcoded ingredient list if every model fails. If you don't take a photo, this step is skipped entirely and the ingredient list is just empty.
 
 **Step 2, Meal Planner (`fridge_to_fork/step2_meal_planner.py`)**
-Given the ingredient list and an optional target dish, Gemini returns 1 to 5 meal suggestions, each with a `can_cook_now` flag and a list of missing ingredients, plus one decision: `cook`, `order_groceries`, or `order_dish`. The prompt hardcodes a list of pantry staples (salt, oil, onions, rice, tea, etc) that must never be reported as missing, so the AI does not recommend ordering groceries you almost certainly already have. Uses the same model fallback chain pattern as Step 1. A separate `generate_top_up_suggestions()` call produces the three small upsell items shown after the main decision.
+Given a target dish (and optionally what the fridge scan found, used only for inspiration), Gemini returns a complete recipe: description, cuisine, prep time, a fully-quantified ingredient list scaled to the requested servings, a numbered cooking method, and a price estimate per ingredient. Gemini is **not** asked to decide what you already have — that classification is done deterministically in Python afterwards:
+- `_is_pantry_staple()` fuzzy-matches each ingredient against a hardcoded staples list.
+- `_fuzzy_ingredient_match()` fuzzy-matches each ingredient against whatever the fridge photo actually detected (handles plurals, "fresh"/"chopped" etc., and British/American spelling variants like chilli/chili).
+
+There is no cook/order_groceries/order_dish AI decision anymore — the app just reports what's missing and lets you choose how to handle it. A separate `generate_top_up_suggestions()` call produces up to 3 upsell items, filtered against the missing-ingredients list with the same fuzzy matcher so nothing gets suggested twice.
 
 **Step 3, Order Router + Swiggy Agent (`fridge_to_fork/step3_order_router.py` + `fridge_to_fork/swiggy_agent.py`)**
-`step3_order_router.py` no longer contains hardcoded per-platform logic. It builds a `MealPlan` and hands it to `run_swiggy_agent()`, a real `google.adk.agents.Agent` wired to all three Swiggy MCP servers at once via `MCPToolset` + `StreamableHTTPConnectionParams`. The meal plan decision is translated into a natural language instruction (for example, "order Butter Chicken from Swiggy Food, deliver to ..."), and the agent decides for itself which tools to call and in what order. See [section 9](#9-swiggy-mcp-integration) for the full integration details.
+`step3_order_router.py` builds a `MealPlan` and hands it to `run_swiggy_agent()`, a real `google.adk.agents.Agent` wired to all three Swiggy MCP servers at once via `MCPToolset` + `StreamableHTTPConnectionParams`. Your choice (order groceries vs. order the dish) is translated into a natural-language instruction, and the agent decides for itself which tools to call and in what order. See [section 8](#8-swiggy-mcp-integration) for the full integration details.
 
 ## 4. Smart Cart
 
-Smart Cart is the Pantry tab's bulk ordering flow, separate from the Cook tab's single meal order. It targets every item at or below its restock threshold in one action instead of one dish's missing ingredients.
+The Smart Cart modal is the shared "add these items to Instamart" flow used both by the recipe checklist's missing-items button and by each Top Up suggestion's Add button.
 
-- `openSmartCart()` (in `templates/index.html`) filters the live inventory for `qty < threshold` (or `qty === 0`) and checks `/auth/status`.
-- If Swiggy is not connected, the modal shows a priced preview and a Connect button, so there is always a usable path even without OAuth.
-- If connected, `/api/inventory/cart-fill` (new endpoint in `app.py`) streams one SSE event per item as it builds a one-item `MealPlan` with `Decision.ORDER_GROCERIES` and runs it through `run_swiggy_agent()`, the same function the Cook tab's order flow uses.
-- A manual fallback always works regardless of auth state: it copies the full item list to the clipboard and opens Instamart's search page for the first item.
+- `openSmartCart(items)` (in `templates/index.html`) checks `/auth/status`.
+- Not connected: shows a preview list and a "Connect Swiggy to order" button, plus a manual fallback that opens Instamart's search page.
+- Connected: `/api/cart-fill` streams one SSE event per item as it builds a one-item `MealPlan` with `Decision.ORDER_GROCERIES` and runs it through `run_swiggy_agent()` — the same function the main order flow uses.
 
 ## 5. Tech stack
 
@@ -66,8 +66,7 @@ Smart Cart is the Pantry tab's bulk ordering flow, separate from the Cook tab's 
 | AI orchestration | Google GenAI SDK, Gemini 2.5 Flash (with fallback chain to lite/older models) |
 | Backend API | FastAPI, Server-Sent Events for streaming pipeline progress |
 | Session / auth | Starlette `SessionMiddleware`, OAuth 2.1 with PKCE against Swiggy's auth server |
-| Inventory storage | SQLite via `aiosqlite`, single file at project root |
-| Frontend | Single vanilla HTML/CSS/JS page, no build step, no framework, `lucide` icons over CDN |
+| Frontend | Single vanilla HTML/CSS/JS page, no build step, no framework, `lucide` + Phosphor icons over CDN |
 | Agent framework | Google ADK (`Agent`, `Runner`, `MCPToolset`, `StreamableHTTPConnectionParams`) |
 | Commerce integration | Swiggy Food, Instamart, and Dineout MCP servers over streamable HTTP |
 | Testing | pytest, pytest-asyncio, pytest-httpx (network calls mocked) |
@@ -76,16 +75,15 @@ Smart Cart is the Pantry tab's bulk ordering flow, separate from the Cook tab's 
 
 ```text
 fridge-to-fork/
-├── app.py                        # FastAPI app: pages, inventory API, scan/order SSE endpoints, OAuth
+├── app.py                        # FastAPI app: page, scan/order SSE endpoints, cart-fill, OAuth
 ├── templates/
-│   └── index.html                # Cook tab + Pantry tab + Smart Cart, single page, vanilla JS
+│   └── index.html                # The whole frontend: recipe flow, checklist, Smart Cart — single page, vanilla JS
 ├── fridge_to_fork/
-│   ├── models.py                 # Ingredient, FridgeContents, MealSuggestion, MealPlan, OrderResult
-│   ├── step1_fridge_vision.py    # Gemini Vision ingredient identification
-│   ├── step2_meal_planner.py     # Gemini meal suggestions + cook/order decision + top-up upsells
+│   ├── models.py                 # Ingredient, RecipeIngredient, FridgeContents, MealSuggestion, MealPlan, OrderResult
+│   ├── step1_fridge_vision.py    # Gemini Vision ingredient identification (optional step)
+│   ├── step2_meal_planner.py     # Gemini recipe generation + deterministic staple/fridge matching + top-up upsells
 │   ├── step3_order_router.py     # Thin adapters onto swiggy_agent.py, preserves old call signatures
 │   ├── swiggy_agent.py           # Google ADK agent wired to all 3 Swiggy MCP servers
-│   ├── inventory_db.py           # aiosqlite persistence, 64 default items, adjust/consume/restock helpers
 │   ├── agent.py                  # End-to-end CLI orchestrator (fridge-to-fork console script)
 │   └── swiggy_live_mcp.py        # Legacy stdio MCP stub, not used by the running app
 ├── tests/
@@ -93,7 +91,6 @@ fridge-to-fork/
 │   ├── test_step2_meal_planner.py
 │   └── test_step3_order_router.py
 ├── .env.example                  # Environment variable template
-├── inventory.db                  # SQLite file, created at startup, gitignored
 └── pyproject.toml
 ```
 
@@ -125,7 +122,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 **5. Open the app**
 
-On the same machine: `http://localhost:8000`. On your phone, over the same WiFi network: `http://<your-pc-ip>:8000` (find your IP with `ipconfig` on Windows or `ifconfig` on Mac/Linux).
+On the same machine: `http://localhost:8000`. On your phone, over the same WiFi network: `http://<your-pc-ip>:8000` (find your IP with `ipconfig` on Windows or `ifconfig` on Mac/Linux — look for the Wi-Fi adapter's IPv4 address, not a virtual/WSL adapter).
 
 **6. (Optional) Connect Swiggy**
 
@@ -157,7 +154,7 @@ All network calls and LLM calls in the test suite are mocked, so no API key is r
 
 ## 9. Swiggy MCP integration
 
-All three Swiggy MCP servers are wired into a single agent at the same time, so the agent picks the right platform for the request instead of the app's own decision logic restricting it up front:
+All three Swiggy MCP servers are wired into a single agent at the same time, so the agent picks the right platform for the request instead of the app's own logic restricting it up front:
 
 - `SWIGGY_FOOD_MCP_URL`, restaurant delivery
 - `SWIGGY_INSTAMART_MCP_URL`, grocery delivery
@@ -174,48 +171,48 @@ All three Swiggy MCP servers are wired into a single agent at the same time, so 
 ## 10. Architecture
 
 ```
-                              +-------------------+
-                              |   templates/       |
-                              |   index.html        |
-                              |  Cook tab | Pantry   |
-                              +----+---------+-------+
-                                   |         |
-                    POST /api/scan |         | /api/inventory/*
-                    POST /api/order|         | /api/inventory/cart-fill
-                                   v         v
+                              +---------------------+
+                              |   templates/          |
+                              |   index.html           |
+                              | (recipe flow + Smart   |
+                              |  Cart, single page)    |
+                              +----+--------------+----+
+                                   |              |
+                    POST /api/scan |              | POST /api/cart-fill
+                    POST /api/order|              |
+                                   v              v
 +----------------------------------------------------------------+
 |                            app.py (FastAPI)                     |
-|  SSE streaming, session/OAuth, inventory CRUD                   |
-+----+------------------------+------------------------+---------+
-     |                        |                        |
-     v                        v                        v
-+-----------+        +-------------------+      +----------------+
-| step1_    |        | step2_            |      | inventory_db.py|
-| fridge_   | -----> | meal_planner.py    |      | (SQLite,       |
-| vision.py |        | Gemini decision:   |      |  aiosqlite)    |
-| Gemini    |        | cook / order_dish /|      +----------------+
-| Vision    |        | order_groceries    |
-+-----------+        +---------+---------+
-                                |
-                                v
-                      +-------------------+
-                      | step3_order_       |
-                      | router.py           |
-                      | (thin adapter)       |
-                      +---------+-----------+
-                                |
-                                v
-                      +-------------------+
-                      | swiggy_agent.py     |
-                      | google.adk.agents   |
-                      | .Agent + MCPToolset |
-                      +----+------+------+--+
-                           |      |      |
-                StreamableHTTP    |      |
-                           v      v      v
-                     +-------+ +-------+ +---------+
-                     | Food  | | Insta-| | Dineout |
-                     | MCP   | | mart  | | MCP     |
-                     |       | | MCP   | |         |
-                     +-------+ +-------+ +---------+
+|         SSE streaming, session/OAuth, order routing             |
++----+------------------------+-----------------------------------+
+     |                        |
+     v                        v
++-----------+        +------------------------+
+| step1_    |        | step2_meal_planner.py   |
+| fridge_   | -----> | Gemini recipe +         |
+| vision.py |        | deterministic staple /  |
+| Gemini    |        | fridge-photo matching   |
+| Vision    |        | (no AI decision)        |
++-----------+        +-----------+-------------+
+                                  |
+                                  v
+                        +-----------------------+
+                        | step3_order_router.py   |
+                        | (thin adapter)           |
+                        +-----------+-------------+
+                                    |
+                                    v
+                        +-----------------------+
+                        | swiggy_agent.py         |
+                        | google.adk.agents       |
+                        | .Agent + MCPToolset     |
+                        +----+------+------+------+
+                             |      |      |
+                  StreamableHTTP    |      |
+                             v      v      v
+                       +-------+ +-------+ +---------+
+                       | Food  | | Insta-| | Dineout |
+                       | MCP   | | mart  | | MCP     |
+                       |       | | MCP   | |         |
+                       +-------+ +-------+ +---------+
 ```

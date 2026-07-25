@@ -21,6 +21,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, Request, UploadFile
+from google import genai
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -43,9 +44,11 @@ from fridge_to_fork.step3_order_router import (
     order_dish_from_swiggy,
     order_groceries_from_instamart,
 )
-from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion
+from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
+
+DEFAULT_DELIVERY_ADDRESS = "Mumbai, India"
 
 # SessionMiddleware must wrap the app before CORSMiddleware so it can
 # read/write cookies before CORS headers are added.
@@ -164,6 +167,110 @@ async def health():
 
 
 # ---------------------------------------------------------------------------
+# YouTube recipe video — best-effort lookup for the "How to make it" card.
+# Returns {} (no video section rendered) on any failure or empty result.
+# ---------------------------------------------------------------------------
+
+YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+
+
+@app.get("/api/youtube")
+async def youtube_recipe_video(dish: str):
+    api_key = os.environ.get("YOUTUBE_API_KEY")
+    if not api_key:
+        return {"videos": []}
+
+    params = {
+        "part": "snippet",
+        "q": f"{dish} recipe",
+        "type": "video",
+        "videoEmbeddable": "true",
+        "relevanceLanguage": "en",
+        "videoDuration": "medium",
+        "maxResults": 4,
+        "key": api_key,
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(YOUTUBE_SEARCH_URL, params=params, timeout=10)
+            resp.raise_for_status()
+            items = resp.json().get("items", [])
+    except (httpx.HTTPError, ValueError):
+        return {"videos": []}
+
+    videos = [
+        {
+            "videoId": item["id"]["videoId"],
+            "title": item["snippet"]["title"],
+            "channel": item["snippet"]["channelTitle"],
+            "thumbnail": item["snippet"]["thumbnails"]["medium"]["url"],
+        }
+        for item in items
+        if item.get("id", {}).get("videoId")
+    ]
+    return {"videos": videos}
+
+
+@app.get("/api/dish-suggestions")
+async def dish_suggestions(q: str):
+    if len(q) < 2:
+        return {"suggestions": []}
+
+    suggestions_api_key = os.environ.get("GEMINI_SUGGESTIONS_API_KEY")
+    if not suggestions_api_key:
+        return {"suggestions": []}
+    suggestions_client = genai.Client(api_key=suggestions_api_key)
+
+    try:
+        response = suggestions_client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=(
+                f'Give exactly 6 dish name suggestions that start with or contain "{q}".\n'
+                "Mix Indian and international dishes. Include both veg and non-veg.\n"
+                "Return ONLY a JSON array of strings, nothing else, no markdown, no explanation.\n"
+                'Example format: ["Palak Paneer", "Paneer Tikka", "Paneer Butter Masala"]'
+            ),
+        )
+        text = (response.text or "").strip().replace("```json", "").replace("```", "").strip()
+        suggestions = json.loads(text)
+        return {"suggestions": suggestions[:6]}
+    except Exception:
+        return {"suggestions": []}
+
+
+@app.get("/api/ingredient-image")
+async def ingredient_image(name: str):
+    api_key = os.getenv("GOOGLE_SEARCH_API_KEY")
+    cx = os.getenv("GOOGLE_SEARCH_CX")
+
+    if not api_key or not cx:
+        return {"imageUrl": None}
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                "https://www.googleapis.com/customsearch/v1",
+                params={
+                    "key": api_key,
+                    "cx": cx,
+                    "q": f"{name} ingredient food",
+                    "searchType": "image",
+                    "num": 1,
+                    "imgSize": "MEDIUM",
+                    "safe": "active"
+                }
+            )
+            data = response.json()
+            items = data.get("items", [])
+            if items:
+                return {"imageUrl": items[0]["link"]}
+    except Exception:
+        pass
+
+    return {"imageUrl": None}
+
+
+# ---------------------------------------------------------------------------
 # Cart fill — search each item on Instamart via the Swiggy MCP agent and
 # add it to the user's cart. Used by the recipe checklist's "Add to
 # Instamart" flow (not tied to the household inventory feature).
@@ -216,7 +323,7 @@ async def cart_fill(request: Request):
                 result = await run_swiggy_agent(
                     plan=plan,
                     delivery_address=os.environ.get(
-                        "DELIVERY_ADDRESS", "Mumbai, India"
+                        "DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS
                     ),
                     access_token=access_token,
                     dry_run=False
@@ -612,7 +719,7 @@ async def place_order(
     meal_name: str = Form(...),
     missing_ingredients: str = Form(""),  # comma-separated
 ):
-    delivery_address = os.environ.get("DELIVERY_ADDRESS", "Mumbai, India")
+    delivery_address = os.environ.get("DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS)
     access_token: str | None = request.session.get("access_token")
 
     async def stream():
