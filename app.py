@@ -12,8 +12,11 @@ import base64
 import hashlib
 import json
 import os
+import queue
 import secrets
 import tempfile
+import threading
+import time
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -39,7 +42,7 @@ def _ascii_safe(value) -> str:
 
 
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
-from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals
+from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals_stream
 from fridge_to_fork.step3_order_router import (
     order_dish_from_swiggy,
     order_groceries_from_instamart,
@@ -101,6 +104,22 @@ def _token_valid(request: Request) -> bool:
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
+
+
+def _run_plan_meals_stream(fridge, target_dish, servings, q: "queue.Queue") -> None:
+    """
+    Runs plan_meals_stream() (a blocking generator) on a background thread
+    and forwards each ("partial"|"result", payload) item into `q`, so the
+    async SSE stream in /api/scan can consume it via asyncio.to_thread(q.get)
+    without blocking the event loop.
+    """
+    try:
+        for kind, payload in plan_meals_stream(fridge, target_dish=target_dish, servings=servings):
+            q.put((kind, payload))
+    except Exception as e:
+        q.put(("error", e))
+    finally:
+        q.put(("done", None))
 
 
 # ---------------------------------------------------------------------------
@@ -190,13 +209,16 @@ async def youtube_recipe_video(dish: str):
         "maxResults": 4,
         "key": api_key,
     }
+    t_youtube = time.time()
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(YOUTUBE_SEARCH_URL, params=params, timeout=10)
             resp.raise_for_status()
             items = resp.json().get("items", [])
     except (httpx.HTTPError, ValueError):
+        print(f"[TIMING] youtube_api_call (failed): {time.time() - t_youtube:.2f}s")
         return {"videos": []}
+    print(f"[TIMING] youtube_api_call: {time.time() - t_youtube:.2f}s")
 
     videos = [
         {
@@ -457,12 +479,16 @@ async def scan(
     servings: int = Form(2),
 ):
     scan_mode = mode
+    t_upload = time.time()
     img_bytes = await file.read() if file is not None else b""
     suffix = Path(file.filename or "image.jpg").suffix or ".jpg" if file is not None else ".jpg"
+    print(f"[TIMING] image_upload_handling: {time.time() - t_upload:.2f}s")
 
     async def stream():
+        t_total = time.time()
         tmp_path = None
         fridge = None
+        top_up_task = None
         try:
             if scan_mode == "recipe":
                 # ── Step 1: No fridge data at all — recipe checklist starts
@@ -486,6 +512,7 @@ async def scan(
 
                 # ── Step 1: Vision ──────────────────────────────────────────
                 yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
+                t_vision = time.time()
                 try:
                     fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
                 except Exception as e:
@@ -493,6 +520,7 @@ async def scan(
                     print(f"[STEP1 ERROR] identify_ingredients failed: {e}")
                     traceback.print_exc()
                     raise  # re-raise so the outer handler catches it
+                print(f"[TIMING] identify_ingredients: {time.time() - t_vision:.2f}s")
                 yield _sse({
                     "type": "step1",
                     "raw_description": fridge.raw_description,
@@ -513,14 +541,51 @@ async def scan(
                 yield _sse({"type": "progress", "step": 2, "message": "Planning your meals…"})
 
             try:
-                plan = await asyncio.to_thread(
-                    plan_meals, fridge, target_dish=target_dish, servings=servings
-                )
+                plan = None
+                t_plan = time.time()
+                first_token_seen = False
+                stream_queue: queue.Queue = queue.Queue()
+                threading.Thread(
+                    target=_run_plan_meals_stream,
+                    args=(fridge, target_dish, servings, stream_queue),
+                    daemon=True,
+                ).start()
+                while True:
+                    kind, payload = await asyncio.to_thread(stream_queue.get)
+                    if kind == "partial":
+                        if not first_token_seen:
+                            first_token_seen = True
+                            print(f"[TIMING] plan_meals_stream_first_token: {time.time() - t_plan:.2f}s")
+                        yield _sse({"type": "step2_partial", "text": payload})
+                    elif kind == "result":
+                        plan = payload
+                        # generate_top_up_suggestions() needs the resolved
+                        # recommended_meal (with its enriched
+                        # missing_ingredients) and decision, so it can't
+                        # start any earlier than this — but from here on it
+                        # can run in the background while we yield step2/
+                        # awaiting_user_choice, instead of waiting until
+                        # after both to start it.
+                        if plan.recommended_meal is not None:
+                            top_up_task = asyncio.create_task(
+                                asyncio.to_thread(
+                                    generate_top_up_suggestions,
+                                    fridge, plan.recommended_meal, plan.decision,
+                                )
+                            )
+                    elif kind == "error":
+                        raise payload
+                    elif kind == "done":
+                        break
+                print(f"[TIMING] plan_meals_stream_complete: {time.time() - t_plan:.2f}s")
+                if plan is None:
+                    plan = _local_fallback_plan(fridge, target_dish)
             except Exception as e:
                 import traceback
                 print(f"[STEP2 ERROR] plan_meals failed: {e}")
                 traceback.print_exc()
                 plan = _local_fallback_plan(fridge, target_dish)
+                top_up_task = None
 
             yield _sse({
                 "type": "step2",
@@ -574,15 +639,27 @@ async def scan(
                 ),
             })
 
-            # ── Top-up suggestions — best-effort upsell, never blocks the choice above ──
+            # ── Top-up suggestions — best-effort upsell, never blocks the choice
+            # above. top_up_task was already started in the background the
+            # moment the plan resolved (see the "result" branch above), so
+            # this is usually just picking up an already-finished result
+            # rather than paying for the call sequentially here. Falls back
+            # to running it now if that background start didn't happen
+            # (e.g. plan came from the local fallback, not the stream). ──
             if plan.recommended_meal is not None:
-                top_up_suggestions = await asyncio.to_thread(
-                    generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
-                )
+                t_topup = time.time()
+                if top_up_task is not None:
+                    top_up_suggestions = await top_up_task
+                else:
+                    top_up_suggestions = await asyncio.to_thread(
+                        generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
+                    )
+                print(f"[TIMING] top_up_call: {time.time() - t_topup:.2f}s")
                 print(f"[TOP_UP] Generated {len(top_up_suggestions)} suggestions: {_ascii_safe(top_up_suggestions)}")
                 if top_up_suggestions:
                     yield _sse({"type": "top_up", "suggestions": top_up_suggestions})
 
+            print(f"[TIMING] TOTAL: {time.time() - t_total:.2f}s")
             yield _sse({"type": "complete"})
 
         except httpx.HTTPStatusError as exc:
@@ -647,13 +724,16 @@ async def scan(
                 })
 
                 if plan.recommended_meal is not None:
+                    t_topup = time.time()
                     top_up_suggestions = await asyncio.to_thread(
                         generate_top_up_suggestions, fridge, plan.recommended_meal, plan.decision
                     )
+                    print(f"[TIMING] top_up_call: {time.time() - t_topup:.2f}s")
                     print(f"[TOP_UP] Generated {len(top_up_suggestions)} suggestions: {_ascii_safe(top_up_suggestions)}")
                     if top_up_suggestions:
                         yield _sse({"type": "top_up", "suggestions": top_up_suggestions})
 
+                print(f"[TIMING] TOTAL: {time.time() - t_total:.2f}s")
                 yield _sse({"type": "complete"})
             else:
                 yield _sse({"type": "error", "message": "Unable to complete analysis."})
@@ -663,6 +743,10 @@ async def scan(
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+            # If an exception hit before the top_up section ever awaited
+            # this, don't leave the background thread's task dangling.
+            if top_up_task is not None and not top_up_task.done():
+                top_up_task.cancel()
 
     return StreamingResponse(
         stream(),

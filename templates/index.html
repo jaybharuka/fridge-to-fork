@@ -204,20 +204,76 @@
 
     /* Hero */
     .hero { padding:24px 20px 16px; }
-    .hero-title { font-family:'Plus Jakarta Sans', sans-serif; font-size:2rem; font-weight:800; letter-spacing:-.02em; color:var(--text); line-height:1.15; margin-top:8px; overflow-wrap:break-word; word-break:normal; }
-    .hero-sub { font-size:14px; color:var(--text-2); line-height:1.5; margin-top:6px; overflow-wrap:break-word; word-break:normal; }
+    .hero-title {
+      font-family:'Plus Jakarta Sans', sans-serif; font-size:36px; font-weight:800; letter-spacing:-.02em;
+      color:rgba(255,255,255,0.95); line-height:1.15; margin-top:8px; overflow-wrap:break-word; word-break:normal;
+    }
+    .hero-sub {
+      font-size:15px; font-weight:400; color:rgba(255,255,255,0.5); line-height:1.6;
+      margin-top:10px; overflow-wrap:break-word; word-break:normal;
+    }
+    [data-theme="light"] .hero-title { color:rgba(0,0,0,0.9); }
+    [data-theme="light"] .hero-sub { color:rgba(0,0,0,0.5); }
 
     /* Input */
     .input-section { padding:0 0 8px; }
-    .input-label { display:block; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--swiggy-text-3); margin-bottom:8px; }
-    .dish-input {
-      width:100%; height:52px; padding:0 16px; font-size:15px; font-family:inherit; font-weight:400;
-      background:var(--bg-secondary); border:1px solid var(--border); border-radius:14px;
-      color:var(--text-primary); outline:none; transition:border-color .15s ease, box-shadow .15s ease;
-      box-shadow:var(--shadow);
+    .input-label {
+      display:block; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+      color:rgba(255,255,255,0.35); margin-top:20px; margin-bottom:8px;
     }
-    .dish-input:focus { border-color:var(--orange); box-shadow:0 0 0 2px var(--orange); }
-    .dish-input::placeholder { color:var(--swiggy-placeholder); }
+    [data-theme="light"] .input-label { color:var(--swiggy-text-3); }
+    .dish-input {
+      width:100%; padding:16px 20px; font-size:16px; font-family:inherit; font-weight:500;
+      border-radius:14px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05);
+      color:rgba(255,255,255,0.9); outline:none; margin-top:32px;
+      transition:border-color 0.2s ease, background 0.2s ease;
+    }
+    .dish-input:focus { border-color:rgba(252,128,25,0.5); background:rgba(255,255,255,0.07); outline:none; }
+    .dish-input::placeholder { color:rgba(255,255,255,0.3); }
+    [data-theme="light"] .dish-input {
+      background: rgba(0,0,0,0.03);
+      border-color: rgba(0,0,0,0.1);
+      color: rgba(0,0,0,0.9);
+    }
+    [data-theme="light"] .dish-input:focus {
+      border-color: rgba(252,128,25,0.5);
+      background: rgba(0,0,0,0.05);
+    }
+    [data-theme="light"] .dish-input::placeholder { color: rgba(0,0,0,0.3); }
+
+    /* Popular dishes — landing screen only */
+    .popular-dishes-section { margin-top:36px; }
+    .popular-dishes-label {
+      font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+      color:rgba(255,255,255,0.35); margin-bottom:14px;
+    }
+    [data-theme="light"] .popular-dishes-label { color:rgba(0,0,0,0.35); }
+    .popular-dishes-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .popular-dish-card {
+      display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:14px;
+      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); cursor:pointer;
+      transition:background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .popular-dish-card:hover { background:rgba(252,128,25,0.08); border-color:rgba(252,128,25,0.2); transform:translateY(-1px); }
+    .popular-dish-card:active { transform:scale(0.98); }
+    .popular-dish-icon {
+      width:42px; height:42px; border-radius:10px; background:rgba(255,255,255,0.06);
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .popular-dish-icon svg { width:18px; height:18px; stroke:rgba(255,255,255,0.55); stroke-width:1.5; }
+    .popular-dish-info { min-width:0; }
+    .popular-dish-name {
+      display:block; font-size:14px; font-weight:600; color:rgba(255,255,255,0.88); line-height:1.2;
+      overflow-wrap:break-word; word-break:normal;
+    }
+    .popular-dish-tag { display:block; font-size:11px; font-weight:500; color:rgba(255,255,255,0.35); margin-top:2px; }
+    [data-theme="light"] .popular-dish-card { background:rgba(0,0,0,0.03); border-color:rgba(0,0,0,0.08); }
+    [data-theme="light"] .popular-dish-card:hover { background:rgba(252,128,25,0.06); border-color:rgba(252,128,25,0.2); }
+    [data-theme="light"] .popular-dish-icon { background:rgba(0,0,0,0.05); }
+    [data-theme="light"] .popular-dish-icon svg { stroke:rgba(0,0,0,0.5); }
+    [data-theme="light"] .popular-dish-name { color:rgba(0,0,0,0.85); }
+    [data-theme="light"] .popular-dish-tag { color:rgba(0,0,0,0.4); }
 
     /* Servings selector */
     .servings-section { margin:14px 0 4px; }
@@ -297,6 +353,17 @@
     .cta-secondary-btn i { font-size:16px; }
     .cta-secondary-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
     .cta-secondary-btn:active { transform:translateY(0) scale(.98); }
+    /* Scoped to the id, not .cta-secondary-btn — that class is shared with
+       the "Try again" buttons on the results page's error states, which
+       aren't part of this fix. The shared class's tinted-orange background
+       was reading as dark brown against this button's own surroundings;
+       transparent + a plain orange border/text reads cleanly in both
+       themes without needing separate light/dark variants. */
+    #scanFridgeBtn {
+      background: transparent;
+      border: 1.5px solid rgba(252,128,25,0.4);
+      color: #FC8019;
+    }
 
     /* Collapsible inline fridge photo capture on the landing screen */
     .landing-scan-area { max-height:0; overflow:hidden; transition:max-height .3s cubic-bezier(.4,0,.2,1); }
@@ -329,13 +396,85 @@
     .chip {
       display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px;
       font-size:11px; font-weight:600; color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--border);
-      opacity:0; animation:fadeSlideUp .3s ease forwards;
+      opacity:0; animation:chipFadeIn .3s ease-out forwards;
     }
     .chip-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
     .chip.high .chip-dot { background:var(--success); }
     .chip.mid .chip-dot { background:var(--orange); }
     .chip.low .chip-dot { background:var(--grey-400); }
     .chip-pct { color:var(--grey-400); font-size:10px; }
+    /* Confidence-tier hierarchy — medium reads as noteworthy, low recedes */
+    .chip.mid .chip-pct { color:var(--orange); }
+    .chip.low .chip-pct { color:rgba(255,255,255,0.4); }
+    .chip.low {
+      border-color:rgba(255,255,255,0.08);
+      background:color-mix(in srgb, var(--bg-secondary), transparent 15%);
+    }
+
+    /* ── Progressive SSE reveal ──────────────────────────────────── */
+    @keyframes sectionFadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
+    .section-reveal { animation:sectionFadeIn .3s ease-out forwards; }
+
+    @keyframes chipFadeIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+
+    @keyframes rowSlideIn { from{opacity:0;transform:translateX(-8px);} to{opacity:1;transform:translateX(0);} }
+    .ingredient-row {
+      display:flex; align-items:center; gap:10px; padding:14px 20px;
+      border-bottom:1px solid var(--border); background:var(--bg-card);
+      animation:rowSlideIn .3s ease-out forwards;
+    }
+    .ingredient-row-name { font-size:15px; font-weight:500; color:var(--grey-900); }
+
+    /* ── Skeleton loaders — shown from step1 until each section's real
+       content arrives (step2 / awaiting_user_choice). Dark-styled by
+       default (this app's loading surfaces default dark); the
+       [data-theme="light"] override below switches the shimmer to a
+       black-tinted gradient for light mode. ── */
+    .skeleton-box {
+      background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.09) 50%,
+        rgba(255,255,255,0.04) 75%
+      );
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.6s ease-in-out infinite;
+      border-radius: 8px;
+    }
+    @keyframes skeletonShimmer {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    [data-theme="light"] .skeleton-box {
+      background: linear-gradient(
+        90deg,
+        rgba(0,0,0,0.04) 25%,
+        rgba(0,0,0,0.09) 50%,
+        rgba(0,0,0,0.04) 75%
+      );
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.6s ease-in-out infinite;
+    }
+    .skeleton-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .skeleton-checkbox { width:20px; height:20px; border-radius:6px; flex-shrink:0; }
+    .skeleton-lines { display:flex; flex-direction:column; gap:6px; flex:1; }
+    .skeleton-name { height:14px; width:55%; }
+    .skeleton-qty { height:11px; width:30%; opacity:0.6; }
+    .skeleton-stat-line { height:20px; width:70%; margin:12px 0; border-radius:8px; }
+    .skeleton-btn { height:52px; width:100%; border-radius:12px; }
+    .skeleton-buttons { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+
+    /* Real content replacing a skeleton fades in on its own — the
+       skeleton it replaces is destroyed in the same DOM write, so there's
+       no separate node left around to animate a fade-out on. */
+    @keyframes contentFadeIn { from{opacity:0;} to{opacity:1;} }
+    .content-fade-in { animation:contentFadeIn .25s ease-out forwards; }
 
     /* Recipe checklist card — the hero result section */
     .recipe-checklist-card {
@@ -447,11 +586,11 @@
       background: #000;
     }
     .yt-active-info { padding: 10px 0 14px; }
-    .yt-channel { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
-    .yt-title { font-size: 16px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+    .yt-channel { font-family:'Plus Jakarta Sans',sans-serif; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.45); margin-bottom: 6px; }
+    .yt-title { font-family:'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 500; color: var(--text-primary); line-height: 1.3; }
     .yt-thumbnails {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       overflow-x: auto;
       scrollbar-width: none;
       padding-bottom: 4px;
@@ -472,9 +611,10 @@
       position: relative;
       width: 140px;
       height: 80px;
-      border-radius: 8px;
+      border-radius: 12px;
       overflow: hidden;
       margin-bottom: 6px;
+      background: var(--bg-secondary);
     }
     .yt-thumb-overlay {
       position: absolute;
@@ -496,6 +636,10 @@
       overflow: hidden;
     }
     .yt-thumb-channel { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .yt-playing-badge {
+      font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+      color:#fff; background:var(--orange); padding:3px 8px; border-radius:999px;
+    }
 
     .recipe-step-num {
       flex-shrink:0; width:24px; height:24px; border-radius:50%; background:var(--orange-light);
@@ -718,6 +862,73 @@
     #landingSection { opacity:1; transition:opacity .2s ease; }
     #landingSection.fade-out { opacity:0; }
 
+    /* Sticky at-a-glance summary bar. top:56px (not 0) so it docks just
+       below .app-header (also sticky, top:0, 56px tall, z-index:30)
+       instead of sliding up underneath/over it while scrolling. */
+    #stickySummaryBar {
+      position: sticky;
+      top: 56px;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: rgba(10,10,10,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+    }
+    #stickySummaryBar.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    #stickySummaryText { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); }
+    #stickySummaryText strong { color: #FC8019; }
+    #stickySummaryDish {
+      font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.4);
+      text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 40%;
+    }
+    [data-theme="light"] #stickySummaryBar {
+      background: rgba(255,255,255,0.88);
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    [data-theme="light"] #stickySummaryText { color: rgba(0,0,0,0.9); }
+    [data-theme="light"] #stickySummaryDish { color: rgba(0,0,0,0.4); }
+
+    /* Fridge photo carried forward as a thumbnail — see
+       transitionToResults(). Only shown for photo scans; opacity starts
+       at 0 (both the header and #fridgeThumbTarget specifically) so the
+       staggered reveal / clone-landing has something to fade in from. */
+    #fridgeSummaryHeader {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      opacity: 0;
+    }
+    #fridgeThumbTarget {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      overflow: hidden;
+      flex-shrink: 0;
+      opacity: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    #fridgeThumbImg { width: 100%; height: 100%; object-fit: cover; }
+    #fridgeSummaryLabel {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.35); text-transform: uppercase; margin-bottom: 3px;
+    }
+    #fridgeSummaryCount { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85); }
+    [data-theme="light"] #fridgeSummaryHeader { border-bottom: 1px solid rgba(0,0,0,0.07); }
+    [data-theme="light"] #fridgeSummaryLabel { color: rgba(0,0,0,0.35); }
+    [data-theme="light"] #fridgeSummaryCount { color: rgba(0,0,0,0.85); }
+
     /* Full-overlay loading state, shown while /api/scan streams. Fixed,
        full-screen takeover — independent of the light/dark theme tokens
        by design (always the same dark, focused surface). */
@@ -728,6 +939,166 @@
       opacity:0; pointer-events:none; transition:opacity .3s ease;
     }
     .loading-overlay.show { opacity:1; pointer-events:auto; }
+
+    /* Photo scan screen — shown in place of .loading-overlay whenever the
+       scan has a real fridge photo. Same fixed-fullscreen/z-index/fade
+       mechanics as .loading-overlay (display toggled in JS, opacity+.show
+       class drives the actual fade so display:none can still transition).
+       Radial warm glow behind the photo instead of flat black — subtle,
+       not distracting, ties the accent orange into the "AI is working"
+       moment without needing any extra motion.
+       Two zones stacked vertically: the clean photo (no chips/overlays —
+       a sweeping scan line while working, nothing else), then a reveal
+       list of detected items below it once step1 fires. */
+    #photoScanScreen {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 25%, rgba(252,128,25,0.05) 0%, #0a0a0a 65%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 24px;
+      opacity: 0;
+      transition: opacity .4s ease;
+    }
+    #photoScanScreen.show { opacity: 1; }
+
+    #photoScanContainer {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    #fridgePhotoPreview {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 20px;
+    }
+
+    /* Sweeps while Gemini Vision is still working; JS pauses+fades it via
+       .stopped the instant step1 fires. Named distinctly from the
+       unrelated .loading-fridge-scanline's own @keyframes scanSweep. */
+    .photo-scan-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(252,128,25,0.85), transparent);
+      animation: photoScanSweep 2.4s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 2;
+      transition: opacity .3s ease;
+    }
+    .photo-scan-line.stopped { animation-play-state: paused; opacity: 0; }
+    @keyframes photoScanSweep {
+      0%   { top: 0%;   opacity: 0; }
+      5%   { opacity: 1; }
+      95%  { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    #photoScanStatus {
+      margin-top: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.75);
+      text-align: center;
+      letter-spacing: 0.01em;
+      min-height: 20px;
+      transition: opacity 0.3s ease;
+    }
+
+    #photoScanSubStatus {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 400;
+      font-style: italic;
+      color: rgba(255,255,255,0.38);
+      text-align: center;
+      min-height: 16px;
+      transition: opacity 0.3s ease;
+    }
+
+    /* Zone 2 — detected items reveal list, hidden (empty) until step1
+       fires, then filled one row at a time. */
+    #detectedItemsList {
+      width: 100%;
+      max-width: 320px;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .detected-item-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      opacity: 0;
+      transform: translateX(-8px);
+      animation: itemSlideIn 0.35s ease-out forwards;
+    }
+    .detected-item-row:last-child { border-bottom: none; }
+    @keyframes itemSlideIn { to { opacity: 1; transform: translateX(0); } }
+    .detected-item-check {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(252,128,25,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .detected-item-check i { width: 14px; height: 14px; color: #FC8019; }
+    .detected-item-name {
+      flex: 1;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.9);
+      text-transform: capitalize;
+    }
+    .detected-item-conf {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.3);
+    }
+
+    #photoScanTimeoutState {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+      max-width: 280px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #photoScanTimeoutState.hidden { display: none; }
+    #photoScanTimeoutState.visible { opacity: 1; transform: translateY(0); }
+    #photoScanTimeoutState i { color: #FC8019; font-size: 26px; margin-bottom: 4px; }
+    .photo-scan-timeout-heading {
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 600;
+      color: rgba(255,255,255,0.9);
+    }
+    .photo-scan-timeout-sub { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.5; }
+    .photo-scan-retry-btn {
+      margin-top: 6px; height: 40px; padding: 0 22px; border-radius: 999px;
+      background: #FC8019; color: #fff; border: none; font-weight: 600; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .photo-scan-retry-btn:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .photo-scan-retry-btn:active { transform: translateY(0) scale(.98); }
 
     /* Background particles */
     .loading-particles { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
@@ -784,71 +1155,50 @@
       100% { transform:scale(1);   opacity:0.9; }
     }
 
-    /* Zone 2 — status lines */
+    /* Zone 2 — AI progress stages. Replaces the old status-line-cycling +
+       numeric-percent/dots combo with one checklist: a headline (what
+       we're broadly doing) above a list of named stages that tick from
+       pending → active (spinner) → done (check) as the scan proceeds. */
     .loading-status-zone {
-      position:relative; z-index:1; max-width:320px; width:100%; margin:36px auto 0; text-align:center;
-      display:flex; flex-direction:column; align-items:center;
+      position:relative; z-index:1; max-width:280px; width:100%; margin:36px auto 0;
     }
-    .loading-status-lines {
-      display:flex; flex-direction:column; align-items:center;
-      max-width:320px; width:100%; margin:0 auto; text-align:center;
-    }
-    .loading-status-line {
-      font-family:'Plus Jakarta Sans',sans-serif; font-size:15px; font-weight:400; letter-spacing:0.01em;
-      line-height:1.4; width:100%; text-align:center; word-break:break-word; white-space:normal; padding:0 16px;
-      color:rgba(255,255,255,0.45);
+    .loading-headline {
+      font-family:'Plus Jakarta Sans',sans-serif; font-size:17px; font-weight:700;
+      color:rgba(255,255,255,0.95); text-align:center; margin-bottom:28px;
       opacity:0; transform:translateY(6px);
-      transition:opacity .35s ease-out, transform .35s ease-out, color .35s ease-out, font-weight .35s ease-out;
+      transition:opacity .35s ease-out, transform .35s ease-out;
     }
-    .loading-status-line.entered { opacity:1; transform:translateY(0); }
-    .loading-status-line.active {
-      color:rgba(255,255,255,0.95); font-weight:600;
+    .loading-headline.entered { opacity:1; transform:translateY(0); }
+    .loading-stages { display:flex; flex-direction:column; gap:16px; }
+    .loading-stage {
+      display:flex; align-items:center; gap:12px;
+      opacity:0; transform:translateY(6px);
+      transition:opacity .35s ease-out, transform .35s ease-out;
     }
-    .loading-status-sub {
-      margin-top:6px; font-size:12px; font-weight:400; font-style:italic; color:rgba(255,255,255,0.45);
-      min-height:16px; opacity:0; transition:opacity .3s ease;
-      width:100%; text-align:center;
+    .loading-stage.entered { opacity:1; transform:translateY(0); }
+    .loading-stage-icon {
+      position:relative; flex-shrink:0; width:22px; height:22px; border-radius:50%;
+      border:1.5px solid rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center;
+      transition:border-color .3s ease, background .3s ease;
     }
-    .loading-status-sub.visible { opacity:1; }
-
-    /* Zone 3 — progress */
-    .loading-progress-zone {
-      position:relative; z-index:1; width:100%; margin-top:40px;
-      display:flex; flex-direction:column; align-items:center;
+    .loading-stage-label {
+      font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; font-weight:500;
+      color:rgba(255,255,255,0.35); transition:color .3s ease, font-weight .3s ease;
     }
-    .loading-percent {
-      font-family:'Plus Jakarta Sans',sans-serif; font-size:36px; font-weight:800; color:#FC8019;
-      text-align:center; width:100%;
+    .loading-stage.active .loading-stage-icon { border-color:#FC8019; }
+    .loading-stage.active .loading-stage-icon::before {
+      content:''; position:absolute; inset:-1.5px; border-radius:50%;
+      border:1.5px solid transparent; border-top-color:#FC8019;
+      animation:stageSpin .8s linear infinite;
     }
-    .loading-progress-bar-track {
-      width:240px; height:5px; border-radius:999px; background:rgba(255,255,255,0.07);
-      margin:10px auto; overflow:hidden;
+    .loading-stage.active .loading-stage-label { color:rgba(255,255,255,0.95); font-weight:600; }
+    @keyframes stageSpin { to { transform:rotate(360deg); } }
+    .loading-stage.done .loading-stage-icon { border-color:#FC8019; background:#FC8019; }
+    .loading-stage.done .loading-stage-icon::after {
+      content:''; position:absolute; left:7px; top:4px; width:5px; height:9px;
+      border:solid #fff; border-width:0 1.5px 1.5px 0; transform:rotate(45deg);
     }
-    .loading-progress-bar-fill {
-      display:block; height:100%; width:0%; border-radius:999px;
-      background:linear-gradient(90deg, #E8700A, #FC8019, #FFB347, #FC8019, #E8700A);
-      background-size:300% 100%;
-      animation:shimmerBar 2s linear infinite;
-      transition:width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    @keyframes shimmerBar {
-      0%   { background-position:200% center; }
-      100% { background-position:-200% center; }
-    }
-    .loading-step-dots { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; }
-    .loading-step-dot {
-      display:inline-block; width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.12);
-      transition:width .2s ease, height .2s ease, background .2s ease;
-    }
-    .loading-step-dot.active {
-      width:9px; height:9px; background:#FC8019;
-      animation:activeDotPulse 1.2s ease-in-out infinite;
-    }
-    .loading-step-dot.done { background:#FC8019; }
-    @keyframes activeDotPulse {
-      0%, 100% { box-shadow:0 0 0 0   rgba(252,128,25,0.5); }
-      50%       { box-shadow:0 0 0 5px rgba(252,128,25,0);   }
-    }
+    .loading-stage.done .loading-stage-label { color:rgba(255,255,255,0.55); }
 
     /* Spinner */
     .spin { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
@@ -1004,14 +1354,14 @@
     <div id="cookTab">
       <div id="landingSection">
       <div class="hero">
-        <h1 class="hero-title">What do you want to eat?</h1>
-        <p class="hero-sub">Type a dish. We'll find what's missing and get it delivered.</p>
+        <h1 class="hero-title">Cook anything.<br>Order what's missing.</h1>
+        <p class="hero-sub">Type a dish. Scan your fridge. Get exactly what you need delivered.</p>
       </div>
 
       <div class="wrap">
         <!-- Target Dish Input -->
         <div class="input-section">
-          <input type="text" id="targetDish" class="dish-input" placeholder="What do you want to eat?" />
+          <input type="text" id="targetDish" class="dish-input" placeholder='Try "Paneer Tikka" or "Matar Pulao"' />
         </div>
 
         <!-- Servings selector -->
@@ -1057,6 +1407,57 @@
 
           <div class="section-divider"></div>
         </div>
+
+        <!-- Popular dishes — landing screen only; hides automatically with
+             the rest of #landingSection once results appear (same as the
+             trending chips above), no separate show/hide logic needed. -->
+        <div class="popular-dishes-section">
+          <div class="popular-dishes-label">Popular right now</div>
+          <div class="popular-dishes-grid">
+            <div class="popular-dish-card" onclick="selectPopularDish('Butter Chicken')">
+              <div class="popular-dish-icon"><i data-lucide="drumstick"></i></div>
+              <div class="popular-dish-info">
+                <span class="popular-dish-name">Butter Chicken</span>
+                <span class="popular-dish-tag">North Indian</span>
+              </div>
+            </div>
+            <div class="popular-dish-card" onclick="selectPopularDish('Matar Pulao')">
+              <div class="popular-dish-icon"><i data-lucide="wheat"></i></div>
+              <div class="popular-dish-info">
+                <span class="popular-dish-name">Matar Pulao</span>
+                <span class="popular-dish-tag">Rice</span>
+              </div>
+            </div>
+            <div class="popular-dish-card" onclick="selectPopularDish('Dal Makhani')">
+              <div class="popular-dish-icon"><i data-lucide="soup"></i></div>
+              <div class="popular-dish-info">
+                <span class="popular-dish-name">Dal Makhani</span>
+                <span class="popular-dish-tag">North Indian</span>
+              </div>
+            </div>
+            <div class="popular-dish-card" onclick="selectPopularDish('Paneer Tikka')">
+              <div class="popular-dish-icon"><i data-lucide="flame"></i></div>
+              <div class="popular-dish-info">
+                <span class="popular-dish-name">Paneer Tikka</span>
+                <span class="popular-dish-tag">Starter</span>
+              </div>
+            </div>
+            <div class="popular-dish-card" onclick="selectPopularDish('Biryani')">
+              <div class="popular-dish-icon"><i data-lucide="chef-hat"></i></div>
+              <div class="popular-dish-info">
+                <span class="popular-dish-name">Biryani</span>
+                <span class="popular-dish-tag">Rice</span>
+              </div>
+            </div>
+            <div class="popular-dish-card" onclick="selectPopularDish('Poha')">
+              <div class="popular-dish-icon"><i data-lucide="sunrise"></i></div>
+              <div class="popular-dish-info">
+                <span class="popular-dish-name">Poha</span>
+                <span class="popular-dish-tag">Breakfast</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       </div>
 
@@ -1078,29 +1479,63 @@
         </div>
 
         <div class="loading-status-zone">
-          <div class="loading-status-lines" id="loadingStatusLines"></div>
-          <div class="loading-status-sub" id="loadingStatusSub"></div>
+          <div class="loading-headline" id="loadingHeadline"></div>
+          <div class="loading-stages" id="loadingStages"></div>
         </div>
+      </div>
 
-        <div class="loading-progress-zone">
-          <div class="loading-percent" id="loadingPercent">0%</div>
-          <div class="loading-progress-bar-track">
-            <div class="loading-progress-bar-fill" id="loadingProgressBar"></div>
-          </div>
-          <div class="loading-step-dots" id="loadingStepDots">
-            <span class="loading-step-dot" data-dot="1"></span>
-            <span class="loading-step-dot" data-dot="2"></span>
-            <span class="loading-step-dot" data-dot="3"></span>
-            <span class="loading-step-dot" data-dot="4"></span>
-            <span class="loading-step-dot" data-dot="5"></span>
-          </div>
+      <!-- Photo scan screen — shown instead of the dark loading overlay
+           when a fridge photo was uploaded. Photo shows clean (no chips
+           or overlays on it); detected ingredients reveal as a list
+           below it instead. Recipe-only mode (no photo) never shows
+           this — it keeps #loadingOverlay as-is. -->
+      <div id="photoScanScreen">
+        <div id="photoScanContainer">
+          <img id="fridgePhotoPreview" src="" alt="Your fridge" />
+          <div class="photo-scan-line" id="scanLine"></div>
+        </div>
+        <p id="photoScanStatus">Scanning your fridge...</p>
+        <p id="photoScanSubStatus"></p>
+        <div id="detectedItemsList"></div>
+        <!-- Shown if step1 hasn't fired within PHOTO_SCAN_TIMEOUT_MS — the
+             vision call can end up cycling through several fallback
+             models with retries/backoff on quota errors, which can take
+             a while. Without this the screen would just spin forever
+             with zero feedback if that whole chain is struggling. -->
+        <div id="photoScanTimeoutState" class="hidden">
+          <i data-lucide="circle-alert"></i>
+          <p class="photo-scan-timeout-heading">This is taking longer than usual</p>
+          <p class="photo-scan-timeout-sub">The vision service may be busy right now. You can keep waiting or try again.</p>
+          <button type="button" class="photo-scan-retry-btn" onclick="retryPhotoScan()">Try again</button>
         </div>
       </div>
 
       <!-- Results -->
       <div id="resultsSection" style="display:none;">
+      <!-- Sticky at-a-glance summary — stays pinned while scrolling through
+           results so the user never loses the key stat. Populated on
+           step2, hidden again on a new scan / page reset. -->
+      <div id="stickySummaryBar">
+        <span id="stickySummaryText"></span>
+        <span id="stickySummaryDish"></span>
+      </div>
       <div class="wrap">
         <div class="results" id="results">
+          <!-- Fridge photo, carried forward from the scan screen as a
+               thumbnail — only shown for photo scans (see
+               transitionToResults()). Starts display:none; JS switches it
+               to flex right before the clone-morph animation so
+               #fridgeThumbTarget has real layout for its target rect. -->
+          <div id="fridgeSummaryHeader" style="display:none;">
+            <div id="fridgeThumbTarget">
+              <img id="fridgeThumbImg" src="" alt="Your fridge" />
+            </div>
+            <div id="fridgeSummaryText">
+              <p id="fridgeSummaryLabel">Your fridge</p>
+              <p id="fridgeSummaryCount"></p>
+            </div>
+          </div>
+
           <!-- Ingredients (hidden when there's no fridge scan to show, e.g. recipe mode) -->
           <div id="fridgeIngredientsSection" class="hidden">
             <div class="section-label"><i data-lucide="refrigerator"></i> What's in your fridge</div>
@@ -1109,9 +1544,6 @@
               <div class="chips" id="ingredientChips"></div>
             </div>
           </div>
-
-          <!-- Recipe checklist (only if the plan returned recipe_ingredients) -->
-          <div id="recipeChecklistSection"></div>
 
           <!-- Meals: only shown when there are genuinely multiple options to
                compare (e.g. scanning the fridge without naming a dish). A
@@ -1122,14 +1554,26 @@
             <div id="mealCards"></div>
           </div>
 
-          <!-- User choice -->
+          <!-- Dish header (name/meta) -->
+          <div id="recipeDishHeaderSection"></div>
+
+          <!-- Stat line + checklist (only if the plan returned recipe_ingredients) -->
+          <div id="recipeChecklistSection"></div>
+
+          <!-- User choice: order buttons (Instamart/Swiggy) -->
           <div id="choiceCard"></div>
 
           <!-- Top up -->
           <div id="topUpSection"></div>
 
-          <!-- Order -->
+          <!-- Order confirmation / cook confirmation / auth prompt / error -->
           <div id="orderCard"></div>
+
+          <!-- Recipe steps (collapsed by default) -->
+          <div id="recipeStepsSection"></div>
+
+          <!-- YouTube (collapsed by default) -->
+          <div id="youtubeVideoSection"></div>
         </div>
       </div>
       </div>
@@ -1225,90 +1669,187 @@
     }
 
     // Which fridge/dish info the current scan has — set at the top of
-    // startScan(), read by addStatusLine() to pick the right copy.
+    // startScan(), read wherever the loading headline/status copy differs
+    // between a photo scan and a plain dish lookup.
     let currentScanHasPhoto = false;
     let currentScanDish = '';
+    // Local object URL for the just-selected fridge photo — set the
+    // instant the file is chosen (see the landingScanFileInput 'change'
+    // listener) so #photoScanScreen can show it immediately. Revoked once
+    // that screen hides.
+    let fridgePhotoURL = null;
+    let photoScanScreenShown = false;
+    // The compressed File itself (not just its object URL) — kept around
+    // so "Try again" on a timed-out scan can resubmit without making the
+    // user re-pick the photo.
+    let lastPhotoFile = null;
+    // Guards against the photo-scan screen spinning forever if the vision
+    // call ends up cycling through several fallback models with retries
+    // (seen taking well over a minute under real quota/flakiness).
+    const PHOTO_SCAN_TIMEOUT_MS = 35000;
+    let photoScanTimeoutTimer = null;
+    // Progressive step2 ingredient streaming — accumulated raw JSON text
+    // from step2_partial deltas, and the ingredient names parsed out of it
+    // so far (append-only: a name only enters this list once its closing
+    // quote has streamed in, so it never needs to be revised).
+    let step2PartialRawText = '';
+    let streamedIngredientNames = [];
+    // Gates the "How to make it" steps + YouTube block so it reveals on
+    // awaiting_user_choice rather than immediately with the rest of the
+    // recipe checklist card at step2.
+    let recipeStepsRevealed = false;
 
-    let subLineTimer = null;
-    let subLineShowTimer = null;
-    const SUB_LINE_MESSAGES = [
-      'Takes about 10 seconds',
-      'Checking ingredient by ingredient',
-      'Finding the best options for you',
-      'Hang tight',
-    ];
-    let subLineIndex = 0;
+    // AI progress stages — named steps that tick pending → active → done
+    // while the overlay is up. There's no real backend signal to key these
+    // off of mid-flight (the only pre-step1 SSE event is a single
+    // 'progress' message), so they advance on a fixed schedule tuned to
+    // roughly match each mode's real latency — same idea as the "thinking"
+    // step indicators in AI chat UIs. Whatever hasn't finished yet gets
+    // marked done outright the instant step1 arrives and the overlay hides
+    // (see hideLoadingOverlay), so it never looks stuck mid-stage.
+    const LOADING_STAGES = {
+      photo: [
+        { label: 'Reading your fridge photo', delay: 0 },
+        { label: 'Detecting ingredients', delay: 1800 },
+        { label: 'Cross-checking pantry basics', delay: 4200 },
+      ],
+      recipe: [
+        { label: 'Understanding your request', delay: 0 },
+        { label: 'Gathering recipe knowledge', delay: 700 },
+        { label: 'Preparing your ingredient list', delay: 1600 },
+      ],
+    };
+    let stageTimeouts = [];
 
-    // Eases from `from` to `to` over `duration` ms — used for the percent
-    // counter so it never jumps instantly, always counts up smoothly.
-    function animatePercent(from, to, duration, el) {
-      const start = performance.now();
-      function tick(now) {
-        const t = Math.min((now - start) / duration, 1);
-        const eased = 1 - Math.pow(1 - t, 3);
-        el.textContent = Math.round(from + (to - from) * eased) + '%';
-        if (t < 1) requestAnimationFrame(tick);
+    function clearStageTimers() {
+      stageTimeouts.forEach(clearTimeout);
+      stageTimeouts = [];
+    }
+
+    // Builds the stage list fresh for this scan and starts its scripted
+    // advance. Separate from showLoadingOverlay() only so a redraw never
+    // needs to touch the fridge/particle zones above it.
+    function startLoadingStages(hasPhoto, headlineText) {
+      clearStageTimers();
+      const headlineEl = document.getElementById('loadingHeadline');
+      if (headlineEl) {
+        headlineEl.textContent = headlineText;
+        headlineEl.classList.remove('entered');
+        requestAnimationFrame(() => headlineEl.classList.add('entered'));
       }
-      requestAnimationFrame(tick);
-    }
 
-    let currentLoadingPercent = 0;
-    const DOT_FOR_PERCENT = { 5: 1, 30: 2, 70: 3, 90: 4, 100: 5 };
-
-    function activateDot(n) {
-      document.querySelectorAll('.loading-step-dot').forEach(dot => {
-        const i = parseInt(dot.dataset.dot, 10);
-        dot.classList.toggle('active', i === n);
-        dot.classList.toggle('done', i < n);
-      });
-    }
-
-    // Drives Zone 3 — bar width, the counting percentage, and which step
-    // dot is active — from the real SSE progress checkpoints (5/30/70/90/100).
-    function setProgress(percent) {
-      const bar = document.getElementById('loadingProgressBar');
-      if (bar) bar.style.width = percent + '%';
-      const percentEl = document.getElementById('loadingPercent');
-      if (percentEl) animatePercent(currentLoadingPercent, percent, 600, percentEl);
-      currentLoadingPercent = percent;
-      if (DOT_FOR_PERCENT[percent]) activateDot(DOT_FOR_PERCENT[percent]);
-    }
-
-    // Appends a new Zone 2 status line, dims every line shown before it,
-    // and restarts the cycling italic sub-line underneath.
-    function addStatusLine(text) {
-      const container = document.getElementById('loadingStatusLines');
+      const stages = hasPhoto ? LOADING_STAGES.photo : LOADING_STAGES.recipe;
+      const container = document.getElementById('loadingStages');
       if (!container) return;
-      container.querySelectorAll('.loading-status-line').forEach(line => {
-        line.classList.remove('active');
-      });
-      const line = document.createElement('div');
-      line.className = 'loading-status-line';
-      line.textContent = text;
-      container.appendChild(line);
-      requestAnimationFrame(() => {
-        line.classList.add('entered', 'active');
+      container.innerHTML = stages.map((stage, i) => `
+        <div class="loading-stage" data-stage="${i}">
+          <span class="loading-stage-icon"></span>
+          <span class="loading-stage-label">${escapeHtml(stage.label)}</span>
+        </div>`).join('');
+      stages.forEach((_, i) => {
+        stageTimeouts.push(setTimeout(() => {
+          const row = container.querySelector(`.loading-stage[data-stage="${i}"]`);
+          if (row) row.classList.add('entered');
+        }, i * 100));
       });
 
-      clearTimeout(subLineShowTimer);
-      clearInterval(subLineTimer);
-      const subEl = document.getElementById('loadingStatusSub');
-      if (subEl) {
-        subEl.classList.remove('visible');
-        subLineShowTimer = setTimeout(() => {
-          subLineIndex = 0;
-          subEl.textContent = SUB_LINE_MESSAGES[subLineIndex];
-          subEl.classList.add('visible');
-          subLineTimer = setInterval(() => {
-            subEl.classList.remove('visible');
-            setTimeout(() => {
-              subLineIndex = (subLineIndex + 1) % SUB_LINE_MESSAGES.length;
-              subEl.textContent = SUB_LINE_MESSAGES[subLineIndex];
-              subEl.classList.add('visible');
-            }, 300);
-          }, 2500);
-        }, 400);
+      stages.forEach((stage, i) => {
+        stageTimeouts.push(setTimeout(() => setActiveStage(i), stage.delay));
+      });
+    }
+
+    function setActiveStage(idx) {
+      document.querySelectorAll('#loadingStages .loading-stage').forEach((row, i) => {
+        row.classList.toggle('active', i === idx);
+        row.classList.toggle('done', i < idx);
+      });
+    }
+
+    // Marks every stage done outright — called right before the overlay
+    // hides so a scan that resolves faster than the scripted schedule
+    // doesn't leave a stage visibly stuck mid-spin.
+    function finishLoadingStages() {
+      clearStageTimers();
+      document.querySelectorAll('#loadingStages .loading-stage').forEach(row => {
+        row.classList.remove('active');
+        row.classList.add('done');
+      });
+    }
+
+    // Best-effort extraction of ingredient names from the raw (possibly
+    // incomplete) JSON text streamed so far. Scoped to text after the
+    // first "recipe_ingredients" key so it doesn't pick up a suggestion's
+    // own top-level "name" field — not perfectly precise for the
+    // multi-suggestion case, but this is a live preview only; the final
+    // step2 event always replaces it with the exact parsed data.
+    function extractStreamedIngredientNames(text) {
+      const idx = text.indexOf('"recipe_ingredients"');
+      if (idx === -1) return [];
+      const names = [];
+      const re = /"name"\s*:\s*"([^"]*)"/g;
+      let m;
+      while ((m = re.exec(text.slice(idx)))) {
+        if (m[1]) names.push(m[1]);
       }
+      return names;
+    }
+
+    // Skeleton scaffold for #recipeChecklistSection — built the instant
+    // results become visible (step1), well before step2_partial has
+    // streamed anything real. renderStreamingIngredientRows() below
+    // consumes #checklistRowsContainer's skeleton rows one at a time as
+    // real ones arrive; step2's renderRecipeChecklistCard() replaces this
+    // whole section wholesale, taking any leftover skeleton with it.
+    function renderChecklistSkeleton() {
+      const section = document.getElementById('recipeChecklistSection');
+      if (!section) return;
+      const skeletonRows = Array.from({ length: 4 }, () => `
+        <div class="skeleton-row">
+          <div class="skeleton-box skeleton-checkbox"></div>
+          <div class="skeleton-lines">
+            <div class="skeleton-box skeleton-name"></div>
+            <div class="skeleton-box skeleton-qty"></div>
+          </div>
+        </div>`).join('');
+      section.innerHTML = `
+        <div class="card">
+          <div class="skeleton-box skeleton-stat-line"></div>
+          <div class="recipe-rows" id="checklistRowsContainer">${skeletonRows}</div>
+        </div>`;
+    }
+
+    // Skeleton for the order-choice buttons — same lifetime idea, replaced
+    // wholesale by renderChoiceCard() once awaiting_user_choice arrives.
+    function renderChoiceSkeleton() {
+      const card = document.getElementById('choiceCard');
+      if (!card) return;
+      card.innerHTML = `
+        <div class="skeleton-buttons">
+          <div class="skeleton-box skeleton-btn"></div>
+          <div class="skeleton-box skeleton-btn"></div>
+        </div>`;
+    }
+
+    // Consumes newly-streamed ingredient names: each one becomes a real
+    // row inserted just above the remaining skeleton rows, removing one
+    // skeleton per real row so the real rows accumulate on top and the
+    // skeleton block only shrinks — never appends past 4, never rebuilds
+    // an already-rendered real row (so it doesn't replay its animation).
+    function renderStreamingIngredientRows(newNames) {
+      const rowsContainer = document.getElementById('checklistRowsContainer');
+      if (!rowsContainer) return;
+      newNames.forEach(name => {
+        const row = document.createElement('div');
+        row.className = 'ingredient-row';
+        row.innerHTML = `<span class="ingredient-row-name">${escapeHtml(name)}</span>`;
+        const nextSkeleton = rowsContainer.querySelector('.skeleton-row');
+        if (nextSkeleton) {
+          rowsContainer.insertBefore(row, nextSkeleton);
+          nextSkeleton.remove();
+        } else {
+          rowsContainer.appendChild(row);
+        }
+      });
     }
 
     // Pops up to 10 dots at random shelf positions once the fridge scan
@@ -1342,36 +1883,324 @@
       }
     }
 
-    function showLoadingOverlay(hasPhoto) {
+    function showLoadingOverlay(hasPhoto, headlineText) {
       const overlay = document.getElementById('loadingOverlay');
       if (!overlay) return;
       initLoadingParticles();
 
-      document.getElementById('loadingStatusLines').innerHTML = '';
-      const subEl = document.getElementById('loadingStatusSub');
-      if (subEl) { subEl.classList.remove('visible'); subEl.textContent = ''; }
-      clearTimeout(subLineShowTimer);
-      clearInterval(subLineTimer);
-
       document.getElementById('loadingFridgeZone').style.display = hasPhoto ? '' : 'none';
       document.getElementById('loadingFridgeDots').innerHTML = '';
 
-      currentLoadingPercent = 0;
-      document.getElementById('loadingPercent').textContent = '0%';
-      document.getElementById('loadingProgressBar').style.width = '0%';
-      activateDot(0);
+      startLoadingStages(hasPhoto, headlineText);
 
       overlay.style.display = 'flex';
-      requestAnimationFrame(() => overlay.classList.add('show'));
+      // Force a synchronous reflow before adding 'show' so the opacity
+      // transition still animates from 0 (display:none -> flex needs a
+      // committed layout first) — but do it inline rather than via
+      // requestAnimationFrame, which a very fast-resolving scan (e.g.
+      // recipe mode's near-instant step1) can outrace, leaving 'show'
+      // added a frame after hideLoadingOverlay already removed it.
+      void overlay.offsetHeight;
+      overlay.classList.add('show');
     }
 
     function hideLoadingOverlay() {
-      clearTimeout(subLineShowTimer);
-      clearInterval(subLineTimer);
+      finishLoadingStages();
+      hidePhotoScanScreen();
       const overlay = document.getElementById('loadingOverlay');
       if (!overlay) return;
       overlay.classList.remove('show');
       setTimeout(() => { overlay.style.display = 'none'; }, 300);
+    }
+
+    // Cycling reassurance line under the main status text while Gemini
+    // Vision is still working — deliberately says nothing about the tech
+    // stack (no "Gemini", no model names): users care what it's doing for
+    // them, not what's doing it.
+    const PHOTO_SCAN_SUB_MESSAGES = [
+      'Reading shelf by shelf',
+      'Checking every corner of your fridge',
+      'Almost there, hang tight',
+    ];
+    let photoScanSubMessageTimer = null;
+    let photoScanSubMessageIndex = 0;
+
+    function startPhotoScanSubMessages() {
+      stopPhotoScanSubMessages();
+      const subEl = document.getElementById('photoScanSubStatus');
+      if (!subEl) return;
+      photoScanSubMessageIndex = 0;
+      subEl.textContent = PHOTO_SCAN_SUB_MESSAGES[0];
+      subEl.style.opacity = '1';
+      photoScanSubMessageTimer = setInterval(() => {
+        subEl.style.opacity = '0';
+        setTimeout(() => {
+          photoScanSubMessageIndex = (photoScanSubMessageIndex + 1) % PHOTO_SCAN_SUB_MESSAGES.length;
+          subEl.textContent = PHOTO_SCAN_SUB_MESSAGES[photoScanSubMessageIndex];
+          subEl.style.opacity = '1';
+        }, 300);
+      }, 3500);
+    }
+
+    function stopPhotoScanSubMessages() {
+      clearInterval(photoScanSubMessageTimer);
+      photoScanSubMessageTimer = null;
+    }
+
+    // Shows the user's own fridge photo — clean, no chips or overlays on
+    // it — instead of the dark loading overlay, only when a real photo
+    // was uploaded. Detected ingredients reveal as a list below the photo
+    // (see showDetectionChips()) rather than on top of it. Mirrors
+    // .loading-overlay's show/hide mechanics (display toggled here,
+    // opacity+.show class does the fade).
+    function showPhotoScanScreen(photoURL) {
+      const screen = document.getElementById('photoScanScreen');
+      if (!screen) return;
+      document.getElementById('fridgePhotoPreview').src = photoURL;
+      document.getElementById('detectedItemsList').innerHTML = '';
+      document.getElementById('photoScanStatus').textContent = 'Scanning your fridge...';
+      const scanLine = document.getElementById('scanLine');
+      if (scanLine) scanLine.classList.remove('stopped');
+      const timeoutState = document.getElementById('photoScanTimeoutState');
+      if (timeoutState) { timeoutState.classList.remove('visible'); timeoutState.classList.add('hidden'); }
+      // Reset the results-page thumbnail from any previous scan — it's
+      // re-shown and re-populated by transitionToResults() once this
+      // scan's detection reveal finishes.
+      const summaryHeader = document.getElementById('fridgeSummaryHeader');
+      if (summaryHeader) { summaryHeader.style.display = 'none'; summaryHeader.style.opacity = '0'; }
+      const thumbTarget = document.getElementById('fridgeThumbTarget');
+      if (thumbTarget) thumbTarget.style.opacity = '0';
+      startPhotoScanSubMessages();
+      startPhotoScanTimeoutTimer();
+      photoScanScreenShown = true;
+      screen.style.display = 'flex';
+      void screen.offsetHeight;
+      screen.classList.add('show');
+    }
+
+    // Called from hideLoadingOverlay() so every existing hide-the-loading-
+    // screen call site (step1's no-photo branch, complete, error,
+    // auth_required, the network-failure catch in startScan) also tears
+    // this down for free without touching each of those call sites.
+    // No-op if the photo scan screen was never shown.
+    function hidePhotoScanScreen() {
+      const screen = document.getElementById('photoScanScreen');
+      if (!screen || !photoScanScreenShown) return;
+      photoScanScreenShown = false;
+      stopPhotoScanSubMessages();
+      clearPhotoScanTimeoutTimer();
+      screen.classList.remove('show');
+      setTimeout(() => { screen.style.display = 'none'; }, 400);
+      if (fridgePhotoURL) {
+        URL.revokeObjectURL(fridgePhotoURL);
+        fridgePhotoURL = null;
+      }
+    }
+
+    // Fires if step1 hasn't arrived within PHOTO_SCAN_TIMEOUT_MS — the
+    // vision call can end up retrying across several fallback models on
+    // quota/transient errors, which can take well over a minute. Shows an
+    // inline notice + retry option instead of leaving the user watching
+    // "Scanning..." with no feedback that anything's off.
+    function startPhotoScanTimeoutTimer() {
+      clearPhotoScanTimeoutTimer();
+      photoScanTimeoutTimer = setTimeout(onPhotoScanTimeout, PHOTO_SCAN_TIMEOUT_MS);
+    }
+
+    function clearPhotoScanTimeoutTimer() {
+      clearTimeout(photoScanTimeoutTimer);
+      photoScanTimeoutTimer = null;
+    }
+
+    function onPhotoScanTimeout() {
+      const state = document.getElementById('photoScanTimeoutState');
+      if (!state) return;
+      state.classList.remove('hidden');
+      requestAnimationFrame(() => state.classList.add('visible'));
+      try { lucide.createIcons(); } catch {}
+    }
+
+    // Resubmits the same photo (no re-picking needed) after a stalled
+    // scan. Falls back to sending the user back to the landing form if
+    // the file reference is somehow gone.
+    function retryPhotoScan() {
+      const state = document.getElementById('photoScanTimeoutState');
+      if (state) { state.classList.remove('visible'); state.classList.add('hidden'); }
+      if (lastPhotoFile) {
+        startScan('photo', lastPhotoFile);
+      } else {
+        hideLoadingOverlay();
+        resetToLanding();
+      }
+    }
+
+    // Adds a single detected ingredient as a row in the reveal list below
+    // the photo — a small orange check circle, the name, and its
+    // confidence percentage (already 0-100 from the step1 payload).
+    function addDetectedItemRow(ingredient) {
+      const list = document.getElementById('detectedItemsList');
+      if (!list) return;
+      const row = document.createElement('div');
+      row.className = 'detected-item-row';
+      row.innerHTML = `
+        <div class="detected-item-check"><i data-lucide="check"></i></div>
+        <span class="detected-item-name">${escapeHtml(ingredient.name)}</span>
+        <span class="detected-item-conf">${ingredient.confidence}%</span>`;
+      list.appendChild(row);
+      try { lucide.createIcons(); } catch {}
+    }
+
+    // step1's photo-scan-screen path: reveals each detected ingredient as
+    // a row below the (clean, unmodified) photo, one every 180ms, updates
+    // the status line to name whichever ingredient just landed, stops the
+    // scan-line sweep immediately since step1 has now arrived, then waits
+    // 1000ms after the last row before handing off to the normal results
+    // reveal.
+    function showDetectionChips(ingredients) {
+      // step1 has arrived — the scan didn't stall, so cancel the timeout
+      // notice (and hide it if it had already fired).
+      clearPhotoScanTimeoutTimer();
+      const timeoutState = document.getElementById('photoScanTimeoutState');
+      if (timeoutState) { timeoutState.classList.remove('visible'); timeoutState.classList.add('hidden'); }
+
+      // Photo is done being scanned the instant step1 fires — stop the
+      // sweep right away rather than waiting for the reveal list to finish.
+      const scanLine = document.getElementById('scanLine');
+      if (scanLine) scanLine.classList.add('stopped');
+
+      const statusEl = document.getElementById('photoScanStatus');
+      const names = (ingredients || []).filter(i => i.name && i.name.trim() !== '');
+
+      if (!names.length) {
+        if (statusEl) statusEl.textContent = 'No ingredients found';
+        setTimeout(transitionToResults, 800);
+        return;
+      }
+
+      names.forEach((ingredient, i) => {
+        setTimeout(() => {
+          addDetectedItemRow(ingredient);
+          const isLast = i === names.length - 1;
+          if (statusEl) {
+            statusEl.textContent = isLast
+              ? `Found ${names.length} ingredient${names.length === 1 ? '' : 's'}`
+              : i === 0
+                ? 'Found something...'
+                : `Found ${ingredient.name}...`;
+          }
+        }, i * 180);
+      });
+
+      const staggerDuration = names.length * 180;
+      setTimeout(transitionToResults, staggerDuration + 800);
+    }
+
+    // Called once the detection reveal finishes — morphs the fridge photo
+    // from its position on the scan screen into a small thumbnail at the
+    // top of the results page (a FLIP-style clone animation) instead of a
+    // hard cut, so the two screens read as one continuous handoff. Falls
+    // back to the old instant-cut behavior if anything the morph needs is
+    // missing, rather than getting stuck.
+    function transitionToResults() {
+      const photoContainer = document.getElementById('photoScanContainer');
+      const targetThumbnail = document.getElementById('fridgeThumbTarget');
+      const screen = document.getElementById('photoScanScreen');
+      const summaryHeader = document.getElementById('fridgeSummaryHeader');
+      if (!photoContainer || !targetThumbnail || !screen || !summaryHeader || !fridgePhotoURL) {
+        hideLoadingOverlay();
+        revealResultsSection();
+        revealResultsContent();
+        return;
+      }
+
+      // Capture the photo now, before hideLoadingOverlay() (called once
+      // the morph completes below) revokes the object URL.
+      document.getElementById('fridgeThumbImg').src = fridgePhotoURL;
+      const count = currentFridgeIngredients.length;
+      document.getElementById('fridgeSummaryCount').textContent =
+        `${count} item${count === 1 ? '' : 's'} detected`;
+
+      // #resultsSection (and therefore #fridgeThumbTarget) needs real
+      // layout for getBoundingClientRect() below to return a meaningful
+      // position. Its content stays invisible (opacity:0, set in the
+      // step1 handler) until revealResultsContent() stages it back in.
+      revealResultsSection();
+      summaryHeader.style.display = 'flex';
+
+      const from = photoContainer.getBoundingClientRect();
+      const to = targetThumbnail.getBoundingClientRect();
+
+      const clone = photoContainer.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.style.cssText = `
+        position: fixed;
+        top: ${from.top}px;
+        left: ${from.left}px;
+        width: ${from.width}px;
+        height: ${from.height}px;
+        z-index: 10000;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 20px;
+        overflow: hidden;
+        pointer-events: none;
+      `;
+      document.body.appendChild(clone);
+
+      // Fade out the scan screen's own background/status/list — the
+      // clone (a separate element appended to <body>) keeps animating on
+      // top of it.
+      screen.style.opacity = '0';
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          clone.style.top = `${to.top}px`;
+          clone.style.left = `${to.left}px`;
+          clone.style.width = `${to.width}px`;
+          clone.style.height = `${to.height}px`;
+          clone.style.borderRadius = '12px';
+        });
+      });
+
+      clone.addEventListener('transitionend', function onDone() {
+        clone.removeEventListener('transitionend', onDone);
+        clone.remove();
+        // Existing cleanup — stops the sub-message/timeout timers, hides
+        // #photoScanScreen, revokes fridgePhotoURL (already captured above).
+        hideLoadingOverlay();
+        targetThumbnail.style.opacity = '1';
+        revealResultsContent();
+      }, { once: true });
+    }
+
+    // Staggered reveal of the skeleton-populated sections once results
+    // become visible — the fridge thumbnail header (photo scans only,
+    // no-op if it was never shown), then the dish header, then the
+    // checklist, then the order buttons. Each was set to
+    // opacity:0/translateY(10px) in the step1 handler so there's
+    // something to animate from.
+    function revealResultsContent() {
+      const summaryHeader = document.getElementById('fridgeSummaryHeader');
+      setTimeout(() => {
+        if (summaryHeader && summaryHeader.style.display === 'flex') {
+          summaryHeader.style.transition = 'opacity 0.3s ease';
+          summaryHeader.style.opacity = '1';
+        }
+      }, 50);
+      setTimeout(() => revealResultsSubSection('recipeDishHeaderSection'), 200);
+      setTimeout(() => revealResultsSubSection('recipeChecklistSection'), 350);
+      setTimeout(() => revealResultsSubSection('choiceCard'), 500);
+    }
+
+    function revealResultsSubSection(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+        });
+      });
     }
 
     function setAnalyseReady(text) {
@@ -1386,13 +2215,17 @@
       try { lucide.createIcons(); } catch {}
     }
 
-    function setAnalyseLoading(hasPhoto) {
+    function setAnalyseLoading(hasPhoto, headlineText) {
       analyseBtn.disabled = true;
       analyseBtn.classList.remove('ready');
       analyseBtn.classList.add('loading');
       document.getElementById('btnIcon').innerHTML = '<div class="spin"></div>';
       document.getElementById('btnText').textContent = 'Getting recipe...';
-      showLoadingOverlay(hasPhoto);
+      if (hasPhoto && fridgePhotoURL) {
+        showPhotoScanScreen(fridgePhotoURL);
+      } else {
+        showLoadingOverlay(hasPhoto, headlineText);
+      }
     }
 
     function setStep(n, status, msg) {
@@ -1432,7 +2265,7 @@
     }
 
     function confClass(pct) {
-      return pct >= 80 ? 'high' : pct >= 60 ? 'mid' : 'low';
+      return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low';
     }
 
     function escapeHtml(s) {
@@ -1676,22 +2509,15 @@
       renderRecipeChecklistCard();
     }
 
-    // Builds the card shell ONCE per new recipe. Row toggles and the
-    // inline fridge scan only touch #recipeRowsContainer /
-    // #recipeChecklistFooter / #recipeStatsRow afterwards, so the scan
-    // area's own open/closed state and any in-progress upload survive
-    // re-renders.
-    function renderRecipeChecklistCard() {
-      const section = document.getElementById('recipeChecklistSection');
-      if (!section) return;
-      if (!currentRecipeChecklist.length) { section.innerHTML = ''; return; }
-
+    // Dish name/meta card — lives in the Recipe tab, built from the same
+    // state as the checklist below but rendered separately since the two
+    // now live in different tab panels.
+    function buildRecipeDishHeaderHtml() {
       const metaParts = [`For ${currentRecipeServings} people`];
       if (currentRecipeMeta.prepTime) metaParts.push(`${currentRecipeMeta.prepTime} min`);
       if (currentRecipeMeta.cuisine) metaParts.push(currentRecipeMeta.cuisine);
-
-      section.innerHTML = `
-        <div class="recipe-checklist-card">
+      return `
+        <div class="recipe-checklist-card content-fade-in">
           <div class="recipe-dish-header">
             <div class="recipe-dish-icon"><i data-lucide="chef-hat"></i></div>
             <div class="recipe-dish-info">
@@ -1700,32 +2526,60 @@
             </div>
             <i data-lucide="sparkles" class="recipe-ai-spark"></i>
           </div>
+        </div>`;
+    }
+
+    // Builds the checklist card shell ONCE per new recipe (stat line +
+    // rows + footer — the dish header and steps live in the Recipe tab
+    // now, see buildRecipeDishHeaderHtml()/revealRecipeStepsAndVideo()).
+    // Row toggles and the inline fridge scan only touch
+    // #recipeRowsContainer / #recipeChecklistFooter / #recipeStatsRow
+    // afterwards, so the scan area's own open/closed state and any
+    // in-progress upload survive re-renders.
+    function renderRecipeChecklistCard() {
+      const dishHeaderSection = document.getElementById('recipeDishHeaderSection');
+      const section = document.getElementById('recipeChecklistSection');
+      if (!section) return;
+      if (!currentRecipeChecklist.length) {
+        section.innerHTML = '';
+        if (dishHeaderSection) dishHeaderSection.innerHTML = '';
+        return;
+      }
+
+      if (dishHeaderSection) dishHeaderSection.innerHTML = buildRecipeDishHeaderHtml();
+
+      section.innerHTML = `
+        <div class="recipe-checklist-card content-fade-in">
           <div class="recipe-stats-row" id="recipeStatsRow">${buildRecipeStatsHtml()}</div>
           <p class="recipe-checklist-sub" id="recipeHookLine">${buildRecipeHookText()}</p>
           <div class="recipe-rows" id="recipeRowsContainer">${buildRecipeRowsHtml()}</div>
           <div id="recipeChecklistFooter">${buildRecipeFooterHtml()}</div>
-          ${buildRecipeStepsHtml()}
         </div>`;
 
       animateStatNumbers(document.getElementById('recipeStatsRow'));
       try { lucide.createIcons(); } catch {}
     }
 
+    // "How to make it" steps — lives in the Recipe tab's own container
+    // now, not nested inside the checklist card, so it no longer carries
+    // the YouTube slot (that's a standalone div in the Videos tab; see
+    // renderYouTubeEmbed(), unchanged since it only cares about the id).
     function buildRecipeStepsHtml() {
       if (!currentRecipeSteps.length) return '';
       const stepsList = currentRecipeSteps.map((step, i) =>
         `<li><span class="recipe-step-num">${i + 1}</span><span>${escapeHtml(step)}</span></li>`
       ).join('');
       return `
-        <div class="recipe-steps-block">
-          <button type="button" class="recipe-steps-toggle" onclick="toggleRecipeSteps()">
-            <i data-lucide="book-open"></i> How to make it
-            <i data-lucide="chevron-down" class="ml-auto ${recipeStepsExpanded ? 'rotated' : ''}"></i>
-          </button>
-          <div id="youtubeVideoSection"></div>
-          <ol class="recipe-steps-list ${recipeStepsExpanded ? '' : 'collapsed'}" id="recipeStepsList">
-            ${stepsList}
-          </ol>
+        <div class="recipe-checklist-card content-fade-in">
+          <div class="recipe-steps-block" style="border-top:none;">
+            <button type="button" class="recipe-steps-toggle" onclick="toggleRecipeSteps()">
+              <i data-lucide="book-open"></i> How to make it
+              <i data-lucide="chevron-down" class="ml-auto ${recipeStepsExpanded ? 'rotated' : ''}"></i>
+            </button>
+            <ol class="recipe-steps-list ${recipeStepsExpanded ? '' : 'collapsed'}" id="recipeStepsList">
+              ${stepsList}
+            </ol>
+          </div>
         </div>`;
     }
 
@@ -1745,6 +2599,7 @@
             </div>
           </div>`
         : `<div class="yt-video-wrap">${buildYouTubeCarouselHtml(videos)}</div>`;
+      section.classList.add('section-reveal');
       section.innerHTML = `
         <button type="button" class="yt-video-toggle" onclick="toggleYoutubeSection()">
           <i data-lucide="youtube"></i> Watch recipe video
@@ -1785,10 +2640,10 @@
                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
               <div class="yt-thumb-img-wrap">
                 <img src="${v.thumbnail}" alt="${escapeHtml(v.title || '')}"
-                     style="width:100%;height:100%;object-fit:cover;border-radius:8px;"/>
+                     style="width:100%;height:100%;object-fit:cover;border-radius:12px;"/>
                 <div class="yt-thumb-overlay ${i === 0 ? 'yt-thumb-playing' : ''}">
                   ${i === 0
-                    ? '<span style="font-size:10px;font-weight:700;color:#fff;background:var(--orange);padding:2px 6px;border-radius:4px;">PLAYING</span>'
+                    ? '<span class="yt-playing-badge">PLAYING</span>'
                     : '<div style="width:24px;height:24px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="play" style="width:14px;height:14px;color:#fff;margin-left:1px;"></i></div>'
                   }
                 </div>
@@ -1820,8 +2675,30 @@
       });
       card.classList.add('yt-thumb-active');
       const activeOverlay = card.querySelector('.yt-thumb-overlay');
-      if (activeOverlay) activeOverlay.innerHTML = '<span style="font-size:10px;font-weight:700;color:#fff;background:var(--orange);padding:2px 6px;border-radius:4px;">PLAYING</span>';
+      if (activeOverlay) activeOverlay.innerHTML = '<span class="yt-playing-badge">PLAYING</span>';
       try { lucide.createIcons(); } catch {}
+    }
+
+    // Fires from 'awaiting_user_choice' — renders the "How to make it"
+    // steps block into the Recipe tab's #recipeStepsSection, and kicks off
+    // the video lookup for the (now standalone, Videos-tab) YouTube slot.
+    // Kept out of the step2 render so it visibly arrives a beat later,
+    // same as the order-choice buttons.
+    function revealRecipeStepsAndVideo(dishName) {
+      if (!recipeStepsRevealed) {
+        recipeStepsRevealed = true;
+        const stepsSection = document.getElementById('recipeStepsSection');
+        if (stepsSection && currentRecipeSteps.length) {
+          stepsSection.innerHTML = buildRecipeStepsHtml();
+          try { lucide.createIcons(); } catch {}
+        }
+      }
+      if (dishName) {
+        fetch(`/api/youtube?dish=${encodeURIComponent(dishName)}`)
+          .then(r => r.json())
+          .then(data => renderYouTubeEmbed(data))
+          .catch(() => renderYouTubeEmbed(null));
+      }
     }
 
     function toggleYoutubeSection() {
@@ -1862,6 +2739,32 @@
       const total = currentRecipeChecklist.length;
       const toOrderCount = total - haveCount;
       return `<p class="recipe-stat-line">You already have <span class="stat-num" data-target="${haveCount}">0</span> of <span class="stat-num" data-target="${total}">0</span> ingredient${total === 1 ? '' : 's'}. Just <span class="recipe-stat-z stat-num" data-target="${toOrderCount}">0</span> item${toOrderCount === 1 ? '' : 's'} to order.</p>`;
+    }
+
+    // Populates the sticky at-a-glance bar from the same checklist state
+    // buildRecipeStatsHtml() uses, once step2 has resolved it. No-op (stays
+    // hidden) when there's no checklist to summarize — e.g. multi-suggestion
+    // mode with no target dish, same case renderRecipeChecklist() itself
+    // skips.
+    function updateStickySummaryBar() {
+      const bar = document.getElementById('stickySummaryBar');
+      if (!bar) return;
+      if (!currentRecipeChecklist.length) {
+        bar.classList.remove('visible');
+        return;
+      }
+      const total = currentRecipeChecklist.length;
+      const haveCount = currentRecipeChecklist.filter(i => i.checked).length;
+      const missingCount = total - haveCount;
+      document.getElementById('stickySummaryText').innerHTML =
+        `${haveCount} of ${total} ingredient${total === 1 ? '' : 's'} · <strong>${missingCount} to order</strong>`;
+      document.getElementById('stickySummaryDish').textContent = currentRecipeDishName;
+      bar.classList.add('visible');
+    }
+
+    function hideStickySummaryBar() {
+      const bar = document.getElementById('stickySummaryBar');
+      if (bar) bar.classList.remove('visible');
     }
 
     // Effect 2 — count the stat numbers up from 0 to their target over 600ms,
@@ -1966,7 +2869,7 @@
         <div class="cart-items-list">
           ${items.map(item => `
             <div class="cart-item-row">
-              <div class="cart-item-icon">${getCategoryEmoji('food')}</div>
+              <div class="cart-item-icon"><i data-lucide="${getCategoryIcon('food')}"></i></div>
               <div class="cart-item-info">
                 <div class="cart-item-name">${escapeHtml(item.name)}</div>
                 <div class="cart-item-qty">${escapeHtml(item.quantity || '')}</div>
@@ -2039,7 +2942,7 @@
         </button>`;
 
       document.getElementById('choiceCard').innerHTML =
-        `<div class="card choice-card">
+        `<div class="card choice-card content-fade-in">
           <div class="choice-header-row"><span class="choice-label">How do you want to handle this?</span></div>
           ${showReasoning ? `<p class="choice-subtitle">${reasoning}</p>` : ''}
           <div class="choice-buttons">
@@ -2164,14 +3067,16 @@
       // failure state is visible instead of a blank screen).
       currentScanHasPhoto = mode === 'photo' && !!file;
       currentScanDish = document.getElementById('targetDish').value.trim();
+      photoScanScreenShown = false;
+      step2PartialRawText = '';
+      streamedIngredientNames = [];
+      recipeStepsRevealed = false;
       const landingEl = document.getElementById('landingSection');
       landingEl.classList.add('fade-out');
       setTimeout(() => { landingEl.style.display = 'none'; }, 200);
       document.getElementById('resultsSection').classList.remove('fade-in');
       document.getElementById('resultsSection').style.display = 'none';
-      setAnalyseLoading(currentScanHasPhoto);
-      setProgress(5);
-      addStatusLine(currentScanHasPhoto ? 'Reading your fridge' : `Looking up ${currentScanDish}`);
+      setAnalyseLoading(currentScanHasPhoto, currentScanHasPhoto ? 'Reading your fridge' : `Looking up ${currentScanDish}`);
       resultsEl.classList.remove('show');
       const scanSectionWrapperEl = document.getElementById('scanSectionWrapper');
       if (scanSectionWrapperEl) scanSectionWrapperEl.style.display = '';
@@ -2180,9 +3085,17 @@
       document.getElementById('mealCards').innerHTML = '';
       document.getElementById('mealSuggestionsSection').classList.add('hidden');
       document.getElementById('recipeChecklistSection').innerHTML = '';
+      document.getElementById('recipeDishHeaderSection').innerHTML = '';
+      document.getElementById('recipeStepsSection').innerHTML = '';
+      document.getElementById('youtubeVideoSection').innerHTML = '';
       document.getElementById('choiceCard').innerHTML = '';
       document.getElementById('topUpSection').innerHTML = '';
       document.getElementById('orderCard').innerHTML = '';
+      hideStickySummaryBar();
+      const summaryHeaderReset = document.getElementById('fridgeSummaryHeader');
+      if (summaryHeaderReset) { summaryHeaderReset.style.display = 'none'; summaryHeaderReset.style.opacity = '0'; }
+      const thumbTargetReset = document.getElementById('fridgeThumbTarget');
+      if (thumbTargetReset) thumbTargetReset.style.opacity = '0';
       currentMealName = null;
       currentMissingIngredients = [];
       currentFridgeIngredients = [];
@@ -2236,6 +3149,7 @@
       const resultsSectionEl = document.getElementById('resultsSection');
       resultsSectionEl.classList.remove('fade-in');
       resultsSectionEl.style.display = 'none';
+      hideStickySummaryBar();
       const landingEl = document.getElementById('landingSection');
       landingEl.style.display = '';
       requestAnimationFrame(() => landingEl.classList.remove('fade-out'));
@@ -2302,6 +3216,8 @@
       statusEl.innerHTML = '<div class="spin"></div> Scanning your fridge…';
       const compressed = await compressImage(file, 1200, 1200, 0.82);
       const compressedFile = new File([compressed], file.name, { type: 'image/jpeg' });
+      fridgePhotoURL = URL.createObjectURL(compressedFile);
+      lastPhotoFile = compressedFile;
       startScan('photo', compressedFile);
     });
 
@@ -2447,6 +3363,7 @@
     function renderSuggestions(suggestions, query) {
       if (!suggestions.length) {
         suggestionBox.style.display = 'none';
+        activeSuggestionIndex = -1;
         return;
       }
       const queryRegex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
@@ -2457,9 +3374,8 @@
           style="padding:14px 16px;cursor:pointer;font-size:14px;
           font-family:'Plus Jakarta Sans',sans-serif;
           border-bottom:1px solid var(--border);
-          transition:background 0.1s ease;"
-          onmouseenter="this.style.background='var(--orange-light)'"
-          onmouseleave="this.style.background='transparent'"
+          transition:background 0.1s ease, color 0.1s ease;"
+          onmouseenter="highlightSuggestion(${i})"
           onclick="selectSuggestion(this.dataset.value)">
           ${highlighted}
         </div>`;
@@ -2468,11 +3384,33 @@
       activeSuggestionIndex = -1;
     }
 
+    // Single source of truth for which row is highlighted — used by both
+    // keyboard nav and mouse hover so the two never fall out of sync.
+    function highlightSuggestion(index) {
+      const rows = suggestionBox.querySelectorAll('.suggestion-row');
+      rows.forEach((r, i) => {
+        if (i === index) {
+          r.style.background = 'rgba(252, 128, 25, 0.12)';
+          r.style.color = '#FC8019';
+        } else {
+          r.style.background = 'transparent';
+          r.style.color = '';
+        }
+      });
+      activeSuggestionIndex = index;
+    }
+
     function selectSuggestion(value) {
       dishInput.value = value;
       suggestionBox.style.display = 'none';
       activeSuggestionIndex = -1;
       dishInput.focus();
+    }
+
+    // Popular-dish cards want the exact same fill+focus-no-autosubmit
+    // behavior the trending chips and autocomplete already use.
+    function selectPopularDish(name) {
+      selectSuggestion(name);
     }
 
     dishInput.addEventListener('input', () => {
@@ -2494,21 +3432,27 @@
     });
 
     dishInput.addEventListener('keydown', (e) => {
+      // Gate on the dropdown actually being open, not just non-empty —
+      // closing it (Escape, outside click, selection) doesn't clear its
+      // rows, so a stale rows.length would otherwise let arrow keys keep
+      // acting on a dropdown the user can no longer see.
+      const isOpen = suggestionBox.style.display === 'block';
       const rows = suggestionBox.querySelectorAll('.suggestion-row');
-      if (!rows.length) return;
+      if (!isOpen || !rows.length) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, rows.length - 1);
-        rows.forEach((r, i) => r.style.background = i === activeSuggestionIndex ? 'var(--orange-light)' : 'transparent');
+        highlightSuggestion(activeSuggestionIndex + 1 >= rows.length ? 0 : activeSuggestionIndex + 1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
-        rows.forEach((r, i) => r.style.background = i === activeSuggestionIndex ? 'var(--orange-light)' : 'transparent');
+        highlightSuggestion(activeSuggestionIndex - 1 < 0 ? rows.length - 1 : activeSuggestionIndex - 1);
       } else if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
         e.preventDefault();
         selectSuggestion(rows[activeSuggestionIndex].dataset.value);
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         suggestionBox.style.display = 'none';
+        activeSuggestionIndex = -1;
+        dishInput.focus();
       }
     });
 
@@ -2527,9 +3471,7 @@
 
       if (ev.type === 'step1') {
         markProgressStepDone(1);
-        setProgress(30);
         const stepCount = (ev.ingredients || []).length;
-        addStatusLine(currentScanHasPhoto ? `Found ${stepCount} ingredients` : 'Getting the full ingredient list');
         if (currentScanHasPhoto) triggerFridgeDots(stepCount);
         const hasIngredients = (ev.ingredients || []).length > 0;
         const isPhotoScan = ev.source !== 'recipe';
@@ -2555,7 +3497,7 @@
           const chips = ev.ingredients
             .filter(i => i.name && i.name.trim() !== '')
             .map((i, idx) =>
-            `<div class="chip ${confClass(i.confidence)} [animation-delay:${idx * 30}ms]">
+            `<div class="chip ${confClass(i.confidence)} [animation-delay:${idx * 80}ms]">
               <div class="chip-dot"></div>
               ${escapeHtml(i.name)}
               <span class="chip-pct">${i.confidence}%</span>
@@ -2563,15 +3505,49 @@
           ).join('');
           document.getElementById('ingredientChips').innerHTML = chips;
         }
+        fridgeSection.classList.add('section-reveal');
+        // Skeletons for what's still to come — real content replaces each
+        // one wholesale as its own SSE event arrives (step2 for the
+        // checklist, awaiting_user_choice for the order buttons).
+        renderChecklistSkeleton();
+        renderChoiceSkeleton();
+        // Both paths below eventually call revealResultsContent(), which
+        // stages these three back in — start them invisible so there's
+        // something to animate from.
+        ['recipeDishHeaderSection', 'recipeChecklistSection', 'choiceCard'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; }
+        });
         resultsEl.classList.add('show');
         try { lucide.createIcons(); } catch {}
+        // Loading screen's job ends here — the page takes over and builds
+        // up live from this point on, instead of staying on a loading
+        // screen until 'complete'. A photo scan pops the detected
+        // ingredients in over the user's own photo first, then morphs the
+        // photo into a results-page thumbnail (transitionToResults());
+        // everything else (recipe mode, no photo) reveals immediately.
+        if (photoScanScreenShown) {
+          showDetectionChips(ev.ingredients);
+        } else {
+          hideLoadingOverlay();
+          revealResultsSection();
+          revealResultsContent();
+        }
+        return;
+      }
+
+      if (ev.type === 'step2_partial') {
+        step2PartialRawText += ev.text;
+        const names = extractStreamedIngredientNames(step2PartialRawText);
+        const newNames = names.slice(streamedIngredientNames.length);
+        if (!newNames.length) return;
+        streamedIngredientNames = streamedIngredientNames.concat(newNames);
+        renderStreamingIngredientRows(newNames);
         return;
       }
 
       if (ev.type === 'step2') {
         markProgressStepDone(3);
-        setProgress(70);
-        addStatusLine(currentScanHasPhoto ? `Checking what you need for ${currentScanDish}` : 'Checking your kitchen staples');
         setStep(2, 'done', ev.recommended_meal ? `Recommend: ${ev.recommended_meal}` : 'Done');
 
         const cards = ev.suggestions.map(s => {
@@ -2588,41 +3564,39 @@
             </div>
           </div>`;
         }).join('');
+        const mealSuggestionsSection = document.getElementById('mealSuggestionsSection');
         document.getElementById('mealCards').innerHTML = cards;
-        document.getElementById('mealSuggestionsSection').classList.toggle('hidden', ev.suggestions.length <= 1);
+        mealSuggestionsSection.classList.toggle('hidden', ev.suggestions.length <= 1);
+        if (ev.suggestions.length > 1) mealSuggestionsSection.classList.add('section-reveal');
+        // Replaces the streaming preview card (partial rows + placeholder,
+        // if any) with the final confirmed checklist — same container,
+        // so nothing flashes or disappears, it just becomes authoritative.
         renderRecipeChecklist(ev);
+        updateStickySummaryBar();
         try { lucide.createIcons(); } catch {}
-
-        if (ev.recommended_meal) {
-          fetch(`/api/youtube?dish=${encodeURIComponent(ev.recommended_meal)}`)
-            .then(r => r.json())
-            .then(data => renderYouTubeEmbed(data))
-            .catch(() => renderYouTubeEmbed(null));
-        }
         return;
       }
 
       if (ev.type === 'awaiting_user_choice') {
         markProgressStepDone(4);
-        setProgress(90);
-        addStatusLine('Figuring out what to order');
         currentMealName = ev.recommended_meal || '';
         currentMissingIngredients = ev.missing_ingredients || [];
         setStep(3, '', 'Waiting for your choice');
         renderChoiceCard(ev);
         resultsEl.classList.add('show');
+        revealRecipeStepsAndVideo(ev.recommended_meal);
         return;
       }
 
       if (ev.type === 'complete') {
         markProgressStepDone(5);
-        setProgress(100);
-        addStatusLine('Done');
         hideScanning();
-        setTimeout(() => {
-          hideLoadingOverlay();
-          revealResultsSection();
-        }, 500);
+        // Safety net — step1 already hid the loading screen and revealed
+        // results, and step2/awaiting_user_choice already replaced their
+        // skeletons wholesale. These calls are idempotent and just cover
+        // any path where an earlier event was skipped.
+        hideLoadingOverlay();
+        revealResultsSection();
         return;
       }
 
@@ -2646,7 +3620,9 @@
             </div>`
         ).join('');
 
-        document.getElementById('topUpSection').innerHTML =
+        const topUpSection = document.getElementById('topUpSection');
+        topUpSection.classList.add('section-reveal');
+        topUpSection.innerHTML =
           `<button type="button" class="section-label topup-header-row topup-toggle" onclick="toggleTopUpSection()">
             <i data-lucide="sparkles"></i> Top up your meal <span class="spacer"></span><span class="topup-powered">instamart</span>
             <i data-lucide="chevron-down" class="ml-2 ${topUpSectionExpanded ? 'rotated' : ''}" id="topupCaret"></i>
@@ -2809,7 +3785,7 @@
                 ${items.map(item => `
                     <div class="cart-item-row">
                         <div class="cart-item-icon ${item.category}">
-                            ${getCategoryEmoji(item.category)}
+                            <i data-lucide="${getCategoryIcon(item.category)}"></i>
                         </div>
                         <div class="cart-item-info">
                             <div class="cart-item-name">
@@ -2859,7 +3835,7 @@
                     <div class="cart-item-row"
                          id="cart-item-${escapeHtml(item.id)}">
                         <div class="cart-item-icon ${item.category}">
-                            ${getCategoryEmoji(item.category)}
+                            <i data-lucide="${getCategoryIcon(item.category)}"></i>
                         </div>
                         <div class="cart-item-info">
                             <div class="cart-item-name">
@@ -2992,12 +3968,12 @@
       document.getElementById('smartCartModal').style.display = 'none';
     }
 
-    function getCategoryEmoji(category) {
+    function getCategoryIcon(category) {
       const map = {
-        food: '🥗', bathroom: '🚿',
-        cosmetics: '✨', household: '🏠'
+        food: 'utensils', bathroom: 'shower-head',
+        cosmetics: 'sparkles', household: 'home'
       };
-      return map[category] || '📦';
+      return map[category] || 'package';
     }
 
     // Initial render

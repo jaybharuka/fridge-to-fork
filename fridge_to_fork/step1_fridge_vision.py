@@ -70,26 +70,45 @@ def _fallback_fridge_contents() -> FridgeContents:
 # ---------------------------------------------------------------------------
 
 _PROMPT = """\
-You are a culinary assistant with expert knowledge of ingredients and food.
-Examine this fridge / pantry image carefully — check every shelf, drawer, and door pocket.
+You are a precise kitchen inventory scanner. Your job is to identify every food item visible in this fridge photo as accurately as possible.
 
-Return ONLY a JSON object in this exact shape (no markdown, no prose):
-{
-  "ingredients": [
-    {
-      "name": "<ingredient name, lowercase>",
-      "quantity": "<rough amount: e.g. '3 eggs', 'half a block', 'plenty', '1 bottle'>",
-      "confidence": <float 0.0-1.0, how certain you are this item is present>
-    }
-  ],
-  "raw_description": "<one short paragraph describing overall fridge contents>"
-}
+Scan the fridge methodically — shelf by shelf, top to bottom, then door compartments left to right. Do not rush. Do not guess.
 
-Rules:
-- Include items even if partially obscured (lower the confidence score).
-- Omit condiments unless clearly identifiable (ketchup, mustard, etc. are ok).
-- Use the ingredient's generic name, not the brand name.
-- Do NOT include packaging materials, non-food items, or containers with unidentifiable contents.
+For each item you identify, follow these rules:
+
+WHAT TO IDENTIFY:
+- Every individual food ingredient you can see, even partially
+- Items inside clear containers, bags, or wrapped packaging — describe what's inside, not the container
+- Produce, dairy, meat, condiments, sauces, drinks, leftovers in identifiable containers
+- Items on shelves, in drawers, on the door, and in the freezer compartment if visible
+
+WHAT TO IGNORE:
+- Water bottles and plain drinking water
+- Non-food items (cleaning products, medicines)
+- Items you genuinely cannot identify — do not guess vague categories like "unknown item"
+- Duplicate entries — if you see 3 eggs in a carton, report "eggs" once, not three times
+
+HOW TO REPORT CONFIDENCE:
+Rate each item's confidence from 0 to 100:
+- 90-100: clearly visible, no doubt
+- 70-89: visible but partially obscured or packaged
+- 50-69: partially visible, reasonable inference
+- Below 50: do not include — skip items you are not reasonably sure about
+
+BE SPECIFIC:
+- Say "cherry tomatoes" not "tomatoes" if you can tell
+- Say "Greek yogurt" not "yogurt" if the container is identifiable
+- Say "chicken breast" not "meat" if the cut is visible
+- Say "cheddar cheese" not "cheese" if the packaging shows it
+
+Return a JSON array only. No explanation. No preamble. Format:
+[
+  {"name": "eggs", "confidence": 95},
+  {"name": "cherry tomatoes", "confidence": 88},
+  {"name": "Greek yogurt", "confidence": 72}
+]
+
+If you cannot identify any food items, return an empty array: []
 """
 
 
@@ -142,6 +161,12 @@ def _call_vision_model_with_retry(
             response = client.models.generate_content(
                 model=model,
                 contents=[image_part, _PROMPT],
+                # A short JSON array of detected ingredients should never
+                # need more than a few hundred tokens. Capping this makes a
+                # misbehaving model (seen returning 150KB+ of truncated,
+                # unparseable text) fail fast and cheaply instead of
+                # burning a full attempt generating runaway output.
+                config=types.GenerateContentConfig(max_output_tokens=2048),
             )
 
             raw_text = response.text.strip()
@@ -153,20 +178,32 @@ def _call_vision_model_with_retry(
                     raw_text = raw_text[4:]
                 raw_text = raw_text.strip()
 
-            payload = json.loads(raw_text)
+            items = json.loads(raw_text)
+
+            # The prompt already tells the model to skip anything below 50
+            # and to just return a flat array, but enforce both in code too
+            # rather than trust the model to follow instructions perfectly.
+            items = [item for item in items if item.get("confidence", 0) >= 50]
+            items = sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
 
             ingredients = [
                 Ingredient(
                     name=item["name"],
-                    quantity=item.get("quantity"),
-                    confidence=float(item.get("confidence", 1.0)),
+                    # Prompt reports confidence on a 0-100 scale; Ingredient's
+                    # confidence field is documented (models.py) as 0.0-1.0,
+                    # so convert here — keeps this function's return format
+                    # unchanged for every downstream caller.
+                    confidence=item.get("confidence", 0) / 100.0,
                 )
-                for item in payload.get("ingredients", [])
+                for item in items
             ]
 
             return FridgeContents(
                 ingredients=ingredients,
-                raw_description=payload.get("raw_description", ""),
+                raw_description=(
+                    f"{len(ingredients)} ingredient(s) detected in your fridge."
+                    if ingredients else "No ingredients detected."
+                ),
             )
 
         except Exception as e:
