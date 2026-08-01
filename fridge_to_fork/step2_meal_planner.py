@@ -379,74 +379,87 @@ Return ONLY valid JSON (no markdown, no prose) with a single suggestion represen
 # Core planner function
 # ---------------------------------------------------------------------------
 
-def _call_text_model_with_retry(client: genai.Client, model: str, prompt: str) -> MealPlan:
+def _parse_meal_plan_payload(raw_text: str) -> MealPlan:
+    """Shared JSON-parsing tail for both the streaming and non-streaming
+    text-model calls — kept in one place so parsing logic can't drift
+    between the two call paths."""
+    raw_text = (raw_text or "").strip()
+
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("```")[1]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+
+    payload = json.loads(raw_text)
+
+    suggestions = [
+        MealSuggestion(
+            name=s["name"],
+            description=s.get("description", ""),
+            # No more have/missing classification, so this no longer
+            # reflects fridge contents — it's unused by the UI.
+            can_cook_now=True,
+            cuisine=s.get("cuisine", ""),
+            prep_time_minutes=int(s.get("prep_time_minutes", 0)),
+            # is_staple / found_in_fridge are filled in afterwards by
+            # _enrich_recipe_ingredients() — deterministic Python
+            # matching, not left to the LLM to self-report.
+            recipe_ingredients=[
+                RecipeIngredient(
+                    name=ri.get("name", ""),
+                    quantity=ri.get("quantity", ""),
+                    estimated_price_inr=int(ri.get("estimated_price_inr", 0) or 0),
+                )
+                for ri in s.get("recipe_ingredients", [])
+            ] or None,
+            cooking_steps=[step for step in s.get("cooking_steps", []) if step],
+        )
+        for s in payload.get("suggestions", [])
+    ]
+
+    decision = Decision(payload.get("decision", Decision.COOK))
+    recommended_name = payload.get("recommended_meal", "")
+    recommended = next((s for s in suggestions if s.name == recommended_name), None)
+    if recommended is None and suggestions:
+        recommended = suggestions[0]
+
+    return MealPlan(
+        suggestions=suggestions,
+        decision=decision,
+        recommended_meal=recommended,
+        reasoning=payload.get("reasoning", ""),
+    )
+
+
+def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt: str):
     """
-    Call `model` up to 3 times with exponential backoff, for transient
-    errors (503/network blips). Raises the last exception if all
-    attempts fail — the caller decides whether that means "try the next
-    model in the fallback chain" or "give up".
+    Streaming counterpart of _call_text_model_with_retry(): same retry/
+    backoff behavior and the same final JSON parsing, but yields partial
+    text chunks as they arrive from the model so the caller can forward
+    them before the full response (and therefore the parsed MealPlan) is
+    ready. Yields ("partial", chunk_text) for each streamed chunk, then
+    exactly one ("result", MealPlan) before returning. Raises the last
+    exception if all attempts fail, same as the non-streaming version.
     """
     max_retries = 3
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
         try:
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-            )
+            full_text = ""
+            for chunk in client.models.generate_content_stream(model=model, contents=prompt):
+                if chunk.text:
+                    full_text += chunk.text
+                    yield ("partial", chunk.text)
 
-            raw_text = (response.text or "").strip()
+            raw_text = full_text.strip()
 
-            # Check if response looks like an error
             if "error" in raw_text.lower() or "resource_exhausted" in raw_text.lower():
                 console.print(f"[yellow][WARNING] {model} API error detected in response[/yellow]")
                 raise RuntimeError("API returned error-like payload")
 
-            if raw_text.startswith("```"):
-                raw_text = raw_text.split("```")[1]
-                if raw_text.startswith("json"):
-                    raw_text = raw_text[4:]
-                raw_text = raw_text.strip()
-
-            payload = json.loads(raw_text)
-
-            suggestions = [
-                MealSuggestion(
-                    name=s["name"],
-                    description=s.get("description", ""),
-                    # No more have/missing classification, so this no longer
-                    # reflects fridge contents — it's unused by the UI.
-                    can_cook_now=True,
-                    cuisine=s.get("cuisine", ""),
-                    prep_time_minutes=int(s.get("prep_time_minutes", 0)),
-                    # is_staple / found_in_fridge are filled in afterwards by
-                    # _enrich_recipe_ingredients() — deterministic Python
-                    # matching, not left to the LLM to self-report.
-                    recipe_ingredients=[
-                        RecipeIngredient(
-                            name=ri.get("name", ""),
-                            quantity=ri.get("quantity", ""),
-                            estimated_price_inr=int(ri.get("estimated_price_inr", 0) or 0),
-                        )
-                        for ri in s.get("recipe_ingredients", [])
-                    ] or None,
-                    cooking_steps=[step for step in s.get("cooking_steps", []) if step],
-                )
-                for s in payload.get("suggestions", [])
-            ]
-
-            decision = Decision(payload.get("decision", Decision.COOK))
-            recommended_name = payload.get("recommended_meal", "")
-            recommended = next((s for s in suggestions if s.name == recommended_name), None)
-            if recommended is None and suggestions:
-                recommended = suggestions[0]
-
-            return MealPlan(
-                suggestions=suggestions,
-                decision=decision,
-                recommended_meal=recommended,
-                reasoning=payload.get("reasoning", ""),
-            )
+            yield ("result", _parse_meal_plan_payload(raw_text))
+            return
 
         except Exception as e:
             console.print(f"[yellow]{model} attempt {attempt} failed:[/yellow] {type(e).__name__}: {e}")
@@ -456,6 +469,67 @@ def _call_text_model_with_retry(client: genai.Client, model: str, prompt: str) -
             backoff *= 2
 
     raise RuntimeError(f"{model} failed after {max_retries} attempts")  # unreachable safeguard
+
+
+def _build_plan_prompt(fridge: FridgeContents, target_dish: Optional[str], servings: int) -> str:
+    ingredient_list = "\n".join(
+        f"- {ing.name}" + (f" ({ing.quantity})" if ing.quantity else "")
+        for ing in fridge.ingredients
+    )
+    if not ingredient_list:
+        ingredient_list = "(no ingredients detected)"
+
+    servings_half = round(servings * 0.5, 1)
+    if servings_half == int(servings_half):
+        servings_half = int(servings_half)
+
+    if target_dish:
+        return _TARGET_DISH_PROMPT.format(
+            ingredient_list=ingredient_list, target_dish=target_dish,
+            servings=servings, servings_half=servings_half,
+        )
+    return _PROMPT_TEMPLATE.format(
+        ingredient_list=ingredient_list, servings=servings, servings_half=servings_half
+    )
+
+
+def plan_meals_stream(
+    fridge: FridgeContents,
+    *,
+    target_dish: Optional[str] = None,
+    model: str | None = None,
+    client: Optional[genai.Client] = None,
+    servings: int = 2,
+):
+    """
+    Streaming counterpart of plan_meals(): same model fallback chain,
+    retry/backoff behavior, and local-fallback-on-total-failure, but
+    yields ("partial", text_chunk) as Gemini streams its response, then
+    exactly one ("result", MealPlan) once the full response has arrived
+    and been parsed. The prompt, JSON schema, and parsing logic are
+    unchanged from plan_meals() — only the delivery timing differs.
+    """
+    client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+    prompt = _build_plan_prompt(fridge, target_dish, servings)
+    chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
+
+    for chain_model in chain:
+        try:
+            for kind, payload in _call_text_model_with_retry_stream(client, chain_model, prompt):
+                if kind == "partial":
+                    yield ("partial", payload)
+                else:
+                    console.print(f"[green][OK] Meal planning succeeded with model: {chain_model}[/green]")
+                    yield ("result", _enrich_recipe_ingredients(payload, fridge))
+                    return
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
+            else:
+                console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
+
+    console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
+    yield ("result", _enrich_recipe_ingredients(_fallback_meal_plan(fridge, target_dish), fridge))
 
 
 def plan_meals(
@@ -494,45 +568,12 @@ def plan_meals(
     keeps failing after retries), moves on to the next model in the
     fallback chain before giving up and returning a local fallback plan.
     """
-    client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
-
-    # Build ingredient list for the prompt
-    ingredient_list = "\n".join(
-        f"- {ing.name}" + (f" ({ing.quantity})" if ing.quantity else "")
-        for ing in fridge.ingredients
-    )
-    if not ingredient_list:
-        ingredient_list = "(no ingredients detected)"
-
-    servings_half = round(servings * 0.5, 1)
-    if servings_half == int(servings_half):
-        servings_half = int(servings_half)
-
-    if target_dish:
-        prompt = _TARGET_DISH_PROMPT.format(
-            ingredient_list=ingredient_list, target_dish=target_dish,
-            servings=servings, servings_half=servings_half,
-        )
-    else:
-        prompt = _PROMPT_TEMPLATE.format(
-            ingredient_list=ingredient_list, servings=servings, servings_half=servings_half
-        )
-
-    chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
-
-    for chain_model in chain:
-        try:
-            result = _call_text_model_with_retry(client, chain_model, prompt)
-            console.print(f"[green][OK] Meal planning succeeded with model: {chain_model}[/green]")
-            return _enrich_recipe_ingredients(result, fridge)
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
-            else:
-                console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
-
-    console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
-    return _enrich_recipe_ingredients(_fallback_meal_plan(fridge, target_dish), fridge)
+    for kind, payload in plan_meals_stream(
+        fridge, target_dish=target_dish, model=model, client=client, servings=servings
+    ):
+        if kind == "result":
+            return payload
+    raise RuntimeError("plan_meals_stream ended without a result")  # unreachable safeguard
 
 
 # ---------------------------------------------------------------------------
