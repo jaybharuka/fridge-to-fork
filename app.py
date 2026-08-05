@@ -193,44 +193,75 @@ async def health():
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 
 
-@app.get("/api/youtube")
-async def youtube_recipe_video(dish: str):
-    api_key = os.environ.get("YOUTUBE_API_KEY")
-    if not api_key:
-        return {"videos": []}
-
+async def _youtube_search(client: httpx.AsyncClient, api_key: str, query: str) -> list[dict]:
+    """One YouTube search.php-equivalent call. Never raises — a failed/
+    malformed query just contributes zero items to the merged result."""
     params = {
         "part": "snippet",
-        "q": f"{dish} recipe",
+        "q": query,
         "type": "video",
         "videoEmbeddable": "true",
-        "relevanceLanguage": "en",
         "videoDuration": "medium",
         "maxResults": 4,
         "key": api_key,
     }
-    t_youtube = time.time()
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(YOUTUBE_SEARCH_URL, params=params, timeout=10)
-            resp.raise_for_status()
-            items = resp.json().get("items", [])
+        resp = await client.get(YOUTUBE_SEARCH_URL, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json().get("items", [])
     except (httpx.HTTPError, ValueError):
-        print(f"[TIMING] youtube_api_call (failed): {time.time() - t_youtube:.2f}s")
-        return {"videos": []}
-    print(f"[TIMING] youtube_api_call: {time.time() - t_youtube:.2f}s")
+        return []
 
-    videos = [
-        {
-            "videoId": item["id"]["videoId"],
-            "title": item["snippet"]["title"],
-            "channel": item["snippet"]["channelTitle"],
-            "thumbnail": item["snippet"]["thumbnails"]["medium"]["url"],
-        }
-        for item in items
-        if item.get("id", {}).get("videoId")
+
+@app.get("/api/youtube")
+async def youtube_recipe_video(dish: str):
+    api_key = os.environ.get("YOUTUBE_API_KEY")
+    if not api_key:
+        return {"videos": [], "first_thumbnail": ""}
+
+    # Four searches in parallel — a single English-biased query (the old
+    # behavior) regularly misses regional recipe channels entirely for
+    # dishes that are mostly cooked/filmed in Hindi or another Indian
+    # language. Order matters for the merge below: results are kept in
+    # this same query order (general first, since it's usually the best
+    # single match), and within each query in YouTube's own relevance order.
+    queries = [
+        f"{dish} recipe",
+        f"{dish} recipe Hindi",
+        f"{dish} recipe in English",
+        f"{dish} recipe Marathi OR Kannada OR Telugu",
     ]
-    return {"videos": videos}
+    t_youtube = time.time()
+    async with httpx.AsyncClient() as client:
+        results = await asyncio.gather(*(_youtube_search(client, api_key, q) for q in queries))
+    print(f"[TIMING] youtube_api_call (4 parallel queries): {time.time() - t_youtube:.2f}s")
+
+    videos = []
+    seen_ids = set()
+    for items in results:
+        for item in items:
+            video_id = item.get("id", {}).get("videoId")
+            if not video_id or video_id in seen_ids:
+                continue
+            seen_ids.add(video_id)
+            videos.append({
+                "id": video_id,
+                "title": item["snippet"]["title"],
+                "channel": item["snippet"]["channelTitle"],
+                # "medium" is guaranteed to exist for every YouTube video,
+                # unlike e.g. maxresdefault which frequently 404s.
+                "thumbnail": item["snippet"]["thumbnails"]["medium"]["url"],
+                "embed_url": f"https://www.youtube.com/embed/{video_id}?rel=0&modestbranding=1&color=white",
+            })
+            if len(videos) == 4:
+                break
+        if len(videos) == 4:
+            break
+
+    return {
+        "videos": videos,
+        "first_thumbnail": videos[0]["thumbnail"] if videos else "",
+    }
 
 
 @app.get("/api/dish-suggestions")
@@ -260,36 +291,77 @@ async def dish_suggestions(q: str):
         return {"suggestions": []}
 
 
-@app.get("/api/ingredient-image")
-async def ingredient_image(name: str):
-    api_key = os.getenv("GOOGLE_SEARCH_API_KEY")
-    cx = os.getenv("GOOGLE_SEARCH_CX")
+UNSPLASH_SEARCH_URL = "https://api.unsplash.com/search/photos"
 
-    if not api_key or not cx:
-        return {"imageUrl": None}
 
+@app.get("/api/dish-image")
+async def get_dish_image(dish: str):
+    """Best-effort dish hero image via the real Unsplash Search API
+    (Unsplash Source, the old redirect-based endpoint, was discontinued in
+    2023 and always 503s now). Never raises — a missing key, no results,
+    or a network/parse failure all just return found=False so the
+    frontend keeps its placeholder."""
+    unsplash_key = os.environ.get("UNSPLASH_ACCESS_KEY", "")
+    if not unsplash_key:
+        return {"image_url": "", "found": False}
+
+    t_dish_image = time.time()
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(
-                "https://www.googleapis.com/customsearch/v1",
+            resp = await client.get(
+                UNSPLASH_SEARCH_URL,
                 params={
-                    "key": api_key,
-                    "cx": cx,
-                    "q": f"{name} ingredient food",
-                    "searchType": "image",
-                    "num": 1,
-                    "imgSize": "MEDIUM",
-                    "safe": "active"
-                }
+                    "query": f"{dish} food recipe",
+                    "per_page": 1,
+                    "orientation": "landscape",
+                },
+                headers={"Authorization": f"Client-ID {unsplash_key}"},
             )
-            data = response.json()
-            items = data.get("items", [])
-            if items:
-                return {"imageUrl": items[0]["link"]}
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+            if results:
+                image_url = results[0]["urls"]["regular"]
+                print(f"[TIMING] dish_image_call: {time.time() - t_dish_image:.2f}s")
+                return {"image_url": image_url, "found": True}
     except Exception:
         pass
+    print(f"[TIMING] dish_image_call (not found): {time.time() - t_dish_image:.2f}s")
+    return {"image_url": "", "found": False}
 
-    return {"imageUrl": None}
+
+@app.get("/api/ingredient-image")
+async def get_ingredient_image(name: str):
+    """Best-effort Top Up product image via the same Unsplash key as
+    /api/dish-image (replaces the old Google Custom Search-backed
+    version). Never raises — a missing key, no results, or a
+    network/parse failure all just return found=False so the frontend
+    keeps its emoji fallback."""
+    unsplash_key = os.environ.get("UNSPLASH_ACCESS_KEY", "")
+    if not unsplash_key:
+        return {"image_url": "", "found": False}
+
+    t_ingredient_image = time.time()
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(
+                UNSPLASH_SEARCH_URL,
+                params={
+                    "query": f"{name} ingredient food",
+                    "per_page": 1,
+                    "orientation": "squarish",
+                },
+                headers={"Authorization": f"Client-ID {unsplash_key}"},
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+            if results:
+                image_url = results[0]["urls"]["small"]
+                print(f"[TIMING] ingredient_image_call: {time.time() - t_ingredient_image:.2f}s")
+                return {"image_url": image_url, "found": True}
+    except Exception:
+        pass
+    print(f"[TIMING] ingredient_image_call (not found): {time.time() - t_ingredient_image:.2f}s")
+    return {"image_url": "", "found": False}
 
 
 # ---------------------------------------------------------------------------
@@ -474,19 +546,27 @@ async def auth_logout(request: Request):
 async def scan(
     request: Request,
     file: UploadFile | None = File(None),
+    fridge_photo_0: UploadFile | None = File(None),
+    fridge_photo_1: UploadFile | None = File(None),
+    fridge_photo_2: UploadFile | None = File(None),
     target_dish: str | None = Form(None),
     mode: str | None = Form(None),
     servings: int = Form(2),
 ):
     scan_mode = mode
     t_upload = time.time()
-    img_bytes = await file.read() if file is not None else b""
-    suffix = Path(file.filename or "image.jpg").suffix or ".jpg" if file is not None else ".jpg"
+    # `file` is the legacy single-photo field (kept for backwards
+    # compatibility); the multi-photo upload area sends up to 3 as
+    # fridge_photo_0/1/2. Whichever arrived, end up with one ordered list —
+    # identify_ingredients() always gets a plain list of paths.
+    photo_uploads = [f for f in [file, fridge_photo_0, fridge_photo_1, fridge_photo_2] if f is not None][:3]
+    photo_bytes = [await f.read() for f in photo_uploads]
+    photo_suffixes = [Path(f.filename or "image.jpg").suffix or ".jpg" for f in photo_uploads]
     print(f"[TIMING] image_upload_handling: {time.time() - t_upload:.2f}s")
 
     async def stream():
         t_total = time.time()
-        tmp_path = None
+        tmp_paths: list[str] = []
         fridge = None
         top_up_task = None
         try:
@@ -506,15 +586,24 @@ async def scan(
                     "source": "recipe",
                 })
             else:
-                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-                    tmp.write(img_bytes)
-                    tmp_path = tmp.name
+                for content, suffix in zip(photo_bytes, photo_suffixes):
+                    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                        tmp.write(content)
+                        tmp_paths.append(tmp.name)
 
-                # ── Step 1: Vision ──────────────────────────────────────────
+                # ── Step 1: Vision — all photos analysed in one Gemini call ──
                 yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
                 t_vision = time.time()
+                vision_timed_out = False
                 try:
-                    fridge = await asyncio.to_thread(identify_ingredients, tmp_path)
+                    fridge = await asyncio.wait_for(
+                        asyncio.to_thread(identify_ingredients, tmp_paths, target_dish or ""),
+                        timeout=60.0,  # hard limit — a hung Gemini call must not hang the whole scan
+                    )
+                except asyncio.TimeoutError:
+                    print(f"[STEP1 TIMEOUT] identify_ingredients exceeded 60s ({time.time() - t_vision:.2f}s), continuing with empty fridge")
+                    vision_timed_out = True
+                    fridge = FridgeContents(ingredients=[])
                 except Exception as e:
                     import traceback
                     print(f"[STEP1 ERROR] identify_ingredients failed: {e}")
@@ -532,6 +621,7 @@ async def scan(
                         }
                         for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)
                     ],
+                    **({"timed_out": True} if vision_timed_out else {}),
                 })
 
             # ── Step 2: Meal planning ───────────────────────────────────────
@@ -610,6 +700,7 @@ async def scan(
                         "estimated_price_inr": ri.estimated_price_inr,
                         "found_in_fridge": ri.found_in_fridge,
                         "is_staple": ri.is_staple,
+                        "category": ri.category,
                     }
                     for ri in (
                         plan.recommended_meal.recipe_ingredients
@@ -624,6 +715,7 @@ async def scan(
                     and getattr(plan.recommended_meal, "cooking_steps", None)
                     else []
                 ),
+                "matched_fridge_items": plan.matched_fridge_items or [],
             })
 
             # ── Step 3: let the user choose — no AI recommendation ──────────
@@ -710,6 +802,7 @@ async def scan(
                         and getattr(plan.recommended_meal, "cooking_steps", None)
                         else []
                     ),
+                    "matched_fridge_items": plan.matched_fridge_items or [],
                 })
                 yield _sse({
                     "type": "awaiting_user_choice",
@@ -738,7 +831,7 @@ async def scan(
             else:
                 yield _sse({"type": "error", "message": "Unable to complete analysis."})
         finally:
-            if tmp_path:
+            for tmp_path in tmp_paths:
                 try:
                     os.unlink(tmp_path)
                 except OSError:

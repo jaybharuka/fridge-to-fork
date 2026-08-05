@@ -32,12 +32,18 @@ console = Console()
 
 
 # ---------------------------------------------------------------------------
-# Fridge / staple matching — deterministic, Python-side (not left to the LLM
-# to self-report, since that proved unreliable in practice)
+# Fridge / staple matching — the have/missing/staple *decision* is
+# deterministic, Python-side (not left to the LLM to self-report, since
+# that proved unreliable in practice). What counts as a "staple" is no
+# longer a hardcoded list, though: Gemini classifies each recipe
+# ingredient's category (staple/specialty/perishable) per-dish as part of
+# the meal-planning response (see RecipeIngredient.category, _RECIPE_RULES
+# below) — a fixed India-wide staples list can't know that a north Indian
+# recipe assumes ghee but a niche regional one doesn't. _STAPLES now only
+# backstops _safe_category() when Gemini's category field is missing or
+# invalid.
 # ---------------------------------------------------------------------------
 
-# Assumed available regardless of what's in the fridge photo (or when
-# there's no photo at all) — a normal Indian kitchen has these.
 _STAPLES = [
     "salt", "oil", "ghee", "butter", "water", "flour", "sugar",
     "cumin seeds", "mustard seeds", "turmeric", "red chilli powder",
@@ -97,15 +103,136 @@ def _fuzzy_ingredient_match(recipe_name: str, candidate_names: list[str]) -> boo
     return False
 
 
-def _is_pantry_staple(recipe_name: str) -> bool:
-    return _fuzzy_ingredient_match(recipe_name, _STAPLES)
+# Never stored in a fridge (dry goods / spice jars) — always "staple",
+# skip the fridge scan entirely regardless of what Gemini's own category
+# field says for them.
+_PANTRY_ONLY_STAPLES = {
+    'salt', 'water', 'oil', 'sugar', 'atta', 'maida', 'flour',
+    'turmeric powder', 'turmeric', 'haldi',
+    'cumin powder', 'jeera powder',
+    'coriander powder', 'dhania powder',
+    'red chilli powder', 'lal mirch powder',
+    'garam masala', 'black pepper', 'pepper powder',
+    'mustard seeds', 'rai',
+    'asafoetida', 'hing',
+    'carom seeds', 'ajwain',
+    'fennel seeds', 'saunf',
+    'bay leaf', 'tej patta',
+    'cardamom', 'elaichi',
+    'cloves', 'laung',
+    'cinnamon', 'dalchini',
+    'star anise', 'chakra phool',
+    'dry red chilli', 'dried red chilli',
+    'ghee', 'butter',
+    'vinegar', 'baking soda', 'baking powder',
+}
+
+# Commonly kept in an Indian fridge, not just the pantry, and Gemini can
+# actually see these in a photo — check the fridge scan before falling
+# back to the staple assumption, so a tomato/ginger/garlic Gemini *did*
+# spot shows as "in fridge" instead of being silently assumed like salt.
+# ("curry leaves" is deliberately NOT in _PANTRY_ONLY_STAPLES above — it
+# belongs only here, since it's exactly the kind of fresh item that should
+# get a fridge-scan check rather than being assumed sight-unseen.)
+_FRIDGE_STAPLES = {
+    'tomato', 'tomatoes',
+    'onion', 'onions', 'pyaz',
+    'garlic', 'lahsun',
+    'ginger', 'adrak',
+    'green chilli', 'green chillies', 'hari mirch',
+    'lemon', 'lime', 'nimbu',
+    'coriander leaves', 'fresh coriander', 'cilantro', 'dhania',
+    'mint leaves', 'pudina',
+    'curry leaves',
+}
+
+# Ground/dry spices and pantry basics that vision detection is unreliable
+# for (a jar is rarely readable well enough to confirm exactly which spice
+# it holds). Built from _PANTRY_ONLY_STAPLES specifically — NOT the old
+# flat _STAPLES list, which mixed those in with fresh items (tomatoes,
+# onions, garlic, ginger) that are now _FRIDGE_STAPLES and are explicitly
+# supposed to be checked against the fridge scan. Blocking those here
+# would silently undo that check.
+_VISION_BLOCKED_TERMS = list(_PANTRY_ONLY_STAPLES) + [
+    "mace", "nutmeg", "kasuri methi", "dried fenugreek", "fenugreek seeds",
+]
+
+
+def _is_vision_blocked(name: str) -> bool:
+    return _fuzzy_ingredient_match(name, _VISION_BLOCKED_TERMS)
+
+
+VALID_CATEGORIES = {"staple", "specialty", "perishable"}
+
+
+def _safe_category(category: str, ingredient_name: str) -> str:
+    """Validate Gemini's per-ingredient category, falling back to a
+    keyword guess against _STAPLES (never "have"-by-default beyond that —
+    an unrecognized/missing category defaults to "specialty", not
+    "staple", so an unclassified ingredient still has to clear the fridge
+    match to count as available)."""
+    if category in VALID_CATEGORIES:
+        return category
+    lower = ingredient_name.lower()
+    if any(s in lower for s in _STAPLES):
+        return "staple"
+    return "specialty"
+
+
+def _classify_ingredient_status(name: str, category: str, fridge_items: list[str]) -> str:
+    """
+    Returns 'staple', 'have', or 'missing' for one recipe ingredient.
+    'staple'  -> pre-checked in the UI, user can uncheck to add to the order
+    'have'    -> detected in the fridge scan, pre-checked, not orderable by default
+    'missing' -> not found, unchecked, orderable
+
+    Three tiers, checked in order:
+    1. _PANTRY_ONLY_STAPLES — never in a fridge photo (salt, spice powders),
+       so there's nothing to check; always "staple".
+    2. _FRIDGE_STAPLES — commonly kept in the fridge, not just assumed:
+       tomato/onion/ginger/garlic/etc. Gemini vision can genuinely see
+       these, so the fridge scan gets first say — only falls back to the
+       staple assumption if the scan didn't detect it. This intentionally
+       overrides whatever Gemini's own `category` field said for these
+       specific ingredients (it's told to call them "staple" too, per
+       _RECIPE_RULES — that's fine, since the fridge-scan result here
+       takes priority over that guess regardless).
+    3. Everything else — Gemini's per-dish category call is trusted,
+       falling through to the same fridge-scan check for
+       specialty/perishable ingredients.
+    """
+    name_lower = name.lower().strip()
+    name_words = set(name_lower.split())
+
+    is_pantry_staple = any(
+        set(s.split()).issubset(name_words) for s in _PANTRY_ONLY_STAPLES
+    )
+    if is_pantry_staple:
+        return "staple"
+
+    is_fridge_staple = any(
+        set(s.split()).issubset(name_words) for s in _FRIDGE_STAPLES
+    )
+    if is_fridge_staple:
+        if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, fridge_items):
+            return "have"
+        return "staple"
+
+    if category == "staple":
+        return "staple"
+    if _is_vision_blocked(name):
+        return "missing"
+    if _fuzzy_ingredient_match(name, fridge_items):
+        return "have"
+    return "missing"
 
 
 def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPlan:
     """
-    Deterministically (not via LLM self-report) fill in is_staple and
-    found_in_fridge on every recipe ingredient, then derive the
-    recommended meal's missing_ingredients (name + total price) from
+    Deterministically (not via LLM self-report on have/missing — Gemini
+    only supplies each ingredient's category, see _RECIPE_RULES) fill in
+    is_staple and found_in_fridge on every recipe ingredient, then derive
+    the recommended meal's missing_ingredients (name + total price) from
     whatever's left unchecked — neither a staple nor detected in the
     fridge photo. No cook/order_groceries/order_dish decision is made
     here; the user picks for themselves between ordering the missing
@@ -117,8 +244,9 @@ def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPl
         if not suggestion.recipe_ingredients:
             continue
         for ri in suggestion.recipe_ingredients:
-            ri.is_staple = _is_pantry_staple(ri.name)
-            ri.found_in_fridge = _fuzzy_ingredient_match(ri.name, fridge_names)
+            status = _classify_ingredient_status(ri.name, ri.category, fridge_names)
+            ri.is_staple = status == "staple"
+            ri.found_in_fridge = status == "have"
 
     if plan.recommended_meal and plan.recommended_meal.recipe_ingredients:
         missing = [
@@ -127,6 +255,25 @@ def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPl
         ]
         plan.recommended_meal.missing_ingredients = [ri.name for ri in missing]
         plan.recommended_meal.total_order_price_inr = sum(ri.estimated_price_inr for ri in missing)
+
+        # Which scanned fridge items (exact detected names) this specific
+        # recipe actually uses — same deterministic fuzzy matcher as
+        # found_in_fridge above, just from the fridge's side rather than
+        # the recipe's, so the fridge chips UI can show relevant items
+        # first. Staples are excluded — they're assumed available, so
+        # they shouldn't appear as "detected in fridge" chips either.
+        # Filters on the computed ri.is_staple (set just above), not the
+        # raw ri.category — a _FRIDGE_STAPLES ingredient (tomato, ginger,
+        # ...) can resolve to "have" despite Gemini tagging its category
+        # "staple", and that one should still show up as a matched chip.
+        non_staple_recipe_names = [
+            ri.name for ri in plan.recommended_meal.recipe_ingredients
+            if not ri.is_staple
+        ]
+        plan.matched_fridge_items = [
+            name for name in fridge_names
+            if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, non_staple_recipe_names)
+        ]
 
     return plan
 
@@ -264,10 +411,25 @@ def _fallback_meal_plan(
 
 _RECIPE_RULES = """\
 RECIPE INGREDIENTS — for the suggested dish, return every single
-ingredient needed to cook it — do not classify ingredients as staples,
-garnishes, "have", or "missing", and do not compare against the fridge
-contents. Just list everything the recipe requires; a separate process
-(not you) will determine what the user already has.
+ingredient needed to cook it. Do not decide "have" vs "missing" and do not
+compare against the fridge contents — a separate process (not you)
+determines that from the category you assign below plus the fridge scan.
+
+INGREDIENT CATEGORY — classify each ingredient into exactly one of:
+- "staple": something virtually every Indian household always has on
+  hand (salt, oil, water, ghee, butter, sugar, common ground/whole
+  spices, basic aromatics like onion/garlic/ginger/green chilli). Be
+  generous here — these get pre-checked for the user, who can still
+  uncheck ones they're personally out of.
+- "specialty": ingredients specific to this dish that cannot be assumed
+  present (e.g. kasuri methi, a particular dal, paneer, coconut milk,
+  tamarind, a specific flour or rice variety, saffron, jaggery).
+- "perishable": fresh ingredients that go bad quickly and must be bought
+  fresh (fresh vegetables other than onion/tomato/garlic/ginger, fresh
+  herbs, fresh meat/fish, fresh paneer, lemon/lime).
+Misclassifying a specialty or perishable ingredient as a staple means the
+user won't be reminded to buy it — only use "staple" for things that are
+genuinely always in the kitchen, regardless of this specific dish.
 
 QUANTITIES — scale every ingredient's quantity to the requested number
 of servings (see below), and include the unit in the same field, e.g.
@@ -313,7 +475,8 @@ Return ONLY valid JSON (no markdown, no prose):
         {{
           "name": "<ingredient name>",
           "quantity": "<exact amount with unit, e.g. '200ml', '2 medium'>",
-          "estimated_price_inr": <integer>
+          "estimated_price_inr": <integer>,
+          "category": "<staple|specialty|perishable>"
         }}
       ],
       "cooking_steps": ["<step 1>", "<step 2>", ...]
@@ -363,7 +526,8 @@ Return ONLY valid JSON (no markdown, no prose) with a single suggestion represen
         {{
           "name": "<ingredient name>",
           "quantity": "<exact amount with unit, e.g. '200ml', '2 medium'>",
-          "estimated_price_inr": <integer>
+          "estimated_price_inr": <integer>,
+          "category": "<staple|specialty|perishable>"
         }}
       ],
       "cooking_steps": ["<step 1>", "<step 2>", ...]
@@ -404,12 +568,14 @@ def _parse_meal_plan_payload(raw_text: str) -> MealPlan:
             prep_time_minutes=int(s.get("prep_time_minutes", 0)),
             # is_staple / found_in_fridge are filled in afterwards by
             # _enrich_recipe_ingredients() — deterministic Python
-            # matching, not left to the LLM to self-report.
+            # matching against the category below, not left to the LLM
+            # to self-report have/missing.
             recipe_ingredients=[
                 RecipeIngredient(
                     name=ri.get("name", ""),
                     quantity=ri.get("quantity", ""),
                     estimated_price_inr=int(ri.get("estimated_price_inr", 0) or 0),
+                    category=_safe_category(ri.get("category", ""), ri.get("name", "")),
                 )
                 for ri in s.get("recipe_ingredients", [])
             ] or None,
@@ -590,7 +756,7 @@ Ingredients already missing for this dish (being ordered separately —
 never suggest these here): {missing_ingredients}
 AI decision: {decision}
 
-Suggest at most 3 smart "upgrade" items that would genuinely improve
+Suggest 4 to 5 smart "upgrade" items that would genuinely improve
 this specific meal. These should be small, affordable, impulse purchases.
 
 RULES:
@@ -613,7 +779,7 @@ RULES:
 - Price should be realistic for Indian market (₹30-₹200 range)
 - At least one suggestion should be under ₹60 (low friction)
 
-Return ONLY a valid JSON array with at most 3 objects:
+Return ONLY a valid JSON array with 4 to 5 objects:
 [
   {{
     "name": "Fresh Strawberries",
@@ -663,7 +829,7 @@ def _parse_top_up_response(raw_text: str) -> list[dict]:
             "source": source,
             "emoji": item.get("emoji", "✨"),
         })
-    return suggestions[:3]
+    return suggestions[:5]
 
 
 def generate_top_up_suggestions(
@@ -710,7 +876,7 @@ def generate_top_up_suggestions(
             print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
             if suggestions:
                 console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model}[/green]")
-                return suggestions[:3]
+                return suggestions[:5]
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                 console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model for top-up...[/yellow]")
