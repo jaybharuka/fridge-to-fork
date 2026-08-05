@@ -31,6 +31,9 @@ class RecipeIngredient:
     estimated_price_inr: int = 0
     found_in_fridge: bool = False     # fuzzy-matched against a scanned fridge photo
     is_staple: bool = False           # assumed available regardless of fridge photo
+    # AI-classified by Gemini per-ingredient (see step2_meal_planner._safe_category):
+    # "staple" | "specialty" | "perishable". Drives is_staple/found_in_fridge above.
+    category: str = "specialty"
 
 
 @dataclass
@@ -52,6 +55,11 @@ class MealPlan:
     decision: Decision = Decision.COOK
     recommended_meal: Optional[MealSuggestion] = None
     reasoning: str = ""
+    # Names of scanned fridge items (exact detected names, not recipe
+    # ingredient names) that are actually used by recommended_meal —
+    # fuzzy-matched deterministically in _enrich_recipe_ingredients(),
+    # same matcher as found_in_fridge, not self-reported by the LLM.
+    matched_fridge_items: list[str] = field(default_factory=list)
 
 
 @dataclass

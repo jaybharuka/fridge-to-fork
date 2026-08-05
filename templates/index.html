@@ -225,7 +225,7 @@
     .dish-input {
       width:100%; padding:16px 20px; font-size:16px; font-family:inherit; font-weight:500;
       border-radius:14px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05);
-      color:rgba(255,255,255,0.9); outline:none; margin-top:32px;
+      color:rgba(255,255,255,0.9); outline:none;
       transition:border-color 0.2s ease, background 0.2s ease;
     }
     .dish-input:focus { border-color:rgba(252,128,25,0.5); background:rgba(255,255,255,0.07); outline:none; }
@@ -276,37 +276,24 @@
     [data-theme="light"] .popular-dish-tag { color:rgba(0,0,0,0.4); }
 
     /* Servings selector */
-    .servings-section { margin:14px 0 4px; }
+    .servings-section { margin:20px 0 20px; }
     .servings-pills {
       display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
     }
     .servings-pills::-webkit-scrollbar { display:none; }
     .servings-pill {
-      flex-shrink:0; width:44px; height:44px; padding:0; border-radius:50%;
+      /* 36px (not 44) so all 8 fit inside a typical 375-430px phone
+         viewport without clipping the last one at the edge — overflow-x:auto
+         above stays as a graceful fallback for genuinely narrow screens. */
+      flex-shrink:0; width:36px; height:36px; padding:0; border-radius:50%;
       display:flex; align-items:center; justify-content:center;
       border:1px solid var(--grey-200); background:transparent; color:var(--swiggy-text-2);
-      font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;
+      font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;
       transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
     .servings-pill:hover { background:var(--bg-secondary); border-color:var(--text-secondary); color:var(--text-primary); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
     .servings-pill:active { transform:translateY(0) scale(.98); }
     .servings-pill.active { background:var(--swiggy-orange); border-color:var(--swiggy-orange); color:#fff; }
-
-    /* Shared pill-style buttons, reused by the inline recipe fridge scan area */
-    .pill-btn {
-      flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; height:48px; padding:0 18px;
-      font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; background:transparent;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
-      pointer-events:auto;
-    }
-    .pill-btn i { font-size:16px; }
-    .pill-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-    .pill-btn:active { transform:translateY(0) scale(.98); }
-    .pill-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
-    .pill-btn-primary { border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); }
-    .pill-btn-primary:hover { background:var(--swiggy-hover-overlay); }
-    .pill-btn-secondary { border:1px solid var(--swiggy-border); color:var(--swiggy-text-2); font-weight:500; }
-    .pill-btn-secondary:hover { background:var(--swiggy-hover-overlay); }
 
     /* Get Recipe primary button */
     .analyse-btn {
@@ -336,8 +323,6 @@
     }
     .analyse-btn:disabled:not(.ready):not(.loading) { cursor:not-allowed; opacity:.45; }
 
-    /* Secondary CTA row: Scan Fridge */
-    .cta-secondary-row { display:flex; gap:8px; margin-top:8px; }
     .cta-secondary-btn {
       flex:1; height:52px; display:flex; align-items:center; justify-content:center; gap:8px;
       background: rgba(252, 128, 25, 0.15); color: #FC8019;
@@ -353,22 +338,61 @@
     .cta-secondary-btn i { font-size:16px; }
     .cta-secondary-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
     .cta-secondary-btn:active { transform:translateY(0) scale(.98); }
-    /* Scoped to the id, not .cta-secondary-btn — that class is shared with
-       the "Try again" buttons on the results page's error states, which
-       aren't part of this fix. The shared class's tinted-orange background
-       was reading as dark brown against this button's own surroundings;
-       transparent + a plain orange border/text reads cleanly in both
-       themes without needing separate light/dark variants. */
-    #scanFridgeBtn {
-      background: transparent;
-      border: 1.5px solid rgba(252,128,25,0.4);
+
+    /* Multi-photo fridge upload (up to 3) — a single "Scan Fridge" button
+       until the first photo lands, then thumbnails + an inline "+" (up to
+       3) take its place. */
+    #scanSectionWrapper { margin-top:12px; }
+    #photoUploadArea { display:flex; flex-direction:column; gap:12px; }
+    #photoThumbnailRow { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .add-photo-plus {
+      width: 80px;
+      height: 80px;
+      border-radius: 12px;
+      border: 1.5px dashed rgba(252,128,25,0.4);
+      background: rgba(252,128,25,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s ease, border-color 0.2s ease;
       color: #FC8019;
     }
+    .add-photo-plus:hover { background: rgba(252,128,25,0.1); border-color: rgba(252,128,25,0.6); }
+    .add-photo-plus svg { width: 24px; height: 24px; stroke-width: 1.5; }
+    .photo-thumb {
+      position:relative; width:80px; height:80px; border-radius:12px; overflow:hidden;
+      flex-shrink:0; border:1.5px solid rgba(255,255,255,0.1);
+    }
+    .photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .photo-thumb-remove {
+      position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%;
+      background:rgba(0,0,0,0.7); border:none; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; line-height:1; padding:0;
+    }
+    .photo-thumb-remove:hover { background:rgba(220,50,50,0.8); }
+    .photo-thumb-remove i { width:12px; height:12px; }
+    #addPhotoBtn {
+      display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+      padding:14px 20px; border-radius:14px; background:transparent; border:1.5px solid rgba(252,128,25,0.5);
+      color:#FC8019; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    #addPhotoBtn:hover { background:rgba(252,128,25,0.08); border-color:rgba(252,128,25,0.7); }
+    #addPhotoBtn:disabled { opacity:0.4; cursor:not-allowed; }
 
-    /* Collapsible inline fridge photo capture on the landing screen */
-    .landing-scan-area { max-height:0; overflow:hidden; transition:max-height .3s cubic-bezier(.4,0,.2,1); }
-    .landing-scan-area.show { max-height:180px; }
-    .landing-scan-inner { padding-top:12px; }
+    /* Photo strip on the photo-scan screen, shown only when more than one
+       fridge photo was uploaded — the main preview shows photo[0] large;
+       tapping a thumbnail swaps which one is shown large (switchScanPreview()). */
+    #photoScanThumbStrip { display:none; gap:8px; justify-content:center; margin-top:12px; }
+    #photoScanThumbStrip.show { display:flex; }
+    .scan-thumb {
+      width: 48px; height: 48px; border-radius: 8px; object-fit: cover;
+      border: 1.5px solid rgba(255,255,255,0.15); opacity: 0.7; cursor: pointer;
+      transition: opacity 0.15s ease, border-color 0.15s ease;
+    }
+    .scan-thumb.active { opacity: 1; border-color: #FC8019; }
 
     /* Bottom hint */
     .bottom-hint { margin-top:12px; text-align:center; font-size:11px; color:var(--hint-faint); }
@@ -389,10 +413,10 @@
       margin-bottom:32px;
     }
 
-    /* Ingredients — description paragraph removed per design (nobody
-       reads it), chips shown alone in a wrapped flex row. */
-    .desc { display:none; }
-    .chips { display:flex; flex-wrap:wrap; gap:8px; }
+    /* Ingredient chips — now only ever rendered inside #fridgeChipsInner
+       (the floating dropdown), styled the same as when they lived in the
+       page flow. */
+    .chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-start; }
     .chip {
       display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px;
       font-size:11px; font-weight:600; color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--border);
@@ -402,14 +426,44 @@
     .chip.high .chip-dot { background:var(--success); }
     .chip.mid .chip-dot { background:var(--orange); }
     .chip.low .chip-dot { background:var(--grey-400); }
-    .chip-pct { color:var(--grey-400); font-size:10px; }
-    /* Confidence-tier hierarchy — medium reads as noteworthy, low recedes */
-    .chip.mid .chip-pct { color:var(--orange); }
-    .chip.low .chip-pct { color:rgba(255,255,255,0.4); }
     .chip.low {
       border-color:rgba(255,255,255,0.08);
       background:color-mix(in srgb, var(--bg-secondary), transparent 15%);
     }
+    /* Chips for fridge items not used by the recommended recipe — same
+       chip, just muted, shown only once expanded via #otherFridgeToggle. */
+    .chip.other { opacity: 0.6; animation: none; }
+
+    /* "N other items in your fridge" collapsible toggle, shown after
+       step2 splits the chips into matched-first / everything-else. */
+    #otherFridgeItems { width: 100%; }
+    #otherFridgeToggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.55);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      width: auto;
+    }
+    #otherFridgeToggle:hover { background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.8); }
+    #otherFridgeToggle svg { width: 14px; height: 14px; stroke-width: 1.5; }
+    #otherFridgeChevron { margin-left: auto; transition: transform 0.2s ease; }
+    #otherFridgeChipsWrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    [data-theme="light"] #otherFridgeToggle {
+      background: rgba(0,0,0,0.04);
+      border-color: rgba(0,0,0,0.08);
+      color: rgba(0,0,0,0.5);
+    }
+    [data-theme="light"] #otherFridgeToggle:hover { color: rgba(0,0,0,0.75); }
 
     /* ── Progressive SSE reveal ──────────────────────────────────── */
     @keyframes sectionFadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
@@ -476,27 +530,104 @@
     @keyframes contentFadeIn { from{opacity:0;} to{opacity:1;} }
     .content-fade-in { animation:contentFadeIn .25s ease-out forwards; }
 
+    /* Unified ingredient-checklist skeleton — one block of wave-shimmer
+       rows shown until step2 resolves, then cross-faded for the real list
+       as a single unit (swapSkeletonToIngredients()) instead of trickling
+       in row-by-row. */
+    #ingredientSkeletonBlock {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .skel-row {
+      height: 56px;
+      background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.04) 0%,
+        rgba(255,255,255,0.04) 30%,
+        rgba(255,255,255,0.09) 50%,
+        rgba(255,255,255,0.04) 70%,
+        rgba(255,255,255,0.04) 100%
+      );
+      background-size: 200% 100%;
+      animation: skeletonWave 1.8s ease-in-out infinite;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .skel-row:last-child { border-bottom: none; }
+    .skel-row:nth-child(1) { animation-delay: 0s; }
+    .skel-row:nth-child(2) { animation-delay: 0.1s; }
+    .skel-row:nth-child(3) { animation-delay: 0.2s; }
+    .skel-row:nth-child(4) { animation-delay: 0.3s; }
+    .skel-row:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes skeletonWave {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    [data-theme="light"] .skel-row {
+      background: linear-gradient(
+        90deg,
+        rgba(0,0,0,0.04) 0%,
+        rgba(0,0,0,0.04) 30%,
+        rgba(0,0,0,0.08) 50%,
+        rgba(0,0,0,0.04) 70%,
+        rgba(0,0,0,0.04) 100%
+      );
+      background-size: 200% 100%;
+      animation: skeletonWave 1.8s ease-in-out infinite;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+
     /* Recipe checklist card — the hero result section */
     .recipe-checklist-card {
       padding:0; margin-bottom:32px; border-radius:0; overflow:hidden;
       background:transparent; border:none; box-shadow:none;
     }
-    .recipe-dish-header { background:var(--bg-card); padding:20px 20px 16px; display:flex; align-items:center; gap:16px; }
-    .recipe-dish-icon {
-      width:44px; height:44px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
-      background:var(--orange-light); color:var(--text-muted); font-size:28px;
-    }
-    .recipe-dish-info { flex:1; min-width:0; }
-    .recipe-dish-name { font-family:'Plus Jakarta Sans', sans-serif; font-size:16px; font-weight:600; color:var(--text); overflow-wrap:break-word; word-break:normal; }
-    .recipe-dish-meta { font-size:13px; color:var(--grey-400); margin-top:2px; }
-    .recipe-ai-spark { flex-shrink:0; color:var(--text-muted); font-size:14px; }
-
     .recipe-stats-row { padding:0; }
     .recipe-stat-line { font-size:15px; font-weight:500; color:var(--text-secondary); padding:16px 20px; }
     .recipe-stat-z { color:var(--orange); font-weight:700; }
 
     .recipe-checklist-sub { font-size:13px; font-style:italic; font-weight:400; color:var(--grey-400); padding:16px 20px; }
-    .recipe-rows { display:flex; flex-direction:column; }
+
+    /* Ingredient checklist scrolls within itself once it's long enough
+       (e.g. a 20-item Dal Makhani list) instead of pushing the choice
+       cards below it off-screen — see #recipeRowsWrap markup in
+       renderRecipeChecklistCard(). .recipe-rows-wrap is the positioning
+       context for the bottom fade; .recipe-rows itself is the actual
+       scroll container. A short list that fits within max-height never
+       triggers overflow, so no scrollbar/fade appears — nothing extra
+       needed for that case. */
+    .recipe-rows-wrap { position:relative; }
+    .recipe-rows {
+      display:flex; flex-direction:column;
+      max-height:46vh;
+      overflow-y:auto;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:thin;
+      scrollbar-color: var(--text-muted) transparent;
+    }
+    @media (min-width:481px) {
+      .recipe-rows { max-height:52vh; }
+    }
+    .recipe-rows::-webkit-scrollbar { width:6px; }
+    .recipe-rows::-webkit-scrollbar-track { background:transparent; }
+    .recipe-rows::-webkit-scrollbar-thumb { background:var(--border); border-radius:999px; }
+    .recipe-rows::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
+
+    /* "More below" affordance — toggled by updateRecipeRowsFade() (see
+       setupRecipeRowsFade()). Fades to --bg-card, matching .recipe-row's
+       own background exactly (not --bg, which is the page background
+       behind the card, not the row's) so the gradient blends seamlessly
+       instead of showing a visible seam at the card's own background. */
+    .recipe-rows-fade {
+      position:absolute; left:0; right:0; bottom:0; height:36px;
+      background:linear-gradient(to bottom, rgba(0,0,0,0), var(--bg-card));
+      pointer-events:none; opacity:0; transition:opacity .2s ease;
+    }
+    .recipe-rows-wrap.has-more-below .recipe-rows-fade { opacity:1; }
+
     .recipe-row {
       display:flex; align-items:center; gap:10px; padding:16px 20px; cursor:pointer;
       border-bottom:1px solid var(--border); background:var(--bg-card); transition:opacity .12s ease, background .1s ease;
@@ -508,6 +639,9 @@
       display:flex; align-items:center; justify-content:center; font-size:20px; transition:border-color .12s ease;
     }
     .recipe-row-checkbox i { color:var(--success); }
+    /* Staple rows still get a pre-checked circle, but muted grey rather than
+       green — it's an assumption, not something the vision scan actually saw. */
+    .recipe-row.is-staple .recipe-row-checkbox i { color:var(--text-muted); }
     .recipe-row-info { flex:1; min-width:0; }
     .recipe-row-name { font-size:15px; font-weight:500; color:var(--grey-900); overflow-wrap:break-word; word-break:normal; }
     .recipe-row-qty { font-size:13px; font-weight:400; color:var(--grey-400); margin-top:6px; overflow-wrap:break-word; word-break:normal; }
@@ -526,21 +660,14 @@
     .recipe-row-tag-staple { color:var(--text-muted); background:var(--bg-secondary); }
     .recipe-row-tag-fridge { color:#2E7D32; background:#E8F5E9; }
     [data-theme="dark"] .recipe-row-tag-fridge { color:#81C784; background:rgba(46,125,50,0.2); }
+    .recipe-row-tag-will-order { font-size:12px; font-style:italic; color:var(--text-muted); white-space:nowrap; }
 
-    .recipe-checklist-footer { padding:12px 20px 20px; background:var(--bg-card); border-top:1px solid var(--border); position:sticky; bottom:0; }
-    .recipe-order-count { font-size:13px; color:var(--grey-400); margin-bottom:10px; text-align:center; }
-    .recipe-cart-btn {
-      width:100%; height:52px; border-radius:14px; border:none; background:var(--orange); color:#fff;
-      font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
-      display:flex; align-items:center; justify-content:center; gap:8px;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
-    }
-    .recipe-cart-btn:hover { background:#E8700A; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
-    .recipe-cart-btn:active { background:#D4640A; transform:translateY(0) scale(.98); }
-    .recipe-cart-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
-    .recipe-cart-btn i { font-size:16px; }
 
-    .recipe-steps-block { border-top:1px solid var(--grey-200); }
+    /* Visually separates "How to make it" from the YouTube section above
+       it on the Recipe tab (that section has no toggle/border of its own
+       now, so this is the only divider between them). */
+    .recipe-steps-block { border-top:1px solid rgba(255,255,255,0.07); padding-top:20px; }
+    [data-theme="light"] .recipe-steps-block { border-top-color: rgba(0,0,0,0.07); }
     .recipe-steps-toggle {
       display:flex; align-items:center; gap:8px; width:100%;
       background:none; border:none; color:var(--grey-900); font-size:14px; font-weight:700;
@@ -561,69 +688,44 @@
     .recipe-steps-list li { display:flex; gap:12px; font-size:14px; line-height:1.6; color:var(--grey-900); padding:6px 8px; border-radius:8px; }
     .recipe-steps-list li:nth-child(even) { background:var(--bg-secondary); }
 
-    /* Recipe video (YouTube embed) */
-    .yt-video-toggle {
-      display:flex; align-items:center; gap:8px; width:100%;
-      background:none; border:none; border-top:1px solid var(--border); color:var(--grey-900); font-size:14px; font-weight:700;
-      cursor:pointer; font-family:inherit; padding:16px 20px;
-    }
-    .yt-video-toggle :first-child { font-size:16px; color:var(--text-muted); }
-    .yt-video-toggle :last-child { font-size:14px; color:var(--grey-400); transition:transform .2s ease; }
-    .yt-video-toggle :last-child.rotated { transform:rotate(180deg); }
-    .yt-video-content {
-      max-height:2000px; overflow:hidden;
-      transition:max-height .35s cubic-bezier(.4,0,.2,1);
-    }
-    .yt-video-content.collapsed { max-height:0; }
+    /* Recipe video (YouTube embed) — always expanded on the Recipe tab,
+       no toggle. Main player, then up to 4 scrollable thumbnails below it. */
     .yt-video-wrap { padding:0 20px 16px; }
-
     .yt-iframe-wrap {
       position: relative;
       width: 100%;
       aspect-ratio: 16/9;
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
       background: #000;
     }
-    .yt-active-info { padding: 10px 0 14px; }
-    .yt-channel { font-family:'Plus Jakarta Sans',sans-serif; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.45); margin-bottom: 6px; }
-    .yt-title { font-family:'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 500; color: var(--text-primary); line-height: 1.3; }
     .yt-thumbnails {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       overflow-x: auto;
       scrollbar-width: none;
       padding-bottom: 4px;
+      margin-top: 12px;
     }
+    .yt-thumbnails::-webkit-scrollbar { display: none; }
     .yt-thumb-card {
+      width: 130px;
       flex-shrink: 0;
-      width: 140px;
       cursor: pointer;
-      opacity: 0.75;
-      transition: opacity 0.2s ease, transform 0.2s ease;
+      transition: transform 0.15s ease;
     }
-    .yt-thumb-card:hover,
-    .yt-thumb-card.yt-thumb-active {
-      opacity: 1;
-      transform: translateY(-2px);
-    }
+    .yt-thumb-card:hover { transform: scale(1.02); }
     .yt-thumb-img-wrap {
       position: relative;
-      width: 140px;
-      height: 80px;
-      border-radius: 12px;
+      width: 100%;
+      aspect-ratio: 16/9;
+      border-radius: 8px;
       overflow: hidden;
       margin-bottom: 6px;
       background: var(--bg-secondary);
     }
-    .yt-thumb-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.2);
-    }
+    .yt-thumb-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .yt-thumb-card.yt-thumb-active .yt-thumb-img-wrap { outline: 2px solid #FC8019; outline-offset: -2px; }
     .yt-thumb-title {
       font-size: 11px;
       font-weight: 600;
@@ -635,10 +737,14 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .yt-thumb-channel { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .yt-thumb-channel {
+      font-size: 10px; font-weight: 400; color: var(--text-muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .yt-playing-badge {
-      font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-      color:#fff; background:var(--orange); padding:3px 8px; border-radius:999px;
+      position: absolute; top: 6px; left: 6px;
+      font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      color: #fff; background: #FC8019; padding: 2px 6px; border-radius: 999px;
     }
 
     .recipe-step-num {
@@ -647,7 +753,6 @@
       display:flex; align-items:center; justify-content:center;
     }
     .recipe-scan-area { padding:0 16px 14px; }
-    .recipe-scan-actions { display:flex; gap:10px; justify-content:center; padding-top:12px; }
     .recipe-scan-status {
       display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px;
       font-size:12px; color:var(--text-2); text-align:center;
@@ -716,92 +821,119 @@
     .choice-btn-primary:hover:not(:disabled) { background:#E8700A; }
     .choice-btn-primary:active:not(:disabled) { background:#D4640A; }
     .choice-btn-outline {
-      background:var(--bg-card); border:1.5px solid var(--orange); color:var(--orange);
+      background:transparent; border:1.5px solid rgba(252,128,25,0.4); color:#FC8019;
     }
     .choice-btn-outline:hover:not(:disabled) { background:var(--orange-light); }
     .choice-icon-circle { width:44px; height:44px; min-width:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:20px; }
     .choice-btn-primary .choice-icon-circle { background:var(--orange-dark); color:#fff; }
-    .choice-btn-outline .choice-icon-circle { background:var(--orange-light); color:var(--orange); }
+    .choice-btn-outline .choice-icon-circle { background:var(--orange-light); color:#FC8019; }
     .choice-text { flex:1; min-width:0; }
     .choice-btn-title { font-size:16px; font-weight:600; overflow-wrap:break-word; word-break:normal; }
     .choice-btn-primary .choice-btn-title { color:#fff; }
-    .choice-btn-outline .choice-btn-title { color:var(--orange); }
+    .choice-btn-outline .choice-btn-title { color:#FC8019; }
     .choice-btn-sub { font-size:13px; margin-top:6px; white-space:normal; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; }
     .choice-btn-primary .choice-btn-sub { color:rgba(255,255,255,.85); }
-    .choice-btn-outline .choice-btn-sub { color:var(--grey-400); }
+    .choice-btn-outline .choice-btn-sub { color:#FC8019; }
     .choice-meta { flex-shrink:0; white-space:nowrap; font-size:13px; font-weight:700; text-align:right; }
     .choice-btn-primary .choice-meta { color:#fff; }
-    .choice-btn-outline .choice-meta { color:var(--orange); }
+    .choice-btn-outline .choice-meta { color:#FC8019; }
 
-    /* Top up */
-    .topup-header-row { margin:20px 0 4px; }
-    .topup-toggle {
-      width:100%; min-height:44px; background:none; border:none; font-family:inherit; cursor:pointer;
-      text-align:left;
+    /* Order preview + Top Up upsell bottom sheet — opens when the user
+       taps "Order missing items from Instamart", before the real
+       auth/order flow (chooseAction) actually fires. Always dark,
+       independent of site theme — same reasoning as the dish hero. */
+    #orderBottomSheet {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: none;
     }
-    .topup-toggle :last-child { color:var(--text-muted); transition:transform .2s ease; }
-    .topup-toggle :last-child.rotated { transform:rotate(180deg); }
-    .topup-content { max-height:2000px; overflow:hidden; transition:max-height .35s cubic-bezier(.4,0,.2,1); }
-    .topup-content.collapsed { max-height:0; }
-    .topup-header-row .spacer { flex:1; }
-    .topup-powered { font-size:11px; color:var(--text-muted); text-transform:none; letter-spacing:0; font-weight:700; }
-    .topup-subtitle { font-size:12px; color:var(--swiggy-text-2); margin-bottom:10px; }
-    /* Instamart-style product cards: image placeholder, name, price,
-       orange Add button — scroll horizontally as a row, no visible scrollbar. */
-    .topup-scroll { display:flex; gap:14px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
-    .topup-scroll::-webkit-scrollbar { display:none; }
-    .topup-product-card {
-      flex:0 0 156px; width:156px; background:var(--bg-card); border:1px solid var(--border); border-radius:16px;
-      overflow:hidden; opacity:0; animation:fadeSlideUp .4s ease forwards;
-      cursor:pointer; transition:transform 0.2s ease, box-shadow 0.2s ease;
+    #orderSheetBackdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
-    .topup-product-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.12); }
-    .topup-product-card:active { transform:translateY(0); }
-    .topup-img-placeholder {
-      width:100%; height:100px; background:transparent;
-      display:flex; align-items:center; justify-content:center; font-size:36px;
+    #orderSheetPanel {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      background: #111111;
+      border-radius: 24px 24px 0 0;
+      padding: 8px 20px 40px 20px;
+      max-height: 85vh;
+      overflow-y: auto;
+      transform: translateX(-50%) translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Grey only while empty (loading); once an <img> or letter-avatar is
-       inserted the container goes transparent so a white-background photo
-       blends into the white card instead of showing a visible box edge. */
-    .topup-img-placeholder:empty { background:var(--grey-50); }
-    .topup-img-placeholder img { mix-blend-mode:multiply; }
-    [data-theme="dark"] .topup-img-placeholder img { mix-blend-mode:normal; }
-    .topup-body { padding:12px; }
-    .topup-name {
-      font-size:13px; font-weight:700; color:var(--grey-900); line-height:1.3; min-height:2.4em;
-      overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;
-      overflow-wrap:break-word; word-break:normal;
+    #orderSheetHandle {
+      width: 36px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.2);
+      margin: 14px auto 20px auto;
     }
-    .topup-bottom-row { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px; }
-    .topup-price { font-size:15px; font-weight:700; color:var(--orange); }
-    .topup-add-btn {
-      position:relative;
-      display:flex; align-items:center; justify-content:center; gap:3px; height:28px; padding:0 12px;
-      border-radius:999px;
-      font-size:11px; font-weight:700; background:var(--orange); color:#fff; border:none;
-      cursor:pointer; font-family:inherit; white-space:nowrap;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    #orderSheetHeader {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
     }
-    /* Invisible expanded hit area — keeps the visible pill compact (28px)
-       while still meeting the 44x44 minimum touch target. */
-    .topup-add-btn::after {
-      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-      width:max(44px, 100%); height:max(44px, 100%);
+    #orderSheetTitle { font-size: 18px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0 0 4px 0; }
+    #orderSheetSubtitle { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.4); margin: 0; }
+    #orderSheetItems { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+    .order-sheet-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85);
     }
-    .topup-add-btn:hover { background:#E8700A; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
-    .topup-add-btn:active { background:#D4640A; transform:translateY(0) scale(.98); }
-    .topup-add-btn i { font-size:12px; }
-    .topup-add-btn.added { background:var(--grey-400); cursor:default; }
+    .order-sheet-item-qty { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.35); }
+    #orderSheetTopUpLabel {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      color: rgba(255,255,255,0.35); margin: 0 0 12px 0;
+    }
+    #orderSheetTopUpCards {
+      display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px;
+      scrollbar-width: none; margin-bottom: 8px;
+    }
+    #orderSheetTopUpCards::-webkit-scrollbar { display: none; }
+    #orderSheetConfirm {
+      width: 100%; padding: 16px; background: #FC8019; color: white;
+      font-size: 16px; font-weight: 700; border: none; border-radius: 14px;
+      cursor: pointer; margin-top: 24px;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    #orderSheetConfirm:hover { background: #E8700A; }
+    #orderSheetConfirm:active { transform: scale(0.98); }
 
-    /* Secondary/cancel button, reused by the Top Up and order-preview sheets */
-    .modal-cancel-btn {
-      width:100%; height:48px; border-radius:14px; background:transparent; color:var(--swiggy-text-2);
-      border:1px solid var(--swiggy-border); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    /* Top Up cards inside the order sheet — bigger than the old main-page
+       mini cards, with a real Unsplash photo (emoji fallback underneath,
+       revealed until the photo loads). */
+    .topup-sheet-card {
+      flex-shrink: 0; width: 130px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+      overflow: hidden; cursor: pointer; transition: transform 0.15s ease;
     }
-    .modal-cancel-btn:hover { background:var(--swiggy-hover-overlay); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-    .modal-cancel-btn:active { transform:translateY(0) scale(.98); }
+    .topup-sheet-card:active { transform: scale(0.97); }
+    .topup-sheet-img-wrap {
+      width: 100%; height: 90px; background: rgba(255,255,255,0.06);
+      overflow: hidden; position: relative;
+    }
+    .topup-sheet-img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; }
+    .topup-sheet-img.loaded { opacity: 1; }
+    .topup-sheet-emoji-fallback {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 32px;
+    }
+    .topup-sheet-info { padding: 10px 10px 12px 10px; }
+    .topup-sheet-name {
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); margin: 0 0 4px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .topup-sheet-price { font-size: 13px; font-weight: 700; color: #FC8019; margin: 0; }
 
     /* Connect Swiggy section */
     .auth-card { background:transparent; border:none; box-shadow:none; border-radius:0; padding:20px; margin-bottom:32px; text-align:center; }
@@ -845,7 +977,8 @@
       background:transparent; color:var(--swiggy-red); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
       transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
     }
-    /* Invisible expanded hit area — same technique as .topup-add-btn */
+    /* Invisible expanded hit area — keeps the visible pill compact while
+       still meeting the 44x44 minimum touch target. */
     .error-card .error-retry-btn::after {
       content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
       width:max(44px, 100%); height:max(44px, 100%);
@@ -865,10 +998,14 @@
     /* Sticky at-a-glance summary bar. top:56px (not 0) so it docks just
        below .app-header (also sticky, top:0, 56px tall, z-index:30)
        instead of sliding up underneath/over it while scrolling. */
-    #stickySummaryBar {
+    /* Sticky positioning lives on the #resultStickyHeader wrapper — see
+       its rule below — so the summary bar and tab bar always stack flush. */
+    #resultStickyHeader {
       position: sticky;
       top: 56px;
       z-index: 200;
+    }
+    #stickySummaryBar {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -897,19 +1034,157 @@
     [data-theme="light"] #stickySummaryText { color: rgba(0,0,0,0.9); }
     [data-theme="light"] #stickySummaryDish { color: rgba(0,0,0,0.4); }
 
+    /* Order/Recipe tab bar — stacks directly under #stickySummaryBar
+       inside #resultStickyHeader (which handles the sticky positioning).
+       Hidden by default; shown once results actually appear. */
+    #resultTabBar {
+      display: none;
+      background: var(--bg);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 0 20px;
+      gap: 0;
+      flex-direction: row;
+    }
+    .result-tab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 14px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: color 0.2s ease, border-color 0.2s ease;
+      position: relative;
+    }
+    .result-tab svg { width: 16px; height: 16px; stroke-width: 1.5; }
+    .result-tab.active { color: #FC8019; border-bottom: 2px solid #FC8019; }
+    .result-tab.locked { opacity: 0.4; cursor: not-allowed; }
+    .result-tab.locked:hover { color: rgba(255,255,255,0.35); }
+    .tab-loading-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      animation: tabDotPulse 1.2s ease-in-out infinite;
+      display: inline-block;
+    }
+    @keyframes tabDotPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50%       { opacity: 1;   transform: scale(1.2); }
+    }
+    .tab-ready-dot { width: 6px; height: 6px; border-radius: 50%; background: #FC8019; display: inline-block; }
+    [data-theme="light"] #resultTabBar { border-bottom: 1px solid rgba(0,0,0,0.07); }
+    [data-theme="light"] .result-tab { color: rgba(0,0,0,0.35); }
+    [data-theme="light"] .result-tab.active { color: #FC8019; }
+    [data-theme="light"] .result-tab.locked:hover { color: rgba(0,0,0,0.35); }
+
+    .result-tab-panel { padding-top: 20px; }
+
+    /* Dish hero image — TheMealDB lookup, name/meta overlaid on a gradient.
+       Deliberately theme-independent (unlike most of this results page):
+       the white overlay text sits on the photo/placeholder itself, not on
+       the page background, so it stays readable in both site themes
+       without needing separate light-mode colors — same as how the
+       full-screen loading/scan surfaces are dark-only by design. */
+    #dishHeroSection {
+      margin: -20px -20px 24px -20px;
+      border-radius: 0 0 20px 20px;
+      overflow: hidden;
+    }
+    #dishHeroImageWrap {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      background: #1a1a1a;
+      overflow: hidden;
+    }
+    #dishHeroImg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #dishHeroImg.loaded { opacity: 1; }
+    #dishHeroGradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 20%,
+        rgba(0,0,0,0.3) 50%,
+        rgba(0,0,0,0.85) 100%
+      );
+      z-index: 1;
+    }
+    #dishHeroOverlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 16px 20px;
+      z-index: 2;
+    }
+    #dishHeroName {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0 0 4px 0;
+      line-height: 1.2;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    #dishHeroMeta {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.75);
+      margin: 0;
+    }
+    #dishHeroPlaceholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+      z-index: 0;
+      transition: opacity 0.4s ease;
+    }
+    #dishHeroInitial {
+      font-size: 64px;
+      font-weight: 800;
+      color: rgba(252,128,25,0.3);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      line-height: 1;
+    }
+
     /* Fridge photo carried forward as a thumbnail — see
        transitionToResults(). Only shown for photo scans; opacity starts
        at 0 (both the header and #fridgeThumbTarget specifically) so the
-       staggered reveal / clone-landing has something to fade in from. */
+       staggered reveal / clone-landing has something to fade in from.
+       Also the anchor for the chips dropdown (#fridgeChipsDropdown, a
+       sibling of #fridgeSummaryRow) — position:relative here, not on the
+       row, so the dropdown's own clicks can never bubble into the row's
+       click handler. */
     #fridgeSummaryHeader {
+      position: relative;
+      margin-bottom: 20px;
+      opacity: 0;
+    }
+    #fridgeSummaryRow {
       display: flex;
       align-items: center;
       gap: 14px;
       padding: 16px 0;
-      margin-bottom: 20px;
       border-bottom: 1px solid rgba(255,255,255,0.07);
-      opacity: 0;
+      cursor: pointer;
+      user-select: none;
     }
+    #fridgeSummaryRow:hover { opacity: 0.85; }
     #fridgeThumbTarget {
       width: 56px;
       height: 56px;
@@ -918,16 +1193,116 @@
       flex-shrink: 0;
       opacity: 0;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      cursor: pointer;
     }
+    /* filter, not opacity — the reveal animation sets opacity:1 via an
+       inline style once the fridge photo morph lands, and inline styles
+       always beat a plain :hover rule regardless of specificity, so an
+       opacity-based hover here would be silently inert after that point. */
+    #fridgeThumbTarget:hover { filter: brightness(0.85); transition: filter 0.15s ease; }
     #fridgeThumbImg { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Fridge photo lightbox */
+    #fridgeLightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(0,0,0,0.92);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    #fridgeLightbox.visible { display: flex; opacity: 1; }
+    #fridgeLightboxImg {
+      max-width: 92%;
+      max-height: 88vh;
+      border-radius: 16px;
+      object-fit: contain;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    }
+    #fridgeLightboxClose {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      transition: background 0.15s ease;
+      z-index: 1;
+    }
+    #fridgeLightboxClose:hover { background: rgba(255,255,255,0.2); }
+    #fridgeLightboxClose svg { width: 18px; height: 18px; stroke-width: 2; }
+    #fridgeSummaryText { flex: 1; min-width: 0; }
     #fridgeSummaryLabel {
       font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
       color: rgba(255,255,255,0.35); text-transform: uppercase; margin-bottom: 3px;
     }
     #fridgeSummaryCount { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85); }
-    [data-theme="light"] #fridgeSummaryHeader { border-bottom: 1px solid rgba(0,0,0,0.07); }
+    #fridgeDropdownChevron {
+      margin-left: auto; flex-shrink: 0; color: rgba(255,255,255,0.4);
+      transition: transform 0.2s ease;
+    }
+    #fridgeDropdownChevron svg { width: 16px; height: 16px; stroke-width: 1.5; }
+    #fridgeDropdownChevron.open { transform: rotate(180deg); }
+    [data-theme="light"] #fridgeSummaryRow { border-bottom: 1px solid rgba(0,0,0,0.07); }
     [data-theme="light"] #fridgeSummaryLabel { color: rgba(0,0,0,0.35); }
     [data-theme="light"] #fridgeSummaryCount { color: rgba(0,0,0,0.85); }
+    [data-theme="light"] #fridgeDropdownChevron { color: rgba(0,0,0,0.4); }
+
+    /* Chips dropdown — floats below #fridgeSummaryRow instead of taking
+       permanent page space. Positioned against #fridgeSummaryHeader (see
+       above), which has no extra height of its own once the dropdown
+       (position:absolute) is taken out of flow, so top:100% lands right
+       under the row regardless of dropdown content height. */
+    #fridgeChipsDropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      width: 100%;
+      max-width: 100%;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 16px;
+      box-sizing: border-box;
+      z-index: 200;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+      display: none;
+      opacity: 0;
+      transform: translateX(-50%) translateY(-6px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    #fridgeChipsDropdown.visible { display: block; opacity: 1; transform: translateX(-50%) translateY(0); }
+    #fridgeChipsDropdownHeader {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+    }
+    #fridgeChipsClose {
+      width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.08);
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,0.6); transition: background 0.15s ease; flex-shrink: 0;
+    }
+    #fridgeChipsClose:hover { background: rgba(255,255,255,0.14); }
+    #fridgeChipsClose svg { width: 14px; height: 14px; stroke-width: 2; }
+    [data-theme="light"] #fridgeChipsDropdown {
+      background: #ffffff; border-color: rgba(0,0,0,0.08); box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+    }
+    [data-theme="light"] #fridgeChipsDropdownHeader { color: rgba(0,0,0,0.35); }
+    [data-theme="light"] #fridgeChipsClose { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.55); }
+    [data-theme="light"] #fridgeChipsClose:hover { background: rgba(0,0,0,0.1); }
 
     /* Full-overlay loading state, shown while /api/scan streams. Fixed,
        full-screen takeover — independent of the light/dark theme tokens
@@ -953,17 +1328,49 @@
     #photoScanScreen {
       position: fixed;
       inset: 0;
-      background: radial-gradient(ellipse at 50% 25%, rgba(252,128,25,0.05) 0%, #0a0a0a 65%);
+      /* background-color underlay is required, not decorative — the
+         gradient's own center stop is only 5% opaque, so without an opaque
+         color behind it the page underneath (sticky header, etc.) shows
+         through near the top of a tall viewport instead of this being a
+         true full-screen cover. */
+      background-color: #0a0a0a;
+      background-image: radial-gradient(ellipse at 50% 25%, rgba(252,128,25,0.05) 0%, #0a0a0a 65%);
       display: none;
+      /* display is toggled to 'flex' by JS — flex-direction/align/justify
+         must live here (not just on #photoScanContent) or a wide desktop
+         viewport left-aligns the single child instead of centering it
+         (default row-direction + flex-start with no width on the child). */
       flex-direction: column;
       align-items: center;
       justify-content: center;
       z-index: 9999;
-      padding: 24px;
       opacity: 0;
       transition: opacity .4s ease;
+      overflow: hidden;
     }
     #photoScanScreen.show { opacity: 1; }
+    /* The screen itself never scrolls (overflow:hidden above) — bounded
+       by max-height so if the photo + status + detected list + timeout
+       state together exceed the viewport, this wrapper scrolls instead
+       (fixes the photo scrolling out from under the sticky header a plain
+       unbounded centered column allowed) — while still being centered as
+       a block by the parent's justify-content:center when it's short. */
+    #photoScanContent {
+      width: 100%;
+      max-width: 400px;
+      max-height: 100%;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      /* Asymmetric — more room up top, less below, so the photo+status
+         block doesn't end up looking bottom-heavy under a short viewport
+         (the photo/list max-heights below keep total content well short
+         of 100%, so #photoScanScreen's justify-content:center still does
+         the real vertical centering; this just sets where the padding
+         budget goes). */
+      padding: 60px 24px 40px 24px;
+    }
 
     #photoScanContainer {
       position: relative;
@@ -971,7 +1378,8 @@
       max-width: 320px;
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);
+      flex-shrink: 0;
     }
 
     #fridgePhotoPreview {
@@ -979,6 +1387,11 @@
       height: auto;
       display: block;
       border-radius: 20px;
+      /* Caps a tall/portrait fridge photo so it can't dominate the screen
+         and push the status text + detected list far down, leaving dead
+         space below everything once the reveal list is short. */
+      max-height: 55vh;
+      object-fit: cover;
     }
 
     /* Sweeps while Gemini Vision is still working; JS pauses+fades it via
@@ -1003,15 +1416,18 @@
     }
 
     #photoScanStatus {
-      margin-top: 16px;
-      font-size: 14px;
+      margin-top: 20px;
+      font-size: 15px;
       font-weight: 600;
-      color: rgba(255,255,255,0.75);
+      color: rgba(255,255,255,0.9);
       text-align: center;
       letter-spacing: 0.01em;
       min-height: 20px;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.3s ease, color 0.3s ease;
     }
+    /* "Found X ingredients" — the final, settled state once detection
+       finishes, so it visually reads as "done" rather than mid-scan. */
+    #photoScanStatus.complete { color: #FC8019; }
 
     #photoScanSubStatus {
       margin-top: 6px;
@@ -1029,47 +1445,75 @@
     #detectedItemsList {
       width: 100%;
       max-width: 320px;
-      margin-top: 20px;
+      margin-top: 16px;
       display: flex;
       flex-direction: column;
       gap: 0;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 4px 16px;
+      /* Capped and internally scrollable — a long detection list must
+         never grow the fixed overlay itself, which is what caused the
+         screen to lose its vertical centering. */
+      max-height: 35vh;
+      overflow-y: auto;
+      scrollbar-width: none;
     }
+    #detectedItemsList::-webkit-scrollbar { display: none; }
+    /* Empty margin-top would leave a gap even with nothing revealed yet
+       (before step1 fires) — collapse it until there's at least one row. */
+    #detectedItemsList:empty { margin-top: 0; border-color: transparent; background: transparent; }
     .detected-item-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
       opacity: 0;
       transform: translateX(-8px);
-      animation: itemSlideIn 0.35s ease-out forwards;
+      animation: itemSlideIn 0.3s ease-out forwards;
     }
     .detected-item-row:last-child { border-bottom: none; }
     @keyframes itemSlideIn { to { opacity: 1; transform: translateX(0); } }
     .detected-item-check {
-      width: 22px;
-      height: 22px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      background: rgba(252,128,25,0.12);
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(255,255,255,0.12);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
-    .detected-item-check i { width: 14px; height: 14px; color: #FC8019; }
+    .detected-item-check i, .detected-item-check svg {
+      width: 14px; height: 14px; stroke: rgba(255,255,255,0.3); color: rgba(255,255,255,0.3);
+      stroke-width: 2.5;
+    }
     .detected-item-name {
       flex: 1;
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      color: rgba(255,255,255,0.9);
+      font-size: 15px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.92);
       text-transform: capitalize;
     }
-    .detected-item-conf {
-      font-size: 12px;
-      font-weight: 600;
-      color: rgba(255,255,255,0.3);
+    /* Confidence tiers — high >=85, medium 70-84, low 50-69 (see
+       addDetectedItemRow()). Defaults above are the "low" look; high/medium
+       override with a colored check circle. The number itself isn't shown
+       anywhere — this is just the color-coding. */
+    .detected-item-row.high .detected-item-check {
+      background: rgba(52,199,89,0.12); border-color: rgba(52,199,89,0.3);
     }
+    .detected-item-row.high .detected-item-check i,
+    .detected-item-row.high .detected-item-check svg { stroke: #34C759; color: #34C759; }
+
+    .detected-item-row.medium .detected-item-check {
+      background: rgba(252,128,25,0.12); border-color: rgba(252,128,25,0.3);
+    }
+    .detected-item-row.medium .detected-item-check i,
+    .detected-item-row.medium .detected-item-check svg { stroke: #FC8019; color: #FC8019; }
 
     #photoScanTimeoutState {
       margin-top: 24px;
@@ -1218,9 +1662,6 @@
     .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
 
-    .shopping-list-item { display:flex; justify-content:space-between; font-size:12px; color:var(--swiggy-text-2); padding:6px 0; border-bottom:1px solid var(--swiggy-hairline); }
-    .shopping-list-item:last-child { border-bottom:none; }
-
     .order-launched-card {
       background:var(--orange-dim); border:1px solid var(--border); border-radius:16px; padding:16px; margin-top:14px; text-align:center;
     }
@@ -1228,17 +1669,6 @@
     .order-launched-card .title { font-weight:700; font-size:14px; color:var(--swiggy-green); }
     .order-launched-card .sub { font-size:12px; color:var(--swiggy-text-2); margin-top:4px; }
 
-    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:55; display:flex; align-items:flex-end; justify-content:center; }
-    @media (min-width:481px) { .modal-overlay { align-items:center; } }
-    .modal-sheet { width:100%; max-width:480px; background:var(--swiggy-surface); border-radius:20px 20px 0 0; padding:20px; max-height:85vh; overflow-y:auto; }
-    @media (min-width:481px) { .modal-sheet { border-radius:20px; } }
-    .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-    .modal-header h3 { font-size:18px; font-weight:700; }
-    .modal-close {
-      background:none; border:none; color:var(--swiggy-text-2); cursor:pointer;
-      width:44px; height:44px; display:flex; align-items:center; justify-content:center; margin:-12px;
-    }
-    .modal-close i { width:16px; height:16px; }
     .field { margin-bottom:12px; }
     .field label { display:block; font-size:11px; font-weight:600; color:var(--swiggy-text-3); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
     .field input, .field select {
@@ -1248,17 +1678,12 @@
     .field input:focus, .field select:focus { border-color:var(--swiggy-orange); }
     .field-row { display:flex; gap:10px; }
     .field-row .field { flex:1; }
-    .modal-submit {
-      width:100%; height:48px; border-radius:14px; background:var(--swiggy-orange); color:#fff; border:none;
-      font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:6px;
-    }
     .empty-state { text-align:center; padding:40px 16px; color:var(--swiggy-text-3); font-size:13px; }
 
-    /* Scan empty/error states — "no ingredients detected" and "scan
-       failed". Rendered either inside an existing .card (no ingredients,
-       nested in fridgeIngredientsSection's card) or as a standalone .card
-       (scan failed, dropped straight into #orderCard) — same border-radius/
-       background/padding as every other result card either way. */
+    /* Scan empty/error states — "no ingredients detected" (rendered inside
+       #fridgeChipsInner, the chips dropdown) and "scan failed" (a
+       standalone .card dropped straight into #orderCard) — same
+       border-radius/background/padding as every other result card either way. */
     .scan-state-card { text-align:center; padding:8px 4px; }
     .scan-state-icon { display:block; margin:0 auto 12px; font-size:40px; color:var(--text-muted); }
     .scan-state-heading { font-size:16px; font-weight:600; color:var(--text-primary); }
@@ -1380,30 +1805,25 @@
         </div>
 
         <!-- Get Recipe -->
-        <button class="analyse-btn ready" id="analyseBtn" onclick="startScan('recipe')">
-          <span id="btnIcon"><i data-lucide="sparkles"></i></span>
+        <button class="analyse-btn ready" id="analyseBtn" onclick="startAnalysis()">
+          <span id="btnIcon"><i data-lucide="wand-2"></i></span>
           <span id="btnText">Get Recipe</span>
         </button>
 
-        <div class="cta-secondary-row">
-          <button type="button" class="cta-secondary-btn" id="scanFridgeBtn" onclick="toggleLandingScanArea()">
-            <i data-lucide="camera"></i> Scan Fridge
-          </button>
-        </div>
-
-        <!-- Fridge scanning section — hidden entirely once results are in (see hideScanning()) -->
+        <!-- Fridge scanning section — hidden entirely once results are in (see hideScanning()).
+             Single "Scan Fridge" trigger, always visible (no reveal toggle). Up to 3 fridge
+             photos, all sent to Gemini Vision together in one call for better ingredient
+             coverage (containers, door compartments, a wide shot alone can miss). -->
         <div id="scanSectionWrapper">
-          <!-- Collapsible fridge photo capture, hidden until "Scan Fridge" is tapped -->
-          <div class="landing-scan-area" id="landingScanArea">
-            <div class="landing-scan-inner">
-              <input type="file" id="landingScanFileInput" accept="image/*" capture="environment" class="hidden" />
-              <div class="recipe-scan-actions">
-                <button type="button" class="pill-btn pill-btn-primary" onclick="triggerLandingScanCamera()"><i data-lucide="camera"></i> Take Photo</button>
-                <button type="button" class="pill-btn pill-btn-secondary" onclick="triggerLandingScanGallery()"><i data-lucide="image"></i> Choose Photo</button>
-              </div>
-              <div id="landingScanStatus" class="recipe-scan-status"></div>
-            </div>
+          <div id="photoUploadArea">
+            <button id="addPhotoBtn" type="button" onclick="triggerAddPhoto()">
+              <i data-lucide="camera"></i>
+              <span id="addPhotoBtnLabel">Scan Fridge</span>
+            </button>
+            <div id="photoThumbnailRow" style="display:none;"></div>
+            <input type="file" id="fridgePhotoInput" accept="image/*" capture="environment" class="hidden" multiple />
           </div>
+          <div id="landingScanStatus" class="recipe-scan-status"></div>
 
           <div class="section-divider"></div>
         </div>
@@ -1490,90 +1910,148 @@
            below it instead. Recipe-only mode (no photo) never shows
            this — it keeps #loadingOverlay as-is. -->
       <div id="photoScanScreen">
-        <div id="photoScanContainer">
-          <img id="fridgePhotoPreview" src="" alt="Your fridge" />
-          <div class="photo-scan-line" id="scanLine"></div>
-        </div>
-        <p id="photoScanStatus">Scanning your fridge...</p>
-        <p id="photoScanSubStatus"></p>
-        <div id="detectedItemsList"></div>
-        <!-- Shown if step1 hasn't fired within PHOTO_SCAN_TIMEOUT_MS — the
-             vision call can end up cycling through several fallback
-             models with retries/backoff on quota errors, which can take
-             a while. Without this the screen would just spin forever
-             with zero feedback if that whole chain is struggling. -->
-        <div id="photoScanTimeoutState" class="hidden">
-          <i data-lucide="circle-alert"></i>
-          <p class="photo-scan-timeout-heading">This is taking longer than usual</p>
-          <p class="photo-scan-timeout-sub">The vision service may be busy right now. You can keep waiting or try again.</p>
-          <button type="button" class="photo-scan-retry-btn" onclick="retryPhotoScan()">Try again</button>
+        <div id="photoScanContent">
+          <div id="photoScanContainer">
+            <img id="fridgePhotoPreview" src="" alt="Your fridge" />
+            <div class="photo-scan-line" id="scanLine"></div>
+          </div>
+          <!-- Only populated/shown when more than one photo was uploaded —
+               a small strip confirming all angles are being analysed. -->
+          <div id="photoScanThumbStrip"></div>
+          <p id="photoScanStatus">Scanning your fridge...</p>
+          <p id="photoScanSubStatus"></p>
+          <div id="detectedItemsList"></div>
+          <!-- Shown if step1 hasn't fired within PHOTO_SCAN_TIMEOUT_MS — the
+               vision call can end up cycling through several fallback
+               models with retries/backoff on quota errors, which can take
+               a while. Without this the screen would just spin forever
+               with zero feedback if that whole chain is struggling. -->
+          <div id="photoScanTimeoutState" class="hidden">
+            <i data-lucide="circle-alert"></i>
+            <p class="photo-scan-timeout-heading">This is taking longer than usual</p>
+            <p class="photo-scan-timeout-sub">The vision service may be busy right now. You can keep waiting or try again.</p>
+            <button type="button" class="photo-scan-retry-btn" onclick="retryPhotoScan()">Try again</button>
+          </div>
         </div>
       </div>
 
       <!-- Results -->
       <div id="resultsSection" style="display:none;">
-      <!-- Sticky at-a-glance summary — stays pinned while scrolling through
-           results so the user never loses the key stat. Populated on
-           step2, hidden again on a new scan / page reset. -->
-      <div id="stickySummaryBar">
-        <span id="stickySummaryText"></span>
-        <span id="stickySummaryDish"></span>
+      <!-- Sticky header group — summary bar + tab bar stacked inside one
+           sticky wrapper so they're always flush with zero gap, regardless
+           of either one's rendered height (no fragile pixel math needed:
+           two independently-sticky siblings resolve their pre-stick
+           position inconsistently across browsers). -->
+      <div id="resultStickyHeader">
+        <!-- Sticky at-a-glance summary — stays pinned while scrolling through
+             results so the user never loses the key stat. Populated on
+             step2, hidden again on a new scan / page reset. -->
+        <div id="stickySummaryBar">
+          <span id="stickySummaryText"></span>
+          <span id="stickySummaryDish"></span>
+        </div>
+
+        <!-- Order/Recipe tab bar. Hidden until results actually appear
+             (revealResultsSection()), reset to Order-active/Recipe-locked
+             on every new scan (startScan()). -->
+        <div id="resultTabBar">
+          <button id="orderTab" class="result-tab active" onclick="switchResultTab('order')">
+            <i data-lucide="shopping-bag"></i>
+            <span>Order</span>
+          </button>
+          <button id="recipeTab" class="result-tab locked" onclick="switchResultTab('recipe')" aria-disabled="true">
+            <i data-lucide="book-open"></i>
+            <span>Recipe</span>
+            <span id="recipeTabStatus" class="tab-loading-dot"></span>
+          </button>
+        </div>
       </div>
+
       <div class="wrap">
         <div class="results" id="results">
-          <!-- Fridge photo, carried forward from the scan screen as a
-               thumbnail — only shown for photo scans (see
-               transitionToResults()). Starts display:none; JS switches it
-               to flex right before the clone-morph animation so
-               #fridgeThumbTarget has real layout for its target rect. -->
-          <div id="fridgeSummaryHeader" style="display:none;">
-            <div id="fridgeThumbTarget">
-              <img id="fridgeThumbImg" src="" alt="Your fridge" />
-            </div>
-            <div id="fridgeSummaryText">
-              <p id="fridgeSummaryLabel">Your fridge</p>
-              <p id="fridgeSummaryCount"></p>
-            </div>
-          </div>
-
-          <!-- Ingredients (hidden when there's no fridge scan to show, e.g. recipe mode) -->
-          <div id="fridgeIngredientsSection" class="hidden">
-            <div class="section-label"><i data-lucide="refrigerator"></i> What's in your fridge</div>
-            <div class="card">
-              <p class="desc" id="fridgeDesc"></p>
-              <div class="chips" id="ingredientChips"></div>
+          <!-- Dish hero image — TheMealDB lookup, name/meta overlaid on a
+               gradient. Negative margins bleed it past .wrap's own
+               padding to the page edges. Starts hidden; loadDishHeroImage()
+               (called from step2) shows it and fetches the real photo. -->
+          <div id="dishHeroSection" style="display:none;">
+            <div id="dishHeroImageWrap">
+              <img id="dishHeroImg" src="" alt="" />
+              <div id="dishHeroGradient"></div>
+              <div id="dishHeroOverlay">
+                <h1 id="dishHeroName"></h1>
+                <p id="dishHeroMeta"></p>
+              </div>
+              <div id="dishHeroPlaceholder">
+                <span id="dishHeroInitial"></span>
+              </div>
             </div>
           </div>
 
-          <!-- Meals: only shown when there are genuinely multiple options to
-               compare (e.g. scanning the fridge without naming a dish). A
-               single target-dish result would just duplicate the recipe
-               checklist card below it. -->
-          <div id="mealSuggestionsSection" class="hidden">
-            <div class="section-label"><i data-lucide="star"></i> Meal Suggestions</div>
-            <div id="mealCards"></div>
+          <!-- ORDER TAB — fridge photo/chips, checklist, choice cards,
+               order confirmation. Default-visible tab. -->
+          <div id="orderTabPanel" class="result-tab-panel">
+            <!-- Fridge photo, carried forward from the scan screen as a
+                 thumbnail — only shown for photo scans (see
+                 transitionToResults()). Starts display:none; JS switches it
+                 to flex right before the clone-morph animation so
+                 #fridgeThumbTarget has real layout for its target rect.
+                 Doubles as the trigger for the chips dropdown below it —
+                 #fridgeChipsDropdown is a sibling (not a descendant) of the
+                 clickable #fridgeSummaryRow so opening/closing it can never
+                 re-trigger the row's own click handler. -->
+            <div id="fridgeSummaryHeader" style="display:none;">
+              <div id="fridgeSummaryRow" onclick="toggleFridgeDropdown()">
+                <div id="fridgeThumbTarget">
+                  <img id="fridgeThumbImg" src="" alt="Your fridge" />
+                </div>
+                <div id="fridgeSummaryText">
+                  <p id="fridgeSummaryLabel">Your fridge</p>
+                  <p id="fridgeSummaryCount"></p>
+                </div>
+                <div id="fridgeDropdownChevron">
+                  <i data-lucide="chevron-down"></i>
+                </div>
+              </div>
+              <div id="fridgeChipsDropdown">
+                <div id="fridgeChipsDropdownHeader">
+                  <span>What's in your fridge</span>
+                  <button type="button" id="fridgeChipsClose" onclick="closeFridgeDropdown()" aria-label="Close">
+                    <i data-lucide="x"></i>
+                  </button>
+                </div>
+                <div id="fridgeChipsInner" class="chips"></div>
+              </div>
+            </div>
+
+            <!-- Meals: only shown when there are genuinely multiple options to
+                 compare (e.g. scanning the fridge without naming a dish). A
+                 single target-dish result would just duplicate the recipe
+                 checklist card below it. -->
+            <div id="mealSuggestionsSection" class="hidden">
+              <div class="section-label"><i data-lucide="star"></i> Meal Suggestions</div>
+              <div id="mealCards"></div>
+            </div>
+
+            <!-- Stat line + checklist (only if the plan returned recipe_ingredients) -->
+            <div id="recipeChecklistSection"></div>
+
+            <!-- User choice: order buttons (Instamart/Swiggy) -->
+            <div id="choiceCard"></div>
+
+            <!-- Order confirmation / cook confirmation / auth prompt / error -->
+            <div id="orderCard"></div>
           </div>
 
-          <!-- Dish header (name/meta) -->
-          <div id="recipeDishHeaderSection"></div>
+          <!-- RECIPE TAB — "how to make it" steps + video, unlocked once
+               awaiting_user_choice fires. -->
+          <div id="recipeTabPanel" class="result-tab-panel" style="display:none;">
+            <!-- YouTube — always expanded, no toggle, shown first -->
+            <div id="youtubeVideoSection"></div>
 
-          <!-- Stat line + checklist (only if the plan returned recipe_ingredients) -->
-          <div id="recipeChecklistSection"></div>
-
-          <!-- User choice: order buttons (Instamart/Swiggy) -->
-          <div id="choiceCard"></div>
-
-          <!-- Top up -->
-          <div id="topUpSection"></div>
-
-          <!-- Order confirmation / cook confirmation / auth prompt / error -->
-          <div id="orderCard"></div>
-
-          <!-- Recipe steps (collapsed by default) -->
-          <div id="recipeStepsSection"></div>
-
-          <!-- YouTube (collapsed by default) -->
-          <div id="youtubeVideoSection"></div>
+            <!-- Recipe steps (collapsible; visually separated from the
+                 video above it, see .recipe-steps-block) -->
+            <div id="recipeStepsSection"></div>
+          </div>
         </div>
       </div>
       </div>
@@ -1582,7 +2060,42 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div id="orderPreviewModalContainer"></div>
+
+  <!-- Fridge photo lightbox — opened by tapping #fridgeThumbTarget in the
+       results header. Deliberately dark/always-on regardless of site
+       theme, same reasoning as the other full-screen overlays here. -->
+  <div id="fridgeLightbox">
+    <button type="button" id="fridgeLightboxClose" aria-label="Close">
+      <i data-lucide="x"></i>
+    </button>
+    <img id="fridgeLightboxImg" src="" alt="Your fridge" />
+  </div>
+
+  <!-- Order preview + Top Up upsell — shown when the user taps "Order
+       missing items from Instamart", before the real auth/order flow
+       kicks off. Deliberately dark regardless of site theme (same as the
+       dish hero / full-screen loading surfaces) since it's an overlay
+       sheet, not page content. -->
+  <div id="orderBottomSheet">
+    <div id="orderSheetBackdrop" onclick="closeOrderSheet()"></div>
+    <div id="orderSheetPanel">
+      <div id="orderSheetHandle"></div>
+
+      <div id="orderSheetHeader">
+        <h3 id="orderSheetTitle">Your order</h3>
+        <p id="orderSheetSubtitle"></p>
+      </div>
+
+      <div id="orderSheetItems"></div>
+
+      <div id="orderSheetTopUp" style="display:none;">
+        <p id="orderSheetTopUpLabel">Add to your order?</p>
+        <div id="orderSheetTopUpCards"></div>
+      </div>
+
+      <button id="orderSheetConfirm" onclick="confirmOrderSheet()">Confirm order</button>
+    </div>
+  </div>
 
   <div id="smartCartModal" class="hidden fixed inset-0 z-[2000] bg-black/70 backdrop-blur-md items-end justify-center" onclick="closeCartModal()">
       <div class="w-full max-w-[480px] bg-[var(--swiggy-surface)] rounded-t-3xl max-h-[85vh] flex flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.4)]"
@@ -1673,16 +2186,28 @@
     // between a photo scan and a plain dish lookup.
     let currentScanHasPhoto = false;
     let currentScanDish = '';
-    // Local object URL for the just-selected fridge photo — set the
-    // instant the file is chosen (see the landingScanFileInput 'change'
-    // listener) so #photoScanScreen can show it immediately. Revoked once
-    // that screen hides.
+    // Up to 3 compressed fridge photos, accumulated by the upload area
+    // before the scan starts — all sent to Gemini Vision together. Also
+    // what "Try again" on a timed-out scan resubmits, so it survives
+    // until the scan actually completes or the user resets.
+    let fridgePhotos = [];
+    // Object URLs for the upload-area thumbnails, index-aligned with
+    // fridgePhotos — rebuilt (and old ones revoked) on every
+    // renderPhotoThumbnails() call.
+    let fridgePhotoThumbURLs = [];
+    // Dedicated object URL for fridgePhotos[0] as the "hero" photo shown
+    // on the photo-scan screen — created fresh in startScan(), revoked by
+    // hidePhotoScanScreen() once that screen closes.
     let fridgePhotoURL = null;
+    // Separate, longer-lived object URL for the SAME photo once it's
+    // carried over to the results-page thumbnail (transitionToResults())
+    // — deliberately not the same URL as fridgePhotoURL above. That one
+    // gets revoked when the scan screen closes; #fridgeThumbImg and the
+    // fridge-photo lightbox both need theirs to keep working for the
+    // entire results view, well after that point. Revoked (and rebuilt)
+    // on every new scan — see the reset blocks in startScan()/resetToLanding().
+    let fridgeThumbPhotoURL = null;
     let photoScanScreenShown = false;
-    // The compressed File itself (not just its object URL) — kept around
-    // so "Try again" on a timed-out scan can resubmit without making the
-    // user re-pick the photo.
-    let lastPhotoFile = null;
     // Guards against the photo-scan screen spinning forever if the vision
     // call ends up cycling through several fallback models with retries
     // (seen taking well over a minute under real quota/flakiness).
@@ -1795,27 +2320,19 @@
     }
 
     // Skeleton scaffold for #recipeChecklistSection — built the instant
-    // results become visible (step1), well before step2_partial has
-    // streamed anything real. renderStreamingIngredientRows() below
-    // consumes #checklistRowsContainer's skeleton rows one at a time as
-    // real ones arrive; step2's renderRecipeChecklistCard() replaces this
-    // whole section wholesale, taking any leftover skeleton with it.
+    // results become visible (step1), well before step2 resolves. Sits as
+    // a sibling of #ingredientList (empty, hidden) so step2's
+    // swapSkeletonToIngredients() can cross-fade one out and the other in
+    // as a single unit instead of trickling rows in individually.
     function renderChecklistSkeleton() {
       const section = document.getElementById('recipeChecklistSection');
       if (!section) return;
-      const skeletonRows = Array.from({ length: 4 }, () => `
-        <div class="skeleton-row">
-          <div class="skeleton-box skeleton-checkbox"></div>
-          <div class="skeleton-lines">
-            <div class="skeleton-box skeleton-name"></div>
-            <div class="skeleton-box skeleton-qty"></div>
-          </div>
-        </div>`).join('');
+      const skelRows = Array.from({ length: 5 }, () => '<div class="skel-row"></div>').join('');
       section.innerHTML = `
-        <div class="card">
-          <div class="skeleton-box skeleton-stat-line"></div>
-          <div class="recipe-rows" id="checklistRowsContainer">${skeletonRows}</div>
-        </div>`;
+        <div class="card" id="ingredientSkeletonCard">
+          <div id="ingredientSkeletonBlock">${skelRows}</div>
+        </div>
+        <div id="ingredientList" style="display:none;"></div>`;
     }
 
     // Skeleton for the order-choice buttons — same lifetime idea, replaced
@@ -1828,28 +2345,6 @@
           <div class="skeleton-box skeleton-btn"></div>
           <div class="skeleton-box skeleton-btn"></div>
         </div>`;
-    }
-
-    // Consumes newly-streamed ingredient names: each one becomes a real
-    // row inserted just above the remaining skeleton rows, removing one
-    // skeleton per real row so the real rows accumulate on top and the
-    // skeleton block only shrinks — never appends past 4, never rebuilds
-    // an already-rendered real row (so it doesn't replay its animation).
-    function renderStreamingIngredientRows(newNames) {
-      const rowsContainer = document.getElementById('checklistRowsContainer');
-      if (!rowsContainer) return;
-      newNames.forEach(name => {
-        const row = document.createElement('div');
-        row.className = 'ingredient-row';
-        row.innerHTML = `<span class="ingredient-row-name">${escapeHtml(name)}</span>`;
-        const nextSkeleton = rowsContainer.querySelector('.skeleton-row');
-        if (nextSkeleton) {
-          rowsContainer.insertBefore(row, nextSkeleton);
-          nextSkeleton.remove();
-        } else {
-          rowsContainer.appendChild(row);
-        }
-      });
     }
 
     // Pops up to 10 dots at random shelf positions once the fridge scan
@@ -1958,7 +2453,24 @@
       if (!screen) return;
       document.getElementById('fridgePhotoPreview').src = photoURL;
       document.getElementById('detectedItemsList').innerHTML = '';
-      document.getElementById('photoScanStatus').textContent = 'Scanning your fridge...';
+      const statusResetEl = document.getElementById('photoScanStatus');
+      statusResetEl.textContent = 'Scanning your fridge...';
+      statusResetEl.classList.remove('complete');
+      const thumbStrip = document.getElementById('photoScanThumbStrip');
+      if (thumbStrip) {
+        if (fridgePhotos.length > 1) {
+          // Reuses the same object URLs the upload-area thumbnails already
+          // created (still valid — nothing revokes them until the next
+          // renderPhotoThumbnails() call) instead of minting new ones.
+          thumbStrip.innerHTML = fridgePhotos.map((f, i) =>
+            `<img src="${fridgePhotoThumbURLs[i]}" alt="Fridge photo ${i + 1}" class="scan-thumb${i === 0 ? ' active' : ''}" onclick="switchScanPreview(${i})" />`
+          ).join('');
+          thumbStrip.classList.add('show');
+        } else {
+          thumbStrip.innerHTML = '';
+          thumbStrip.classList.remove('show');
+        }
+      }
       const scanLine = document.getElementById('scanLine');
       if (scanLine) scanLine.classList.remove('stopped');
       const timeoutState = document.getElementById('photoScanTimeoutState');
@@ -1976,6 +2488,17 @@
       screen.style.display = 'flex';
       void screen.offsetHeight;
       screen.classList.add('show');
+    }
+
+    // Swaps which uploaded photo shows large in #fridgePhotoPreview —
+    // tapping a thumbnail in the strip below it.
+    function switchScanPreview(index) {
+      const url = fridgePhotoThumbURLs[index];
+      if (!url) return;
+      document.getElementById('fridgePhotoPreview').src = url;
+      document.querySelectorAll('#photoScanThumbStrip .scan-thumb').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
     }
 
     // Called from hideLoadingOverlay() so every existing hide-the-loading-
@@ -2020,14 +2543,14 @@
       try { lucide.createIcons(); } catch {}
     }
 
-    // Resubmits the same photo (no re-picking needed) after a stalled
+    // Resubmits the same photos (no re-picking needed) after a stalled
     // scan. Falls back to sending the user back to the landing form if
-    // the file reference is somehow gone.
+    // the file references are somehow gone.
     function retryPhotoScan() {
       const state = document.getElementById('photoScanTimeoutState');
       if (state) { state.classList.remove('visible'); state.classList.add('hidden'); }
-      if (lastPhotoFile) {
-        startScan('photo', lastPhotoFile);
+      if (fridgePhotos.length) {
+        startScan('photo', fridgePhotos);
       } else {
         hideLoadingOverlay();
         resetToLanding();
@@ -2035,17 +2558,21 @@
     }
 
     // Adds a single detected ingredient as a row in the reveal list below
-    // the photo — a small orange check circle, the name, and its
-    // confidence percentage (already 0-100 from the step1 payload).
+    // the photo — a small check circle (colored by confidence tier) and
+    // the name. The number itself isn't shown — users care what's in
+    // their fridge, not whether it was 92% or 85% sure; confidence still
+    // drives the tier class (high/medium/low) so the color-coding stays,
+    // it's just not spelled out as a percentage.
     function addDetectedItemRow(ingredient) {
       const list = document.getElementById('detectedItemsList');
       if (!list) return;
+      const confidence = ingredient.confidence || 0;
+      const tier = confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low';
       const row = document.createElement('div');
-      row.className = 'detected-item-row';
+      row.className = `detected-item-row ${tier}`;
       row.innerHTML = `
         <div class="detected-item-check"><i data-lucide="check"></i></div>
-        <span class="detected-item-name">${escapeHtml(ingredient.name)}</span>
-        <span class="detected-item-conf">${ingredient.confidence}%</span>`;
+        <span class="detected-item-name">${escapeHtml(ingredient.name)}</span>`;
       list.appendChild(row);
       try { lucide.createIcons(); } catch {}
     }
@@ -2087,6 +2614,7 @@
               : i === 0
                 ? 'Found something...'
                 : `Found ${ingredient.name}...`;
+            statusEl.classList.toggle('complete', isLast);
           }
         }, i * 180);
       });
@@ -2113,9 +2641,17 @@
         return;
       }
 
-      // Capture the photo now, before hideLoadingOverlay() (called once
-      // the morph completes below) revokes the object URL.
-      document.getElementById('fridgeThumbImg').src = fridgePhotoURL;
+      // Own dedicated URL for the thumbnail/lightbox — NOT fridgePhotoURL
+      // itself, which hideLoadingOverlay() (via hidePhotoScanScreen(),
+      // called once the morph completes below) revokes. A revoked blob
+      // URL still shows fine in an <img> that already finished loading it
+      // (the browser keeps the decoded bitmap around), which is why the
+      // thumbnail itself looked fine — but any NEW <img> pointed at that
+      // same now-revoked URL (e.g. the fridge-photo lightbox) fails to
+      // load at all, showing a broken-image icon.
+      if (fridgeThumbPhotoURL) URL.revokeObjectURL(fridgeThumbPhotoURL);
+      fridgeThumbPhotoURL = fridgePhotos[0] ? URL.createObjectURL(fridgePhotos[0]) : fridgePhotoURL;
+      document.getElementById('fridgeThumbImg').src = fridgeThumbPhotoURL;
       const count = currentFridgeIngredients.length;
       document.getElementById('fridgeSummaryCount').textContent =
         `${count} item${count === 1 ? '' : 's'} detected`;
@@ -2125,7 +2661,14 @@
       // position. Its content stays invisible (opacity:0, set in the
       // step1 handler) until revealResultsContent() stages it back in.
       revealResultsSection();
-      summaryHeader.style.display = 'flex';
+      // Block, not flex — #fridgeSummaryHeader is just a positioning
+      // wrapper now (see its CSS comment); the actual flex row lives on
+      // its child #fridgeSummaryRow, which is flex unconditionally via
+      // its own static CSS. Setting the wrapper itself to flex here would
+      // turn #fridgeSummaryRow into a shrink-to-fit flex item instead of
+      // a full-width block, collapsing it to content width and leaving it
+      // stuck on the left with dead space to the right of it.
+      summaryHeader.style.display = 'block';
 
       const from = photoContainer.getBoundingClientRect();
       const to = targetThumbnail.getBoundingClientRect();
@@ -2174,19 +2717,17 @@
 
     // Staggered reveal of the skeleton-populated sections once results
     // become visible — the fridge thumbnail header (photo scans only,
-    // no-op if it was never shown), then the dish header, then the
-    // checklist, then the order buttons. Each was set to
-    // opacity:0/translateY(10px) in the step1 handler so there's
-    // something to animate from.
+    // no-op if it was never shown), then the checklist, then the order
+    // buttons. Each was set to opacity:0/translateY(10px) in the step1
+    // handler so there's something to animate from.
     function revealResultsContent() {
       const summaryHeader = document.getElementById('fridgeSummaryHeader');
       setTimeout(() => {
-        if (summaryHeader && summaryHeader.style.display === 'flex') {
+        if (summaryHeader && summaryHeader.style.display === 'block') {
           summaryHeader.style.transition = 'opacity 0.3s ease';
           summaryHeader.style.opacity = '1';
         }
       }, 50);
-      setTimeout(() => revealResultsSubSection('recipeDishHeaderSection'), 200);
       setTimeout(() => revealResultsSubSection('recipeChecklistSection'), 350);
       setTimeout(() => revealResultsSubSection('choiceCard'), 500);
     }
@@ -2210,7 +2751,7 @@
       analyseBtn.disabled = false;
       analyseBtn.classList.remove('loading');
       analyseBtn.classList.add('ready');
-      document.getElementById('btnIcon').innerHTML = '<i data-lucide="sparkles"></i>';
+      document.getElementById('btnIcon').innerHTML = '<i data-lucide="wand-2"></i>';
       document.getElementById('btnText').textContent = text || 'Get Recipe';
       try { lucide.createIcons(); } catch {}
     }
@@ -2268,39 +2809,213 @@
       return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low';
     }
 
+    // Shared chip markup for both the initial step1 render and
+    // rerenderFridgeChips()'s matched/other split — `other` just mutes it
+    // slightly (.chip.other) so it still reads as the same chip style.
+    // `settled` skips the entrance animation (renders already at opacity:1)
+    // — used when re-rendering a chip that was already visible a moment
+    // ago (rerenderFridgeChips() after step2), so it doesn't flash back to
+    // invisible and fade in again just because its DOM node got recreated.
+    function buildFridgeChip(ingredient, idx, other, settled) {
+      const delayClass = settled ? '' : ` [animation-delay:${idx * 80}ms]`;
+      const settledStyle = settled ? ' style="opacity:1;animation:none;"' : '';
+      // Chip color still reflects confClass(), but the number itself isn't
+      // shown — just the name, clean and simple.
+      return `<div class="chip ${confClass(ingredient.confidence)}${other ? ' other' : ''}${delayClass}"${settledStyle}>
+        <div class="chip-dot"></div>
+        ${escapeHtml(ingredient.name)}
+      </div>`;
+    }
+
+    // Re-splits the fridge chips once step2 knows which detected items
+    // this specific recipe actually uses (matchedFridgeItems) — relevant
+    // ones stay visible, the rest collapse under a toggle. matched_fridge_
+    // items holds exact fridge-detected names (see _enrich_recipe_
+    // ingredients() in step2_meal_planner.py), so this is a plain
+    // case-insensitive exact match, not fuzzy substring matching.
+    function rerenderFridgeChips() {
+      // Nothing to split in recipe-only mode (no fridge scan at all) or
+      // if the backend couldn't determine relevance — the step1 render
+      // already shows every chip, which is exactly the fallback wanted.
+      if (!currentFridgeIngredients.length || !matchedFridgeItems.length) return;
+
+      const container = document.getElementById('fridgeChipsInner');
+      if (!container) return;
+
+      const matchedLower = matchedFridgeItems.map(n => n.toLowerCase().trim());
+      let primary = currentFridgeIngredients.filter(i => matchedLower.includes(i.name.toLowerCase().trim()));
+      let secondary = currentFridgeIngredients.filter(i => !matchedLower.includes(i.name.toLowerCase().trim()));
+
+      // If matching didn't actually separate anything (e.g. every chip
+      // matched), there's nothing meaningful to collapse — leave as-is.
+      if (!secondary.length) return;
+
+      // Fewer than 4 genuinely relevant chips reads as sparse/broken
+      // rather than helpful — pad the visible row up to 5 total with the
+      // next few "other" items so it always feels substantial, moving
+      // them out of the collapsed section accordingly.
+      if (primary.length < 4) {
+        const needed = 5 - primary.length;
+        primary = primary.concat(secondary.slice(0, needed));
+        secondary = secondary.slice(needed);
+      }
+
+      // settled:true on both — matched chips were already visible from
+      // step1's render a moment ago (no reason to re-fade them in), and
+      // the "other" chips start hidden inside the collapsed wrap anyway,
+      // so an entrance animation would never even be seen.
+      let html = primary.map((i, idx) => buildFridgeChip(i, idx, false, true)).join('');
+
+      // Padding may have absorbed every "other" item — nothing left to
+      // collapse, so just show the (now-complete) row plainly.
+      if (secondary.length) {
+        html += `
+          <div id="otherFridgeItems">
+            <button type="button" id="otherFridgeToggle" onclick="toggleOtherFridgeItems()">
+              <i data-lucide="plus-circle"></i>
+              <span>${secondary.length} other item${secondary.length === 1 ? '' : 's'} in your fridge</span>
+              <i data-lucide="chevron-down" id="otherFridgeChevron"></i>
+            </button>
+            <div id="otherFridgeChipsWrap" style="display:none;">
+              ${secondary.map((i, idx) => buildFridgeChip(i, idx, true, true)).join('')}
+            </div>
+          </div>`;
+      }
+
+      container.innerHTML = html;
+      try { lucide.createIcons(); } catch {}
+    }
+
+    function toggleOtherFridgeItems() {
+      const wrap = document.getElementById('otherFridgeChipsWrap');
+      const chevron = document.getElementById('otherFridgeChevron');
+      if (!wrap || !chevron) return;
+      const isOpen = wrap.style.display !== 'none';
+      wrap.style.display = isOpen ? 'none' : 'flex';
+      chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+
+    // Floating chips dropdown, anchored to #fridgeSummaryHeader (tapping
+    // the "Your fridge · N items" row) — chips never take permanent page
+    // space. outsideFridgeClick() only gets attached while open, and
+    // checks both the dropdown and the row so a click on either doesn't
+    // close it out from under itself.
+    function toggleFridgeDropdown() {
+      const dropdown = document.getElementById('fridgeChipsDropdown');
+      if (!dropdown) return;
+      if (dropdown.classList.contains('visible')) {
+        closeFridgeDropdown();
+        return;
+      }
+      const chevron = document.getElementById('fridgeDropdownChevron');
+      dropdown.style.display = 'block';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          dropdown.classList.add('visible');
+          if (chevron) chevron.classList.add('open');
+        });
+      });
+      setTimeout(() => {
+        document.addEventListener('click', outsideFridgeClick);
+      }, 0);
+    }
+
+    function closeFridgeDropdown() {
+      const dropdown = document.getElementById('fridgeChipsDropdown');
+      if (!dropdown) return;
+      const chevron = document.getElementById('fridgeDropdownChevron');
+      dropdown.classList.remove('visible');
+      if (chevron) chevron.classList.remove('open');
+      setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+      document.removeEventListener('click', outsideFridgeClick);
+    }
+
+    function outsideFridgeClick(e) {
+      const dropdown = document.getElementById('fridgeChipsDropdown');
+      const row = document.getElementById('fridgeSummaryRow');
+      if (dropdown && row && !dropdown.contains(e.target) && !row.contains(e.target)) {
+        closeFridgeDropdown();
+      }
+    }
+
+    // Fullscreen fridge photo lightbox — opened by tapping the thumbnail
+    // in the results header (see the #fridgeThumbTarget listener below,
+    // which stops the click from also toggling the chips dropdown).
+    function openFridgeLightbox() {
+      const src = document.getElementById('fridgeThumbImg').src;
+      if (!src) return;
+      const lb = document.getElementById('fridgeLightbox');
+      document.getElementById('fridgeLightboxImg').src = src;
+      lb.style.display = 'flex';
+      requestAnimationFrame(() => lb.classList.add('visible'));
+    }
+
+    function closeFridgeLightbox() {
+      const lb = document.getElementById('fridgeLightbox');
+      lb.classList.remove('visible');
+      setTimeout(() => { lb.style.display = 'none'; }, 250);
+    }
+
+    document.getElementById('fridgeLightboxClose').addEventListener('click', closeFridgeLightbox);
+    document.getElementById('fridgeLightbox').addEventListener('click', function(e) {
+      if (e.target === this) closeFridgeLightbox();
+    });
+    document.getElementById('fridgeThumbTarget').addEventListener('click', function(e) {
+      e.stopPropagation(); // don't also trigger #fridgeSummaryRow's dropdown toggle
+      openFridgeLightbox();
+    });
+
     function escapeHtml(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
       ));
     }
 
-    // Resolves a Top Up product image via the backend's /api/ingredient-image
-    // (Spoonacular-backed) and falls back to a TheMealDB guess if that
-    // returns nothing. Never throws — the caller falls back further to a
-    // letter avatar if the returned URL itself fails to load.
-    async function getTopUpImageUrl(itemName) {
-      // Simplify name for better API matching
+    // Strips filler words so the ingredient-image search query matches
+    // better (e.g. "fresh chopped coriander leaves" -> "coriander").
+    function simplifyIngredientName(itemName) {
       const stopWords = ['fresh','dried','roasted','grated','sliced','chopped',
         'ground','whole','raw','cubes','paste','powder','leaves','seeds',
         'pieces','extract','syrup','sweet','spicy','tangy','classic'];
-
-      const simplified = itemName
+      return itemName
         .replace(/\(.*?\)/g, '')
         .split(' ')
         .filter(w => !stopWords.includes(w.toLowerCase()) && w.length > 2)
         .join(' ')
         .trim() || itemName;
+    }
+
+    // Resolves a Top Up card's product photo via /api/ingredient-image
+    // (Unsplash-backed) — used by the order-sheet's Top Up cards. The
+    // emoji fallback is already showing (set at render time) and stays
+    // put on any miss/failure — this only ever upgrades it, never removes
+    // it before a replacement is ready.
+    async function loadTopUpImage(cardEl, ingredientName) {
+      const imgEl = cardEl.querySelector('.topup-sheet-img');
+      const fallbackEl = cardEl.querySelector('.topup-sheet-emoji-fallback');
+      if (!imgEl) return;
 
       try {
-        const res = await fetch(`/api/ingredient-image?name=${encodeURIComponent(simplified)}`);
+        const query = simplifyIngredientName(ingredientName);
+        const res = await fetch(`/api/ingredient-image?name=${encodeURIComponent(query)}`);
         const data = await res.json();
-        if (data.imageUrl) return data.imageUrl;
-      } catch (e) {}
-
-      // TheMealDB fallback with simplified name
-      const word = simplified.split(' ')[0];
-      const cap = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      return `https://www.themealdb.com/images/ingredients/${cap}-Small.png`;
+        if (data.found && data.image_url) {
+          // Preload before touching the visible <img> so it never shows a
+          // broken-image icon if the URL 404s after all.
+          const probe = new Image();
+          probe.onload = () => {
+            imgEl.src = data.image_url;
+            imgEl.classList.add('loaded');
+            if (fallbackEl) fallbackEl.style.display = 'none';
+          };
+          probe.onerror = () => {
+            // Keep placeholder/emoji fallback.
+          };
+          probe.src = data.image_url;
+        }
+      } catch (e) {
+        // Keep existing emoji fallback — no crash.
+      }
     }
 
     const FOOD_EMOJI_MAP = {
@@ -2461,13 +3176,14 @@
     }
 
     let currentMealName = null;
-    let currentMissingIngredients = [];
     let currentTopUpSuggestions = [];
     let currentFridgeIngredients = [];
+    // Exact detected fridge item names the recommended recipe actually
+    // uses (from step2's matched_fridge_items) — drives the "relevant
+    // items first, N others collapsed" split in rerenderFridgeChips().
+    let matchedFridgeItems = [];
     let currentRecipeChecklist = [];
     let currentRecipeDishName = '';
-    let currentRecipeServings = 2;
-    let currentRecipeMeta = { prepTime: 0, cuisine: '' };
     let currentRecipeSteps = [];
     let recipeStepsExpanded = false;
 
@@ -2490,9 +3206,6 @@
       }
 
       currentRecipeDishName = ev.recommended_meal || (ev.suggestions[0] && ev.suggestions[0].name) || 'this dish';
-      currentRecipeServings = servings;
-      const recSuggestion = (ev.suggestions || []).find(s => s.name === currentRecipeDishName) || (ev.suggestions || [])[0] || {};
-      currentRecipeMeta = { prepTime: recSuggestion.prep_time_minutes || 0, cuisine: recSuggestion.cuisine || '' };
       currentRecipeSteps = ev.cooking_steps || [];
       currentRecipeChecklist = recipeIngredients.map(ing => {
         const foundInFridge = ing.found_in_fridge === true;
@@ -2509,55 +3222,113 @@
       renderRecipeChecklistCard();
     }
 
-    // Dish name/meta card — lives in the Recipe tab, built from the same
-    // state as the checklist below but rendered separately since the two
-    // now live in different tab panels.
-    function buildRecipeDishHeaderHtml() {
-      const metaParts = [`For ${currentRecipeServings} people`];
-      if (currentRecipeMeta.prepTime) metaParts.push(`${currentRecipeMeta.prepTime} min`);
-      if (currentRecipeMeta.cuisine) metaParts.push(currentRecipeMeta.cuisine);
-      return `
-        <div class="recipe-checklist-card content-fade-in">
-          <div class="recipe-dish-header">
-            <div class="recipe-dish-icon"><i data-lucide="chef-hat"></i></div>
-            <div class="recipe-dish-info">
-              <div class="recipe-dish-name">${escapeHtml(currentRecipeDishName)}</div>
-              <div class="recipe-dish-meta">${escapeHtml(metaParts.join(' · '))}</div>
-            </div>
-            <i data-lucide="sparkles" class="recipe-ai-spark"></i>
-          </div>
-        </div>`;
-    }
-
     // Builds the checklist card shell ONCE per new recipe (stat line +
-    // rows + footer — the dish header and steps live in the Recipe tab
-    // now, see buildRecipeDishHeaderHtml()/revealRecipeStepsAndVideo()).
-    // Row toggles and the inline fridge scan only touch
-    // #recipeRowsContainer / #recipeChecklistFooter / #recipeStatsRow
-    // afterwards, so the scan area's own open/closed state and any
-    // in-progress upload survive re-renders.
+    // rows), into #ingredientList — a sibling of the skeleton block that
+    // renderChecklistSkeleton() left in place. Row toggles only touch
+    // #recipeRowsContainer / #recipeStatsRow afterwards, so the scan
+    // area's own open/closed state and any in-progress upload survive
+    // re-renders.
     function renderRecipeChecklistCard() {
-      const dishHeaderSection = document.getElementById('recipeDishHeaderSection');
       const section = document.getElementById('recipeChecklistSection');
       if (!section) return;
       if (!currentRecipeChecklist.length) {
         section.innerHTML = '';
-        if (dishHeaderSection) dishHeaderSection.innerHTML = '';
         return;
       }
 
-      if (dishHeaderSection) dishHeaderSection.innerHTML = buildRecipeDishHeaderHtml();
+      let list = document.getElementById('ingredientList');
+      if (!list) {
+        // No skeleton was ever rendered (e.g. a re-render path) — build
+        // the container fresh instead of assuming it's already there.
+        section.innerHTML = '<div id="ingredientList"></div>';
+        list = document.getElementById('ingredientList');
+      }
 
-      section.innerHTML = `
-        <div class="recipe-checklist-card content-fade-in">
+      list.innerHTML = `
+        <div class="recipe-checklist-card">
           <div class="recipe-stats-row" id="recipeStatsRow">${buildRecipeStatsHtml()}</div>
           <p class="recipe-checklist-sub" id="recipeHookLine">${buildRecipeHookText()}</p>
-          <div class="recipe-rows" id="recipeRowsContainer">${buildRecipeRowsHtml()}</div>
-          <div id="recipeChecklistFooter">${buildRecipeFooterHtml()}</div>
+          <div class="recipe-rows-wrap" id="recipeRowsWrap">
+            <div class="recipe-rows" id="recipeRowsContainer">${buildRecipeRowsHtml()}</div>
+            <div class="recipe-rows-fade"></div>
+          </div>
         </div>`;
 
       animateStatNumbers(document.getElementById('recipeStatsRow'));
       try { lucide.createIcons(); } catch {}
+      swapSkeletonToIngredients();
+      setupRecipeRowsFade();
+    }
+
+    // "More below" fade affordance for the (possibly internally-scrolling)
+    // ingredient checklist. A ResizeObserver on #recipeRowsContainer
+    // covers both the initial reveal (its box goes from 0x0 while
+    // #ingredientList is display:none to its real size once
+    // swapSkeletonToIngredients() reveals it) and viewport resizes
+    // (max-height is in vh); a plain scroll listener covers the user
+    // scrolling within the list. Re-run explicitly after any content
+    // change (toggleRecipeItem() -> updateRecipeRowsAndFooter()) since
+    // replacing the rows' innerHTML doesn't change the container's own
+    // border-box size and so doesn't fire the ResizeObserver on its own.
+    let recipeRowsResizeObserver = null;
+    function updateRecipeRowsFade() {
+      const rows = document.getElementById('recipeRowsContainer');
+      const wrap = document.getElementById('recipeRowsWrap');
+      if (!rows || !wrap) return;
+      const hasMoreBelow = rows.scrollTop + rows.clientHeight < rows.scrollHeight - 1;
+      wrap.classList.toggle('has-more-below', hasMoreBelow);
+    }
+    function setupRecipeRowsFade() {
+      const rows = document.getElementById('recipeRowsContainer');
+      if (!rows) return;
+      rows.addEventListener('scroll', updateRecipeRowsFade);
+      if (recipeRowsResizeObserver) recipeRowsResizeObserver.disconnect();
+      recipeRowsResizeObserver = new ResizeObserver(updateRecipeRowsFade);
+      recipeRowsResizeObserver.observe(rows);
+      updateRecipeRowsFade();
+    }
+
+    // One clean reveal: skeleton fades out as a unit, then the populated
+    // #ingredientList fades/slides in as a unit — no per-row trickle. A
+    // no-op if the skeleton was already swapped out (list re-render path).
+    function swapSkeletonToIngredients() {
+      // Hide the whole padded .card shell, not just the skeleton rows
+      // inside it — leaving the shell behind (even with its child
+      // display:none) still reserves its own padding/margin as blank
+      // space between the fridge section and the real list.
+      const skeletonCard = document.getElementById('ingredientSkeletonCard');
+      const list = document.getElementById('ingredientList');
+      if (!list) return;
+      // Guards against ever reversing the reveal mid-fade if something
+      // calls this twice for the same scan (renderRecipeChecklistCard()
+      // only calls it once in practice, but this makes that a guarantee
+      // rather than an assumption). Reset on every new scan — see
+      // startScan()'s reset block.
+      if (list.dataset.revealed === 'true') return;
+      list.dataset.revealed = 'true';
+      if (!skeletonCard) {
+        list.style.display = 'block';
+        return;
+      }
+
+      skeletonCard.style.transition = 'opacity 0.25s ease';
+      skeletonCard.style.opacity = '0';
+
+      setTimeout(() => {
+        skeletonCard.style.display = 'none';
+
+        list.style.opacity = '0';
+        list.style.transform = 'translateY(6px)';
+        list.style.display = 'block';
+        list.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            list.style.opacity = '1';
+            list.style.transform = 'translateY(0)';
+          });
+        });
+      }, 250);
     }
 
     // "How to make it" steps — lives in the Recipe tab's own container
@@ -2571,7 +3342,7 @@
       ).join('');
       return `
         <div class="recipe-checklist-card content-fade-in">
-          <div class="recipe-steps-block" style="border-top:none;">
+          <div class="recipe-steps-block">
             <button type="button" class="recipe-steps-toggle" onclick="toggleRecipeSteps()">
               <i data-lucide="book-open"></i> How to make it
               <i data-lucide="chevron-down" class="ml-auto ${recipeStepsExpanded ? 'rotated' : ''}"></i>
@@ -2584,69 +3355,51 @@
     }
 
     // Best-effort recipe video lookup — shows a clean empty-state placeholder
-    // on any failure or empty result, never an error message. Collapsed by
-    // default — the header row alone is visible until tapped.
-    let youtubeSectionExpanded = true;
+    // on any failure or empty result, never an error message. Always fully
+    // expanded on the Recipe tab (no toggle) — the video is the reason the
+    // user is looking at this tab in the first place.
     function renderYouTubeEmbed(data) {
       const section = document.getElementById('youtubeVideoSection');
       if (!section) return;
       const videos = (data && data.videos) || [];
       const inner = !videos.length
-        ? `<div class="yt-video-wrap">
-            <div class="empty-state">
-              <i data-lucide="youtube" class="text-[32px]" style="color:var(--text-muted);display:block;margin-bottom:8px;"></i>
-              No video found for this dish
-            </div>
+        ? `<div class="empty-state">
+            <i data-lucide="youtube" class="text-[32px]" style="color:var(--text-muted);display:block;margin-bottom:8px;"></i>
+            No video found for this dish
           </div>`
-        : `<div class="yt-video-wrap">${buildYouTubeCarouselHtml(videos)}</div>`;
+        : buildYouTubeCarouselHtml(videos);
       section.classList.add('section-reveal');
       section.innerHTML = `
-        <button type="button" class="yt-video-toggle" onclick="toggleYoutubeSection()">
-          <i data-lucide="youtube"></i> Watch recipe video
-          <i data-lucide="chevron-down" class="ml-auto ${youtubeSectionExpanded ? 'rotated' : ''}" id="ytCaret"></i>
-        </button>
-        <div class="yt-video-content ${youtubeSectionExpanded ? '' : 'collapsed'}" id="ytVideoContent">${inner}</div>`;
+        <div class="section-label"><i data-lucide="youtube"></i> Watch recipe video</div>
+        <div class="yt-video-wrap">${inner}</div>`;
       try { lucide.createIcons(); } catch {}
     }
 
     function buildYouTubeCarouselHtml(videos) {
-      const [first, ...rest] = videos;
+      const [first] = videos;
+      const thumbs = videos.slice(0, 4);
       return `
-        <div class="yt-active-player">
-          <div class="yt-iframe-wrap">
-            <iframe
-              id="ytMainFrame"
-              src="https://www.youtube.com/embed/${encodeURIComponent(first.videoId)}?rel=0&modestbranding=1&color=white"
-              frameborder="0"
-              allowfullscreen
-              style="width:100%;height:100%;border-radius:12px;display:block;"
-            ></iframe>
-          </div>
-          <div class="yt-active-info">
-            <div class="yt-channel">${escapeHtml(first.channel || '')}</div>
-            <div class="yt-title">${escapeHtml(first.title || '')}</div>
-          </div>
+        <div class="yt-iframe-wrap">
+          <iframe
+            id="ytMainFrame"
+            src="${first.embed_url}"
+            frameborder="0"
+            allowfullscreen
+            style="width:100%;height:100%;display:block;"
+          ></iframe>
         </div>
-        ${videos.length > 1 ? `
+        ${thumbs.length > 1 ? `
         <div class="yt-thumbnails">
-          ${videos.map((v, i) => `
+          ${thumbs.map((v, i) => `
             <div class="yt-thumb-card ${i === 0 ? 'yt-thumb-active' : ''}"
-                 data-video-id="${escapeHtml(v.videoId)}"
-                 data-title="${escapeHtml(v.title || '')}"
-                 data-channel="${escapeHtml(v.channel || '')}"
+                 data-embed-url="${escapeHtml(v.embed_url)}"
                  role="button" tabindex="0"
                  aria-label="Play ${escapeHtml(v.title || 'recipe video')}"
                  onclick="switchYouTubeVideo(this)"
                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
               <div class="yt-thumb-img-wrap">
-                <img src="${v.thumbnail}" alt="${escapeHtml(v.title || '')}"
-                     style="width:100%;height:100%;object-fit:cover;border-radius:12px;"/>
-                <div class="yt-thumb-overlay ${i === 0 ? 'yt-thumb-playing' : ''}">
-                  ${i === 0
-                    ? '<span class="yt-playing-badge">PLAYING</span>'
-                    : '<div style="width:24px;height:24px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="play" style="width:14px;height:14px;color:#fff;margin-left:1px;"></i></div>'
-                  }
-                </div>
+                <img src="${v.thumbnail}" alt="${escapeHtml(v.title || '')}" />
+                ${i === 0 ? '<span class="yt-playing-badge">PLAYING</span>' : ''}
               </div>
               <div class="yt-thumb-title">${escapeHtml(v.title || '')}</div>
               <div class="yt-thumb-channel">${escapeHtml(v.channel || '')}</div>
@@ -2656,27 +3409,25 @@
     }
 
     function switchYouTubeVideo(card) {
-      const videoId = card.dataset.videoId;
-      const title = card.dataset.title;
-      const channel = card.dataset.channel;
-
+      const embedUrl = card.dataset.embedUrl;
       const frame = document.getElementById('ytMainFrame');
-      if (frame) frame.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?rel=0&modestbranding=1&color=white&autoplay=1`;
-
-      const titleEl = document.querySelector('.yt-title');
-      const channelEl = document.querySelector('.yt-channel');
-      if (titleEl) titleEl.textContent = title;
-      if (channelEl) channelEl.textContent = channel;
+      // autoplay=1 needs its own separator logic since embed_url already
+      // has its own query string (built server-side with "?rel=0...").
+      if (frame) frame.src = embedUrl + '&autoplay=1';
 
       document.querySelectorAll('.yt-thumb-card').forEach(c => {
         c.classList.remove('yt-thumb-active');
-        const overlay = c.querySelector('.yt-thumb-overlay');
-        if (overlay) overlay.innerHTML = '<div style="width:24px;height:24px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="play" style="width:14px;height:14px;color:#fff;margin-left:1px;"></i></div>';
+        const badge = c.querySelector('.yt-playing-badge');
+        if (badge) badge.remove();
       });
       card.classList.add('yt-thumb-active');
-      const activeOverlay = card.querySelector('.yt-thumb-overlay');
-      if (activeOverlay) activeOverlay.innerHTML = '<span class="yt-playing-badge">PLAYING</span>';
-      try { lucide.createIcons(); } catch {}
+      const imgWrap = card.querySelector('.yt-thumb-img-wrap');
+      if (imgWrap) {
+        const badge = document.createElement('span');
+        badge.className = 'yt-playing-badge';
+        badge.textContent = 'PLAYING';
+        imgWrap.appendChild(badge);
+      }
     }
 
     // Fires from 'awaiting_user_choice' — renders the "How to make it"
@@ -2694,28 +3445,30 @@
         }
       }
       if (dishName) {
-        fetch(`/api/youtube?dish=${encodeURIComponent(dishName)}`)
-          .then(r => r.json())
-          .then(data => renderYouTubeEmbed(data))
-          .catch(() => renderYouTubeEmbed(null));
+        fetchYoutubeVideos(dishName).then(renderYouTubeEmbed).catch(() => renderYouTubeEmbed(null));
       }
     }
 
-    function toggleYoutubeSection() {
-      youtubeSectionExpanded = !youtubeSectionExpanded;
-      const content = document.getElementById('ytVideoContent');
-      const caret = document.getElementById('ytCaret');
-      if (content) content.classList.toggle('collapsed', !youtubeSectionExpanded);
-      if (caret) caret.classList.toggle('rotated', youtubeSectionExpanded);
-    }
-
-    let topUpSectionExpanded = true;
-    function toggleTopUpSection() {
-      topUpSectionExpanded = !topUpSectionExpanded;
-      const content = document.getElementById('topupContent');
-      const caret = document.getElementById('topupCaret');
-      if (content) content.classList.toggle('collapsed', !topUpSectionExpanded);
-      if (caret) caret.classList.toggle('rotated', topUpSectionExpanded);
+    // Cached by dish name — loadDishHeroImage() (hero's YouTube-thumbnail
+    // source, now the last resort after Unsplash/TheMealDB — may or may
+    // not end up calling this at all, depending on whether an earlier
+    // source already succeeded) and this function both need the same
+    // /api/youtube search, so whichever one runs second in a given scan
+    // reuses the first's result instead of paying for the API call twice.
+    let cachedYoutubeDish = null;
+    let cachedYoutubeData = null;
+    function fetchYoutubeVideos(dishName) {
+      if (cachedYoutubeDish === dishName && cachedYoutubeData) {
+        return Promise.resolve(cachedYoutubeData);
+      }
+      return fetch(`/api/youtube?dish=${encodeURIComponent(dishName)}`)
+        .then(r => r.json())
+        .then(data => {
+          cachedYoutubeDish = dishName;
+          cachedYoutubeData = data;
+          return data;
+        })
+        .catch(() => ({ videos: [], first_thumbnail: '' }));
     }
 
     function toggleRecipeSteps() {
@@ -2767,6 +3520,145 @@
       if (bar) bar.classList.remove('visible');
     }
 
+    // Instant tab switch — both panels' content is already in the DOM
+    // (built by the normal SSE handlers, unchanged), this just toggles
+    // which one is visible. Recipe tab stays inert until
+    // unlockRecipeTab() (fired from awaiting_user_choice) enables it.
+    // Deliberately NOT a native `disabled` button — disabled elements
+    // never dispatch click events, which would make "tap the locked tab
+    // to see the toast" impossible. aria-disabled communicates the same
+    // thing to assistive tech without blocking the click.
+    function switchResultTab(tab) {
+      if (tab === 'recipe') {
+        const recipeTab = document.getElementById('recipeTab');
+        if (recipeTab.classList.contains('locked')) {
+          showToast('Still loading your recipe...');
+          return;
+        }
+        // First real view of an unlocked Recipe tab — the "new content"
+        // dot has done its job, drop it for the rest of this scan's
+        // results (resetResultTabs() recreates it for the next scan).
+        const dot = document.getElementById('recipeTabStatus');
+        if (dot) dot.remove();
+      }
+      document.querySelectorAll('.result-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(tab + 'Tab').classList.add('active');
+      document.getElementById('orderTabPanel').style.display = tab === 'order' ? 'block' : 'none';
+      document.getElementById('recipeTabPanel').style.display = tab === 'recipe' ? 'block' : 'none';
+      // Shared chrome (sits outside both tab panels) — only makes sense
+      // alongside the Order tab's own checklist/order content.
+      const heroSection = document.getElementById('dishHeroSection');
+      if (heroSection) heroSection.style.display = tab === 'order' ? 'block' : 'none';
+    }
+
+    function unlockRecipeTab() {
+      const recipeTab = document.getElementById('recipeTab');
+      recipeTab.classList.remove('locked');
+      recipeTab.setAttribute('aria-disabled', 'false');
+      const status = document.getElementById('recipeTabStatus');
+      if (status) status.className = 'tab-ready-dot';
+    }
+
+    // Reset to Order-active/Recipe-locked-and-loading — called at the top
+    // of every new scan (startScan()) so a fresh result never inherits the
+    // previous scan's tab state.
+    function resetResultTabs() {
+      switchResultTab('order');
+      const recipeTab = document.getElementById('recipeTab');
+      recipeTab.classList.add('locked');
+      recipeTab.setAttribute('aria-disabled', 'true');
+      // switchResultTab('recipe') may have permanently removed the dot
+      // during the previous scan's results — recreate it if so, since
+      // this new scan needs its own "unread" indicator.
+      let status = document.getElementById('recipeTabStatus');
+      if (!status) {
+        status = document.createElement('span');
+        status.id = 'recipeTabStatus';
+        recipeTab.appendChild(status);
+      }
+      status.className = 'tab-loading-dot';
+      document.getElementById('resultTabBar').style.display = 'none';
+    }
+
+    // Resolves true/false once `url` has definitely loaded or failed —
+    // never hangs forever on a dead/slow URL. Probes with a throwaway
+    // Image() rather than the real #dishHeroImg, so nothing touches the
+    // visible hero until a source is actually confirmed to work.
+    function tryLoadImage(url) {
+      return new Promise(resolve => {
+        const img = new Image();
+        let settled = false;
+        const finish = (ok) => { if (!settled) { settled = true; resolve(ok); } };
+        img.onload = () => finish(true);
+        img.onerror = () => finish(false);
+        img.src = url;
+        setTimeout(() => finish(false), 5000);
+      });
+    }
+
+    function setHeroImage(url) {
+      const img = document.getElementById('dishHeroImg');
+      const placeholder = document.getElementById('dishHeroPlaceholder');
+      img.onload = () => {
+        img.classList.add('loaded');
+        if (placeholder) placeholder.style.opacity = '0';
+      };
+      img.onerror = () => { img.style.display = 'none'; };
+      img.src = url;
+    }
+
+    // Dish hero image at the top of results — text/placeholder show
+    // immediately (no network wait); the real photo is best-effort from a
+    // waterfall of three sources, tried in order until one actually
+    // loads: Unsplash first (better quality/framing for a hero image than
+    // a YouTube thumbnail), TheMealDB (free, no key, strong for common/
+    // global dishes), then a YouTube recipe video's thumbnail as the last
+    // resort before the placeholder (shares the same search the "Watch
+    // recipe video" section needs via fetchYoutubeVideos(), so trying it
+    // here still costs one API call, not two, whichever order it runs
+    // in). Never throws — if every source fails or times out, the
+    // placeholder initial stays up.
+    async function loadDishHeroImage(dishName, servingsCount, cookTime) {
+      document.getElementById('dishHeroName').textContent = dishName;
+      document.getElementById('dishHeroMeta').textContent =
+        `For ${servingsCount} ${servingsCount === 1 ? 'person' : 'people'} · ${cookTime || '25 min'}`;
+      document.getElementById('dishHeroInitial').textContent = dishName.charAt(0).toUpperCase();
+      document.getElementById('dishHeroSection').style.display = 'block';
+
+      // Source 1 — Unsplash
+      try {
+        const uRes = await fetch(`/api/dish-image?dish=${encodeURIComponent(dishName)}`);
+        const uData = await uRes.json();
+        if (uData.found && uData.image_url && await tryLoadImage(uData.image_url)) {
+          setHeroImage(uData.image_url);
+          return;
+        }
+      } catch (e) {}
+
+      // Source 2 — TheMealDB
+      try {
+        const mealRes = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(dishName)}`);
+        const mealData = await mealRes.json();
+        const thumb = mealData && mealData.meals && mealData.meals[0] && mealData.meals[0].strMealThumb;
+        if (thumb && await tryLoadImage(thumb)) {
+          setHeroImage(thumb);
+          return;
+        }
+      } catch (e) {}
+
+      // Source 3 — YouTube recipe video thumbnail
+      try {
+        const ytData = await fetchYoutubeVideos(dishName);
+        const thumb = ytData && ytData.first_thumbnail;
+        if (thumb && await tryLoadImage(thumb)) {
+          setHeroImage(thumb);
+          return;
+        }
+      } catch (e) {}
+
+      // All three sources failed — placeholder initial stays visible.
+    }
+
     // Effect 2 — count the stat numbers up from 0 to their target over 600ms,
     // eased. Pure requestAnimationFrame, no dependencies.
     function animateStatNumbers(root) {
@@ -2790,13 +3682,18 @@
         // Checked = "I have this" (staple, fridge-matched, or manually
         // confirmed) — greyed out + strikethrough. Auto-detected ones
         // (not manually toggled on by the user) get an explanatory tag.
+        // Staples stay editable: the user can uncheck one they're out of,
+        // which drops it into the order count/sheet like any other
+        // missing item (see toggleRecipeItem()).
         let tag = '';
         if (ing.checked) {
           if (ing.foundInFridge) tag = '<span class="recipe-row-tag recipe-row-tag-fridge"><i data-lucide="camera"></i> in fridge</span>';
           else if (ing.isStaple) tag = '<span class="recipe-row-tag recipe-row-tag-staple">Staple</span>';
+        } else if (ing.isStaple) {
+          tag = '<span class="recipe-row-tag-will-order">Will be ordered</span>';
         }
         return `
-          <div class="recipe-row ${ing.checked ? 'checked' : ''}" onclick="toggleRecipeItem(${idx})">
+          <div class="recipe-row ${ing.checked ? 'checked' : ''} ${ing.isStaple ? 'is-staple' : ''}" onclick="toggleRecipeItem(${idx})">
             <span class="recipe-row-checkbox">${ing.checked ? '<i data-lucide="circle-check"></i>' : ''}</span>
             <div class="recipe-row-info">
               <div class="recipe-row-name">${escapeHtml(ing.name)}</div>
@@ -2809,28 +3706,15 @@
       }).join('');
     }
 
-    function buildRecipeFooterHtml() {
-      const toOrderCount = currentRecipeChecklist.filter(i => !i.checked).length;
-      if (toOrderCount === 0) return '';
-      return `
-        <div class="recipe-checklist-footer">
-          <p class="recipe-order-count">${toOrderCount} ingredient${toOrderCount === 1 ? '' : 's'} to order</p>
-          <button class="recipe-cart-btn" onclick="orderRecipeCart()">
-            <i data-lucide="shopping-cart"></i> Add ${toOrderCount} item${toOrderCount === 1 ? '' : 's'} to Instamart
-          </button>
-        </div>`;
-    }
-
     function updateRecipeRowsAndFooter() {
       const rowsEl = document.getElementById('recipeRowsContainer');
-      const footerEl = document.getElementById('recipeChecklistFooter');
       const statsEl = document.getElementById('recipeStatsRow');
       const hookEl = document.getElementById('recipeHookLine');
       if (rowsEl) rowsEl.innerHTML = buildRecipeRowsHtml();
-      if (footerEl) footerEl.innerHTML = buildRecipeFooterHtml();
       if (statsEl) { statsEl.innerHTML = buildRecipeStatsHtml(); animateStatNumbers(statsEl); }
       if (hookEl) hookEl.textContent = buildRecipeHookText();
       try { lucide.createIcons(); } catch {}
+      updateRecipeRowsFade();
     }
 
     function toggleRecipeItem(idx) {
@@ -2838,6 +3722,31 @@
       if (!item) return;
       item.checked = !item.checked;
       updateRecipeRowsAndFooter();
+      updateStickySummaryBar();
+      refreshChoiceCardMissingText();
+      refreshOrderSheetIfOpen();
+    }
+
+    // Single source of truth for "what still needs to be ordered" — every
+    // unchecked row, whether it started as `missing` or as a `staple` the
+    // user has since unchecked. Anything checked (have, staple, or a
+    // manual override) is excluded, matching the stat line's own count.
+    function getItemsToOrder() {
+      return currentRecipeChecklist.filter(i => !i.checked);
+    }
+
+    function buildMissingSummaryText(items) {
+      const names = items.map(i => escapeHtml(i.name));
+      if (!names.length) return 'Nothing — you have everything';
+      return names.length > 3 ? `${names.slice(0, 3).join(', ')} + ${names.length - 3} more` : names.join(', ');
+    }
+
+    // Keeps the "Order missing items" button's subtitle in sync whenever
+    // a checkbox (including a staple) is toggled after the choice card has
+    // already been rendered.
+    function refreshChoiceCardMissingText() {
+      const sub = document.getElementById('groceriesMissingSub');
+      if (sub) sub.innerHTML = buildMissingSummaryText(getItemsToOrder());
     }
 
     function parseQuantityString(qtyStr) {
@@ -2846,56 +3755,6 @@
         return { qty_needed: parseFloat(match[1]) || 1, unit: match[2].trim() || 'unit' };
       }
       return { qty_needed: 1, unit: qtyStr || 'unit' };
-    }
-
-    function orderRecipeCart() {
-      const toOrderItems = currentRecipeChecklist.filter(i => !i.checked);
-      if (!toOrderItems.length) return;
-      showMockOrderConfirmation(toOrderItems);
-    }
-
-    // Staging demo only — no real Instamart order is placed. Shows a fake
-    // order ID and ETA so the flow feels complete without depending on the
-    // live cart-fill agent.
-    function showMockOrderConfirmation(items) {
-      const orderId = 'FTF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const modal = document.getElementById('smartCartModal');
-      modal.style.display = 'flex';
-      document.getElementById('cartModalBody').innerHTML = `
-        <div class="cart-header">
-          <div class="cart-title">Order confirmed</div>
-          <div class="cart-subtitle">Staging demo — no real order was placed</div>
-        </div>
-        <div class="cart-items-list">
-          ${items.map(item => `
-            <div class="cart-item-row">
-              <div class="cart-item-icon"><i data-lucide="${getCategoryIcon('food')}"></i></div>
-              <div class="cart-item-info">
-                <div class="cart-item-name">${escapeHtml(item.name)}</div>
-                <div class="cart-item-qty">${escapeHtml(item.quantity || '')}</div>
-              </div>
-            </div>`).join('')}
-        </div>
-        <div class="cart-summary">
-          <div class="cart-summary-row"><span>Order ID</span><span class="mono-text">${orderId}</span></div>
-          <div class="cart-summary-row"><span>Estimated delivery</span><span class="order-value eta">22 minutes</span></div>
-        </div>
-        <div class="cart-connect-hint">STAGING DEMO — this screen does not place a real Instamart order.</div>
-      `;
-      try { lucide.createIcons(); } catch {}
-    }
-
-    function addTopUpToCart(idx) {
-      const item = currentTopUpSuggestions[idx];
-      if (!item) return;
-      openSmartCart([{
-        id: `topup_${idx}_${Date.now()}`,
-        name: item.name,
-        qty_needed: 1,
-        unit: 'piece',
-        threshold: 1,
-        category: 'food',
-      }]);
     }
 
     function isInternalReasoning(text) {
@@ -2911,10 +3770,9 @@
     }
 
     function renderChoiceCard(ev) {
-      const missing = (ev.missing_ingredients || []).map(escapeHtml);
-      const missingText = missing.length
-        ? (missing.length > 3 ? `${missing.slice(0, 3).join(', ')} + ${missing.length - 3} more` : missing.join(', '))
-        : 'Nothing — you have everything';
+      // Derived live from the checklist (not the frozen ev.missing_ingredients
+      // snapshot) so a staple the user has since unchecked shows up here too.
+      const missingText = buildMissingSummaryText(getItemsToOrder());
       const mealName = escapeHtml(ev.recommended_meal || 'this dish');
       const rawReasoning = ev.reasoning || '';
       const showReasoning = rawReasoning && !isInternalReasoning(rawReasoning);
@@ -2927,7 +3785,7 @@
           <div class="choice-icon-circle"><i data-lucide="shopping-cart"></i></div>
           <div class="choice-text">
             <div class="choice-btn-title">Order missing items from Instamart</div>
-            <div class="choice-btn-sub">${missingText}</div>
+            <div class="choice-btn-sub" id="groceriesMissingSub">${missingText}</div>
           </div>
         </button>`;
 
@@ -2985,7 +3843,7 @@
       const form = new FormData();
       form.append('action', action);
       form.append('meal_name', currentMealName || '');
-      form.append('missing_ingredients', currentMissingIngredients.join(','));
+      form.append('missing_ingredients', getItemsToOrder().map(i => i.name).join(','));
 
       try {
         const res = await fetch('/api/order', { method: 'POST', body: form });
@@ -3000,7 +3858,7 @@
       }
     }
 
-    /* ═══════════════ ORDER MISSING ITEMS — PREVIEW MODAL ═══════════════ */
+    /* ═══════════════ ORDER MISSING ITEMS — PREVIEW + TOP UP UPSELL SHEET ═══════════════ */
     let pendingGroceriesBtn = null;
 
     function getMissingIngredientDefaults(name) {
@@ -3021,51 +3879,134 @@
       return { unit: 'pack', qty: 1 };
     }
 
+    // Tapping the Instamart choice card opens this sheet instead of going
+    // straight to auth/order — a chance to review what's missing and add
+    // Top Up suggestions before committing. Skips straight to the real
+    // flow if there's nothing to confirm.
     function confirmOrderGroceries(btnEl) {
-      const items = currentMissingIngredients;
+      const items = getItemsToOrder();
       if (!items.length) {
         chooseAction('order_groceries', btnEl);
         return;
       }
       pendingGroceriesBtn = btnEl;
+      openOrderSheet();
+    }
 
-      const rows = items.map(name => {
-        const { unit, qty } = getMissingIngredientDefaults(name);
-        return `<div class="shopping-list-item"><span>${escapeHtml(name)}</span><span>${qty} ${escapeHtml(unit)}</span></div>`;
-      }).join('');
+    // Renders up to 5 Top Up cards inside the order sheet — real Unsplash
+    // photos loaded in parallel via loadTopUpImage(), emoji shown
+    // immediately and left in place until (or unless) each photo lands.
+    function renderOrderSheetTopUp(items) {
+      const section = document.getElementById('orderSheetTopUp');
+      if (!items || !items.length) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = 'block';
 
-      document.getElementById('orderPreviewModalContainer').innerHTML = `
-        <div class="modal-overlay" onclick="closeOrderPreviewModal(event)">
-          <div class="modal-sheet" onclick="event.stopPropagation()">
-            <div class="modal-header">
-              <h3>Order missing items</h3>
-              <button class="modal-close" onclick="closeOrderPreviewModal()" aria-label="Close"><i data-lucide="x"></i></button>
-            </div>
-            <div class="cart-items-list">${rows}</div>
-            <button class="modal-submit" onclick="confirmAndOrderGroceries()">Confirm and Order</button>
-            <button class="modal-cancel-btn" onclick="closeOrderPreviewModal()">Cancel</button>
+      const topItems = items.slice(0, 5);
+      const container = document.getElementById('orderSheetTopUpCards');
+      container.innerHTML = topItems.map((item, i) => `
+        <div class="topup-sheet-card" id="topupSheetCard-${i}">
+          <div class="topup-sheet-img-wrap">
+            <img class="topup-sheet-img" alt="${escapeHtml(item.name)}" />
+            <div class="topup-sheet-emoji-fallback">${getEmojiForIngredient(item.name)}</div>
           </div>
-        </div>`;
-      try { lucide.createIcons(); } catch {}
+          <div class="topup-sheet-info">
+            <p class="topup-sheet-name">${escapeHtml(item.name)}</p>
+            <p class="topup-sheet-price">~₹${item.estimated_price || 0}</p>
+          </div>
+        </div>`).join('');
+
+      topItems.forEach((item, i) => {
+        const cardEl = document.getElementById(`topupSheetCard-${i}`);
+        if (cardEl) loadTopUpImage(cardEl, item.name);
+      });
     }
 
-    function closeOrderPreviewModal(e) {
-      if (e) e.stopPropagation();
-      document.getElementById('orderPreviewModalContainer').innerHTML = '';
+    // Shared by openOrderSheet() and refreshOrderSheetIfOpen() so a staple
+    // toggled while the sheet is already open updates it in place.
+    function renderOrderSheetItems() {
+      const items = getItemsToOrder();
+      document.getElementById('orderSheetSubtitle').textContent =
+        `${items.length} item${items.length === 1 ? '' : 's'} to order`;
+
+      document.getElementById('orderSheetItems').innerHTML = items.map(item => {
+        const { unit, qty } = getMissingIngredientDefaults(item.name);
+        return `<div class="order-sheet-item"><span>${escapeHtml(item.name)}</span><span class="order-sheet-item-qty">${qty} ${escapeHtml(unit)}</span></div>`;
+      }).join('');
     }
 
-    async function confirmAndOrderGroceries() {
+    function openOrderSheet() {
+      const sheet = document.getElementById('orderBottomSheet');
+      const panel = document.getElementById('orderSheetPanel');
+      const backdrop = document.getElementById('orderSheetBackdrop');
+
+      renderOrderSheetItems();
+      renderOrderSheetTopUp(currentTopUpSuggestions);
+
+      sheet.style.display = 'block';
+      requestAnimationFrame(() => {
+        backdrop.style.opacity = '1';
+        panel.style.transform = 'translateX(-50%) translateY(0)';
+      });
+    }
+
+    function refreshOrderSheetIfOpen() {
+      const sheet = document.getElementById('orderBottomSheet');
+      if (sheet && sheet.style.display === 'block') renderOrderSheetItems();
+    }
+
+    function closeOrderSheet() {
+      const panel = document.getElementById('orderSheetPanel');
+      const backdrop = document.getElementById('orderSheetBackdrop');
+      panel.style.transform = 'translateX(-50%) translateY(100%)';
+      backdrop.style.opacity = '0';
+      setTimeout(() => { document.getElementById('orderBottomSheet').style.display = 'none'; }, 400);
+    }
+
+    function confirmOrderSheet() {
       const btnEl = pendingGroceriesBtn;
-      closeOrderPreviewModal();
+      closeOrderSheet();
       chooseAction('order_groceries', btnEl);
     }
 
-    async function startScan(mode, file) {
+    // Swipe-down-to-dismiss on the panel itself (backdrop tap is handled
+    // by its own onclick in the markup).
+    (function initOrderSheetSwipe() {
+      const panel = document.getElementById('orderSheetPanel');
+      if (!panel) return;
+      let touchStartY = 0;
+      panel.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+      panel.addEventListener('touchend', e => {
+        if (e.changedTouches[0].clientY - touchStartY > 80) closeOrderSheet();
+      }, { passive: true });
+    })();
+
+    // Single entry point for the "Get Recipe" button — routes to a photo
+    // scan (all fridgePhotos sent together) if any were added, otherwise a
+    // plain dish lookup. Keeps the button's onclick attribute simple.
+    function startAnalysis() {
+      if (fridgePhotos.length > 0) {
+        startScan('photo', fridgePhotos);
+      } else {
+        startScan('recipe');
+      }
+    }
+
+    async function startScan(mode, files) {
       // UI state — landing hides and the loading overlay takes over the
       // instant the scan starts; resultsSection only reappears once the
       // 'complete' SSE event fires (or on error/auth_required, so the
       // failure state is visible instead of a blank screen).
-      currentScanHasPhoto = mode === 'photo' && !!file;
+      currentScanHasPhoto = mode === 'photo' && !!files && files.length > 0;
+      if (currentScanHasPhoto) {
+        // Dedicated URL for the hero display — independent of the
+        // thumbnail URLs (fridgePhotoThumbURLs), which need to stay valid
+        // for the upload area / thumb strip after this one gets revoked
+        // in hidePhotoScanScreen().
+        fridgePhotoURL = URL.createObjectURL(files[0]);
+      }
       currentScanDish = document.getElementById('targetDish').value.trim();
       photoScanScreenShown = false;
       step2PartialRawText = '';
@@ -3081,31 +4022,39 @@
       const scanSectionWrapperEl = document.getElementById('scanSectionWrapper');
       if (scanSectionWrapperEl) scanSectionWrapperEl.style.display = '';
       resetProgressSteps();
-      document.getElementById('ingredientChips').innerHTML = '';
+      closeFridgeDropdown();
+      closeFridgeLightbox();
+      document.getElementById('fridgeChipsInner').innerHTML = '';
       document.getElementById('mealCards').innerHTML = '';
       document.getElementById('mealSuggestionsSection').classList.add('hidden');
       document.getElementById('recipeChecklistSection').innerHTML = '';
-      document.getElementById('recipeDishHeaderSection').innerHTML = '';
       document.getElementById('recipeStepsSection').innerHTML = '';
       document.getElementById('youtubeVideoSection').innerHTML = '';
       document.getElementById('choiceCard').innerHTML = '';
-      document.getElementById('topUpSection').innerHTML = '';
       document.getElementById('orderCard').innerHTML = '';
       hideStickySummaryBar();
+      resetResultTabs();
       const summaryHeaderReset = document.getElementById('fridgeSummaryHeader');
       if (summaryHeaderReset) { summaryHeaderReset.style.display = 'none'; summaryHeaderReset.style.opacity = '0'; }
       const thumbTargetReset = document.getElementById('fridgeThumbTarget');
       if (thumbTargetReset) thumbTargetReset.style.opacity = '0';
+      if (fridgeThumbPhotoURL) { URL.revokeObjectURL(fridgeThumbPhotoURL); fridgeThumbPhotoURL = null; }
+      document.getElementById('dishHeroSection').style.display = 'none';
+      const dishHeroImgReset = document.getElementById('dishHeroImg');
+      if (dishHeroImgReset) { dishHeroImgReset.classList.remove('loaded'); dishHeroImgReset.style.display = ''; dishHeroImgReset.src = ''; }
+      const dishHeroPlaceholderReset = document.getElementById('dishHeroPlaceholder');
+      if (dishHeroPlaceholderReset) dishHeroPlaceholderReset.style.opacity = '';
       currentMealName = null;
-      currentMissingIngredients = [];
       currentFridgeIngredients = [];
+      matchedFridgeItems = [];
       currentRecipeChecklist = [];
 
       const form = new FormData();
-      if (mode === 'photo' && file) {
+      if (mode === 'photo' && files && files.length) {
         // No `mode` field: the backend's original vision branch runs
-        // whenever mode isn't "recipe".
-        form.append('file', file);
+        // whenever mode isn't "recipe". Up to 3 photos, all analysed by
+        // Gemini in one call.
+        files.forEach((f, i) => form.append(`fridge_photo_${i}`, f));
       } else {
         form.append('mode', mode);
       }
@@ -3121,7 +4070,7 @@
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         await readSSEStream(res, handleEvent);
       } catch (err) {
-        renderApiErrorCard('orderCard', () => startScan(mode, file));
+        renderApiErrorCard('orderCard', () => startScan(mode, files));
         resultsEl.classList.add('show');
         hideLoadingOverlay();
         revealResultsSection();
@@ -3138,6 +4087,9 @@
       if (!el) return;
       el.style.display = 'block';
       requestAnimationFrame(() => el.classList.add('fade-in'));
+
+      const tabBar = document.getElementById('resultTabBar');
+      if (tabBar) tabBar.style.display = 'flex';
     }
 
     // Used by the "Try again" button on the two scan empty/error states —
@@ -3150,30 +4102,18 @@
       resultsSectionEl.classList.remove('fade-in');
       resultsSectionEl.style.display = 'none';
       hideStickySummaryBar();
+      resetResultTabs();
+      closeFridgeDropdown();
+      closeFridgeLightbox();
       const landingEl = document.getElementById('landingSection');
       landingEl.style.display = '';
       requestAnimationFrame(() => landingEl.classList.remove('fade-out'));
+      clearFridgePhotos();
     }
 
-    /* ── Landing "Scan Fridge" secondary button ── */
-    function toggleLandingScanArea() {
-      const area = document.getElementById('landingScanArea');
-      const btn = document.getElementById('scanFridgeBtn');
-      const showing = area.classList.contains('show');
-      area.classList.toggle('show', !showing);
-      if (btn) btn.classList.toggle('active', !showing);
-    }
-
-    function triggerLandingScanCamera() {
-      const input = document.getElementById('landingScanFileInput');
-      input.setAttribute('capture', 'environment');
-      input.click();
-    }
-
-    function triggerLandingScanGallery() {
-      const input = document.getElementById('landingScanFileInput');
-      input.removeAttribute('capture');
-      input.click();
+    function triggerAddPhoto() {
+      if (fridgePhotos.length >= 3) return;
+      document.getElementById('fridgePhotoInput').click();
     }
 
     // Mobile camera photos are commonly 8-12MB at full resolution, which can
@@ -3209,16 +4149,79 @@
       });
     }
 
-    document.getElementById('landingScanFileInput').addEventListener('change', async e => {
-      const file = e.target.files[0];
-      if (!file) return;
+    // Adds one compressed photo to fridgePhotos (max 3) and re-renders its
+    // thumbnail — does NOT start the scan; that only happens once the user
+    // taps "Get Recipe" (see startAnalysis()), so they can add up to 3
+    // photos first.
+    function addPhoto(file) {
+      if (fridgePhotos.length >= 3) return Promise.resolve();
       const statusEl = document.getElementById('landingScanStatus');
-      statusEl.innerHTML = '<div class="spin"></div> Scanning your fridge…';
-      const compressed = await compressImage(file, 1200, 1200, 0.82);
-      const compressedFile = new File([compressed], file.name, { type: 'image/jpeg' });
-      fridgePhotoURL = URL.createObjectURL(compressedFile);
-      lastPhotoFile = compressedFile;
-      startScan('photo', compressedFile);
+      if (statusEl) statusEl.innerHTML = '<div class="spin"></div> Adding photo…';
+      return compressImage(file, 1200, 1200, 0.82).then(blob => {
+        fridgePhotos.push(new File([blob], file.name, { type: 'image/jpeg' }));
+        updatePhotoUI();
+        if (statusEl) statusEl.innerHTML = '';
+      });
+    }
+
+    function removePhoto(index) {
+      fridgePhotos.splice(index, 1);
+      updatePhotoUI();
+    }
+
+    // Thumbnails + an inline "+" (only while under the 3-photo cap) —
+    // only called once at least one photo exists; see updatePhotoUI().
+    function renderPhotoThumbnails() {
+      fridgePhotoThumbURLs.forEach(url => URL.revokeObjectURL(url));
+      fridgePhotoThumbURLs = fridgePhotos.map(f => URL.createObjectURL(f));
+      const row = document.getElementById('photoThumbnailRow');
+      let html = fridgePhotos.map((file, i) => `
+        <div class="photo-thumb">
+          <img src="${fridgePhotoThumbURLs[i]}" alt="Fridge photo ${i + 1}" />
+          <button type="button" class="photo-thumb-remove" onclick="removePhoto(${i})" aria-label="Remove photo">
+            <i data-lucide="x"></i>
+          </button>
+        </div>`).join('');
+      if (fridgePhotos.length < 3) {
+        html += `<button type="button" class="add-photo-plus" onclick="triggerAddPhoto()" aria-label="Add another photo">
+          <i data-lucide="plus"></i>
+        </button>`;
+      }
+      row.innerHTML = html;
+      try { lucide.createIcons(); } catch {}
+    }
+
+    // Called once a scan finishes successfully (or the user bails back to
+    // the landing form) — the next scan should start with an empty photo
+    // set, not whatever was left over from this one.
+    function clearFridgePhotos() {
+      fridgePhotos = [];
+      updatePhotoUI();
+    }
+
+    // Single "Scan Fridge" button (0 photos) <-> thumbnail row + inline
+    // "+" (1-3 photos) — never both at once, which is what caused the
+    // duplicate-looking "Scan Fridge" button.
+    function updatePhotoUI() {
+      const scanBtn = document.getElementById('addPhotoBtn');
+      const row = document.getElementById('photoThumbnailRow');
+      if (fridgePhotos.length === 0) {
+        scanBtn.style.display = 'flex';
+        row.style.display = 'none';
+        row.innerHTML = '';
+      } else {
+        scanBtn.style.display = 'none';
+        row.style.display = 'flex';
+        renderPhotoThumbnails();
+      }
+    }
+
+    document.getElementById('fridgePhotoInput').addEventListener('change', async e => {
+      const files = Array.from(e.target.files).slice(0, 3 - fridgePhotos.length);
+      e.target.value = ''; // reset so the same file can be re-picked later
+      for (const file of files) {
+        await addPhoto(file);
+      }
     });
 
     /* ═══════════════ DISH AUTOCOMPLETE ═══════════════ */
@@ -3477,14 +4480,15 @@
         const isPhotoScan = ev.source !== 'recipe';
         setStep(1, 'done', hasIngredients ? `${ev.ingredients.length} ingredients found` : 'Ready to scan');
         currentFridgeIngredients = ev.ingredients || [];
-        const fridgeSection = document.getElementById('fridgeIngredientsSection');
         // Recipe mode starts with an intentionally empty fridge — nothing
         // to show. A photo scan that comes back empty is a real failure
         // to detect anything, so surface it instead of hiding silently.
+        // Both cases render into the chips dropdown, not page content —
+        // #fridgeSummaryHeader/#fridgeSummaryRow's own visibility (driven
+        // by transitionToResults(), photo scans only) is what actually
+        // gates whether there's a row to click at all.
         if (!hasIngredients && isPhotoScan) {
-          fridgeSection.classList.remove('hidden');
-          document.getElementById('fridgeDesc').textContent = '';
-          document.getElementById('ingredientChips').innerHTML =
+          document.getElementById('fridgeChipsInner').innerHTML =
             `<div class="scan-state-card">
               <i data-lucide="refrigerator" class="scan-state-icon"></i>
               <div class="scan-state-heading">Nothing detected in your fridge</div>
@@ -3492,20 +4496,12 @@
               <button type="button" class="cta-secondary-btn" onclick="resetToLanding()">Try again</button>
             </div>`;
         } else {
-          fridgeSection.classList.toggle('hidden', !hasIngredients);
-          document.getElementById('fridgeDesc').textContent = ev.raw_description;
           const chips = ev.ingredients
             .filter(i => i.name && i.name.trim() !== '')
-            .map((i, idx) =>
-            `<div class="chip ${confClass(i.confidence)} [animation-delay:${idx * 80}ms]">
-              <div class="chip-dot"></div>
-              ${escapeHtml(i.name)}
-              <span class="chip-pct">${i.confidence}%</span>
-            </div>`
-          ).join('');
-          document.getElementById('ingredientChips').innerHTML = chips;
+            .map((i, idx) => buildFridgeChip(i, idx, false))
+            .join('');
+          document.getElementById('fridgeChipsInner').innerHTML = chips;
         }
-        fridgeSection.classList.add('section-reveal');
         // Skeletons for what's still to come — real content replaces each
         // one wholesale as its own SSE event arrives (step2 for the
         // checklist, awaiting_user_choice for the order buttons).
@@ -3514,7 +4510,7 @@
         // Both paths below eventually call revealResultsContent(), which
         // stages these three back in — start them invisible so there's
         // something to animate from.
-        ['recipeDishHeaderSection', 'recipeChecklistSection', 'choiceCard'].forEach(id => {
+        ['recipeChecklistSection', 'choiceCard'].forEach(id => {
           const el = document.getElementById(id);
           if (el) { el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; }
         });
@@ -3537,12 +4533,14 @@
       }
 
       if (ev.type === 'step2_partial') {
+        // DOM rows no longer trickle in here — the skeleton stays a single
+        // unit until step2 fires, then swaps wholesale. Name tracking is
+        // kept (cheap, and available for a future progress subtext) even
+        // though nothing currently reads it back out.
         step2PartialRawText += ev.text;
         const names = extractStreamedIngredientNames(step2PartialRawText);
         const newNames = names.slice(streamedIngredientNames.length);
-        if (!newNames.length) return;
-        streamedIngredientNames = streamedIngredientNames.concat(newNames);
-        renderStreamingIngredientRows(newNames);
+        if (newNames.length) streamedIngredientNames = streamedIngredientNames.concat(newNames);
         return;
       }
 
@@ -3573,6 +4571,13 @@
         // so nothing flashes or disappears, it just becomes authoritative.
         renderRecipeChecklist(ev);
         updateStickySummaryBar();
+        matchedFridgeItems = ev.matched_fridge_items || [];
+        rerenderFridgeChips();
+        if (ev.recommended_meal) {
+          const recSuggestion = ev.suggestions.find(s => s.name === ev.recommended_meal) || ev.suggestions[0] || {};
+          const cookTime = recSuggestion.prep_time_minutes ? `${recSuggestion.prep_time_minutes} min` : null;
+          loadDishHeroImage(ev.recommended_meal, servings, cookTime);
+        }
         try { lucide.createIcons(); } catch {}
         return;
       }
@@ -3580,11 +4585,11 @@
       if (ev.type === 'awaiting_user_choice') {
         markProgressStepDone(4);
         currentMealName = ev.recommended_meal || '';
-        currentMissingIngredients = ev.missing_ingredients || [];
         setStep(3, '', 'Waiting for your choice');
         renderChoiceCard(ev);
         resultsEl.classList.add('show');
         revealRecipeStepsAndVideo(ev.recommended_meal);
+        unlockRecipeTab();
         return;
       }
 
@@ -3597,74 +4602,17 @@
         // any path where an earlier event was skipped.
         hideLoadingOverlay();
         revealResultsSection();
+        clearFridgePhotos();
         return;
       }
 
       if (ev.type === 'top_up') {
+        // No longer rendered on the main results page — stored only, for
+        // the order bottom sheet's upsell cards (see openOrderSheet() /
+        // renderOrderSheetTopUp()).
         const suggestions = ev.suggestions || [];
         if (!suggestions.length) return;
         currentTopUpSuggestions = suggestions;
-
-        const cards = suggestions.map((s, i) => `
-            <div class="topup-product-card [animation-delay:${i * 80}ms]">
-              <div class="topup-img-placeholder" id="topupImg-${i}"></div>
-              <div class="topup-body">
-                <div class="topup-name">${escapeHtml(s.name)}</div>
-                <div class="topup-bottom-row">
-                  <span class="topup-price">₹${s.estimated_price || 0}</span>
-                  <button class="topup-add-btn" id="topupAddBtn-${i}" onclick="addTopUpToCart(${i})">
-                    <i data-lucide="plus"></i> Add
-                  </button>
-                </div>
-              </div>
-            </div>`
-        ).join('');
-
-        const topUpSection = document.getElementById('topUpSection');
-        topUpSection.classList.add('section-reveal');
-        topUpSection.innerHTML =
-          `<button type="button" class="section-label topup-header-row topup-toggle" onclick="toggleTopUpSection()">
-            <i data-lucide="sparkles"></i> Top up your meal <span class="spacer"></span><span class="topup-powered">instamart</span>
-            <i data-lucide="chevron-down" class="ml-2 ${topUpSectionExpanded ? 'rotated' : ''}" id="topupCaret"></i>
-          </button>
-          <div class="topup-content ${topUpSectionExpanded ? '' : 'collapsed'}" id="topupContent">
-            <p class="topup-subtitle">Small additions, big upgrade</p>
-            <div class="topup-scroll">${cards}</div>
-          </div>`;
-        try { lucide.createIcons(); } catch {}
-
-        // Placeholder shows first (grey square, via .topup-img-placeholder's
-        // own background) — each card's real image resolves independently
-        // and asynchronously, falling back to a letter avatar if it 404s.
-        suggestions.forEach((s, i) => {
-          getTopUpImageUrl(s.name).then(url => {
-            const container = document.getElementById(`topupImg-${i}`);
-            if (!container) return;
-            const img = document.createElement('img');
-            img.src = url;
-            img.alt = '';
-            img.style.width = '80px';
-            img.style.height = '80px';
-            img.style.objectFit = 'contain';
-            const emojiDiv = document.createElement('div');
-            emojiDiv.style.cssText = `
-              display:none;
-              width:100%;
-              height:100%;
-              align-items:center;
-              justify-content:center;
-              font-size:48px;
-              line-height:1;
-            `;
-            img.onerror = function() {
-              this.style.display = 'none';
-              emojiDiv.style.display = 'flex';
-              emojiDiv.textContent = getEmojiForIngredient(s.name);
-            };
-            container.appendChild(img);
-            container.appendChild(emojiDiv);
-          });
-        });
         return;
       }
 
