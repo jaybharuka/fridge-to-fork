@@ -1,0 +1,191 @@
+/* Ported from templates/index.html — results shell: header, sticky summary
+   bar, tab bar, fridge summary header, chips dropdown, lightbox. Class
+   names differ (CSS Modules scope them) but selectors/values match the
+   source 1:1, except where noted. */
+
+/* App header — templates/index.html:186-203 */
+.appHeader {
+  position: sticky; top: 0; z-index: 30; height: 56px; border-bottom: 1px solid var(--border);
+  background: rgba(var(--bg-rgb), 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  transition: background .2s ease;
+}
+.appHeaderInner {
+  max-width: 480px; margin: 0 auto; height: 100%; padding: 0 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; font-size: 16px; white-space: nowrap; }
+.brand svg { width: 20px; height: 20px; color: var(--text-muted); }
+.headerActions { display: flex; align-items: center; gap: 8px; }
+.themeToggle {
+  width: 44px; height: 44px; background: var(--bg-secondary); border: 1px solid var(--border); cursor: pointer; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0;
+  transition: transform .3s ease, background .2s ease, color .2s ease;
+}
+.themeToggle svg { width: 16px; height: 16px; transition: opacity .2s ease, transform .2s ease; }
+.themeToggle:hover { color: var(--text-primary); background: var(--border); }
+.themeToggle.spinning { transform: rotate(180deg); }
+
+/* Sticky at-a-glance summary bar — templates/index.html:1003-1035 */
+.resultStickyHeader { position: sticky; top: 56px; z-index: 200; }
+.stickySummaryBar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+.stickySummaryBar.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.stickySummaryText { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
+.stickySummaryText strong { color: #FC8019; }
+.stickySummaryDish {
+  font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.4);
+  text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 40%;
+}
+:global([data-theme="light"]) .stickySummaryBar { background: rgba(255, 255, 255, 0.88); border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
+:global([data-theme="light"]) .stickySummaryText { color: rgba(0, 0, 0, 0.9); }
+:global([data-theme="light"]) .stickySummaryDish { color: rgba(0, 0, 0, 0.4); }
+
+/* Order/Recipe tab bar — templates/index.html:1040-1085 */
+.resultTabBar {
+  display: flex; background: var(--bg); border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 0 20px; gap: 0; flex-direction: row;
+}
+.resultTab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 14px 0; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.35);
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; transition: color 0.2s ease, border-color 0.2s ease; position: relative;
+  font-family: inherit;
+}
+.resultTab svg { width: 16px; height: 16px; stroke-width: 1.5; }
+.resultTab.active { color: #FC8019; border-bottom: 2px solid #FC8019; }
+.resultTab.locked { opacity: 0.4; cursor: not-allowed; }
+.resultTab.locked:hover { color: rgba(255, 255, 255, 0.35); }
+.tabLoadingDot {
+  width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.3);
+  animation: tabDotPulse 1.2s ease-in-out infinite; display: inline-block;
+}
+@keyframes tabDotPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.2); }
+}
+.tabReadyDot { width: 6px; height: 6px; border-radius: 50%; background: #FC8019; display: inline-block; }
+:global([data-theme="light"]) .resultTabBar { border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
+:global([data-theme="light"]) .resultTab { color: rgba(0, 0, 0, 0.35); }
+:global([data-theme="light"]) .resultTab.active { color: #FC8019; }
+:global([data-theme="light"]) .resultTab.locked:hover { color: rgba(0, 0, 0, 0.35); }
+
+/* Fridge summary header + thumbnail — templates/index.html:1165-1260.
+   Opacity-driven visible/hidden (no display:none) so the thumbnail can sit
+   at opacity:0 in its final position during the photo-scan screen, then
+   crossfade in — see FridgeSummaryHeader.tsx for the full explanation. */
+.fridgeSummaryHeader { position: relative; margin-bottom: 20px; opacity: 0; transition: opacity 0.45s ease; }
+.fridgeSummaryHeader.visible { opacity: 1; }
+.fridgeSummaryRow {
+  display: flex; align-items: center; gap: 14px; padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07); cursor: pointer; user-select: none;
+}
+.fridgeSummaryRow:hover { opacity: 0.85; }
+.fridgeThumbTarget {
+  width: 56px; height: 56px; border-radius: 12px; overflow: hidden; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); cursor: pointer;
+}
+.fridgeThumbTarget:hover { filter: brightness(0.85); transition: filter 0.15s ease; }
+.fridgeThumbImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fridgeSummaryText { flex: 1; min-width: 0; }
+.fridgeSummaryLabel {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase; margin: 0 0 3px;
+}
+.fridgeSummaryCount { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85); margin: 0; }
+.fridgeDropdownChevron { margin-left: auto; flex-shrink: 0; color: rgba(255, 255, 255, 0.4); transition: transform 0.2s ease; }
+.fridgeDropdownChevron svg { width: 16px; height: 16px; stroke-width: 1.5; }
+.fridgeDropdownChevron.open { transform: rotate(180deg); }
+:global([data-theme="light"]) .fridgeSummaryRow { border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
+:global([data-theme="light"]) .fridgeSummaryLabel { color: rgba(0, 0, 0, 0.35); }
+:global([data-theme="light"]) .fridgeSummaryCount { color: rgba(0, 0, 0, 0.85); }
+:global([data-theme="light"]) .fridgeDropdownChevron { color: rgba(0, 0, 0, 0.4); }
+
+/* Chips dropdown — templates/index.html:1262-1305. Opacity/pointer-events
+   driven instead of the original's display:none + double-rAF trick — that
+   trick exists only to work around display:none blocking a CSS opacity
+   transition on entry; opacity+pointer-events transitions cleanly without
+   it, so it's dropped here as an unnecessary complication in React. */
+.fridgeChipsDropdown {
+  position: absolute; top: calc(100% + 8px); left: 50%; width: 100%; max-width: 100%;
+  background: #1a1a1a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+  padding: 16px; box-sizing: border-box; z-index: 200; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  opacity: 0; pointer-events: none;
+  transform: translateX(-50%) translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  max-height: 60vh; overflow-y: auto;
+}
+.fridgeChipsDropdown.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.fridgeChipsDropdownHeader {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.35);
+}
+.fridgeChipsClose {
+  width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.08);
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, 0.6); transition: background 0.15s ease; flex-shrink: 0;
+}
+.fridgeChipsClose:hover { background: rgba(255, 255, 255, 0.14); }
+.fridgeChipsClose svg { width: 14px; height: 14px; stroke-width: 2; }
+:global([data-theme="light"]) .fridgeChipsDropdown { background: #ffffff; border-color: rgba(0, 0, 0, 0.08); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12); }
+:global([data-theme="light"]) .fridgeChipsDropdownHeader { color: rgba(0, 0, 0, 0.35); }
+:global([data-theme="light"]) .fridgeChipsClose { background: rgba(0, 0, 0, 0.06); color: rgba(0, 0, 0, 0.55); }
+:global([data-theme="light"]) .fridgeChipsClose:hover { background: rgba(0, 0, 0, 0.1); }
+
+/* Ingredient chips — templates/index.html:416-466 */
+.chipsInner { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid var(--border);
+}
+.chipDot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.chip.high .chipDot { background: var(--success); }
+.chip.mid .chipDot { background: var(--orange); }
+.chip.low .chipDot { background: var(--grey-400); }
+.chip.low { border-color: rgba(255, 255, 255, 0.08); background: color-mix(in srgb, var(--bg-secondary), transparent 15%); }
+.chip.other { opacity: 0.6; }
+.otherFridgeItems { width: 100%; }
+.otherFridgeToggle {
+  display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 14px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.55);
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s ease; width: auto;
+}
+.otherFridgeToggle:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.8); }
+.otherFridgeToggle svg { width: 14px; height: 14px; stroke-width: 1.5; }
+.otherFridgeChevron { margin-left: auto; transition: transform 0.2s ease; }
+.otherFridgeChevron.open { transform: rotate(180deg); }
+.otherFridgeChipsWrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+:global([data-theme="light"]) .otherFridgeToggle { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.08); color: rgba(0, 0, 0, 0.5); }
+:global([data-theme="light"]) .otherFridgeToggle:hover { color: rgba(0, 0, 0, 0.75); }
+
+/* No-detection empty state — templates/index.html:4490-4497 */
+.scanStateCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 8px; text-align: center; }
+.scanStateIcon { width: 26px; height: 26px; color: rgba(255, 255, 255, 0.3); margin-bottom: 4px; }
+.scanStateHeading { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
+.scanStateSub { font-size: 12px; color: rgba(255, 255, 255, 0.45); line-height: 1.5; }
+
+/* Fridge photo lightbox — templates/index.html:1206-1244. Same
+   opacity/pointer-events approach as the chips dropdown (no display:none). */
+.fridgeLightbox {
+  position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.92);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+}
+.fridgeLightbox.visible { opacity: 1; pointer-events: auto; }
+.fridgeLightboxImg { max-width: 92%; max-height: 88vh; border-radius: 16px; object-fit: contain; box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6); }
+.fridgeLightboxClose {
+  position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12); border: none; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: white; transition: background 0.15s ease; z-index: 1;
+}
+.fridgeLightboxClose:hover { background: rgba(255, 255, 255, 0.2); }
+.fridgeLightboxClose svg { width: 18px; height: 18px; stroke-width: 2; }
