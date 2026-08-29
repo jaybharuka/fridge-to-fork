@@ -1,8 +1,14 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { ChevronDown } from 'lucide-react';
 import styles from './results.module.css';
 
 interface FridgeSummaryHeaderProps {
+  /** Attached to the clickable row div. Pass the same ref into
+   *  FridgeChipsDropdown's `excludeRef` so its click-outside handler
+   *  doesn't also fire when the row itself is clicked — mirrors
+   *  outsideFridgeClick()'s `!row.contains(e.target)` guard
+   *  (templates/index.html:2936). */
+  rowRef?: Ref<HTMLDivElement>;
   /** Controls the opacity crossfade described below — false while
    *  PhotoScanScreen is showing, true once its onRevealComplete fires. */
   visible: boolean;
@@ -37,6 +43,7 @@ interface FridgeSummaryHeaderProps {
 // the CSS transition on .fridgeSummaryHeader (opacity, ~450ms) does the
 // rest — no clone, no manual rect math, same perceived handoff.
 export function FridgeSummaryHeader({
+  rowRef,
   visible,
   thumbUrl,
   ingredientCount,
@@ -47,7 +54,7 @@ export function FridgeSummaryHeader({
 }: FridgeSummaryHeaderProps) {
   return (
     <div className={`${styles.fridgeSummaryHeader} ${visible ? styles.visible : ''}`}>
-      <div className={styles.fridgeSummaryRow} onClick={onToggleDropdown}>
+      <div ref={rowRef} className={styles.fridgeSummaryRow} onClick={onToggleDropdown}>
         <div
           className={styles.fridgeThumbTarget}
           onClick={e => {
