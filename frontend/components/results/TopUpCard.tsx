@@ -16,9 +16,11 @@ interface IngredientImageResponse {
 
 // Ported from templates/index.html:2988-3019 (loadTopUpImage) and
 // 3910-3918/928-936 (markup/CSS). The emoji fallback shows immediately and
-// stays underneath at all times — the real photo is preloaded via a
-// throwaway Image() and only swapped in once it has actually loaded, so a
-// 404/failed fetch never shows a broken-image icon.
+// is unmounted only once the real photo has actually finished loading — the
+// photo is preloaded via a throwaway Image() and only swapped in after
+// onload fires, so a 404/failed fetch never shows a broken-image icon and
+// never hides the fallback (fallback is position:absolute and would
+// otherwise paint over the <img> per CSS stacking order).
 export function TopUpCard({ item }: TopUpCardProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -59,7 +61,9 @@ export function TopUpCard({ item }: TopUpCardProps) {
           src={imageUrl ?? ''}
           alt={item.name}
         />
-        <div className={styles.topupSheetEmojiFallback}>{getEmojiForIngredient(item.name)}</div>
+        {!imageUrl && (
+          <div className={styles.topupSheetEmojiFallback}>{getEmojiForIngredient(item.name)}</div>
+        )}
       </div>
       <div className={styles.topupSheetInfo}>
         <p className={styles.topupSheetName}>{item.name}</p>
