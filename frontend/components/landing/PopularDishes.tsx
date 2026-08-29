@@ -1,6 +1,8 @@
 import { Drumstick, Wheat, Soup, Flame, ChefHat, Sunrise } from 'lucide-react';
 import styles from './landing.module.css';
 
+// See the contract note on DishInputProps in DishInput.tsx: pass the same
+// state setter here as `onSelectDish` and to DishInput as `onChange`.
 interface PopularDishesProps {
   onSelectDish: (name: string) => void;
 }
