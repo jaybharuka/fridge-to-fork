@@ -1,0 +1,153 @@
+:root {
+  --bg: #FFFFFF;
+  --bg-secondary: #F8F8F8;
+  --bg-card: #FFFFFF;
+  --border: #E4E4E4;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B6B;
+  --text-muted: #757575;
+  --shadow: 0 2px 8px rgba(0,0,0,0.06);
+  --orange: #FC8019;
+  --orange-light: #FFF3E8;
+  --orange-dark: #E8700A;
+  --bg-rgb: 255,255,255;
+  --success: #2ECC71;
+
+  --grey-50: var(--bg-secondary);
+  --grey-100: #F0F0F0;
+  --grey-200: var(--border);
+  --grey-400: var(--text-muted);
+  --grey-900: var(--text-primary);
+
+  --bg-1: var(--bg-secondary);
+  --bg-2: var(--bg-card);
+  --bg-3: var(--bg-secondary);
+  --border-2: var(--border);
+  --text: var(--text-primary);
+  --text-2: var(--text-secondary);
+  --text-3: var(--text-muted);
+  --orange-dim: var(--orange-light);
+  --orange-border: rgba(252,128,25,0.3);
+  --green: var(--success);
+  --green-deep: var(--success);
+  --green-dim: rgba(46,204,113,0.08);
+  --green-border: rgba(46,204,113,0.25);
+  --red: #E02020;
+  --red-dim: rgba(224,32,32,0.06);
+  --red-border: rgba(224,32,32,0.2);
+  --blue: var(--text-primary);
+  --blue-dim: rgba(28,28,28,0.05);
+  --blue-border: rgba(28,28,28,0.14);
+  --yellow: #E0A32C;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+  --placeholder: var(--text-muted);
+  --header-bg: rgba(255,255,255,.85);
+  --hairline: var(--border);
+  --hover-overlay: rgba(0,0,0,.04);
+  --card-shadow: var(--shadow);
+  --hint-faint: var(--border);
+
+  --swiggy-orange: var(--orange);
+  --swiggy-orange-dark: var(--orange-dark);
+  --swiggy-bg: var(--bg);
+  --swiggy-surface: var(--bg-card);
+  --swiggy-surface-2: var(--bg-secondary);
+  --swiggy-border: var(--border);
+  --swiggy-text: var(--text-primary);
+  --swiggy-text-2: var(--text-secondary);
+  --swiggy-text-3: var(--text-muted);
+  --swiggy-green: var(--green);
+  --swiggy-green-deep: var(--green-deep);
+  --swiggy-blue: var(--blue);
+  --swiggy-red: var(--red);
+  --swiggy-yellow: var(--yellow);
+  --swiggy-placeholder: var(--placeholder);
+  --swiggy-header-bg: var(--header-bg);
+  --swiggy-nav-bg: var(--header-bg);
+  --swiggy-hairline: var(--hairline);
+  --swiggy-hover-overlay: var(--hover-overlay);
+  --swiggy-card-shadow: var(--card-shadow);
+  --swiggy-hint-faint: var(--hint-faint);
+}
+
+[data-theme="dark"] {
+  --bg: #0F0F0F;
+  --bg-secondary: #1A1A1A;
+  --bg-card: #1E1E1E;
+  --border: #2A2A2A;
+  --text-primary: #F5F5F5;
+  --text-secondary: #A0A0A0;
+  --text-muted: #808080;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --orange: #FC8019;
+  --orange-light: rgba(252,128,25,0.12);
+  --orange-dark: #E8700A;
+  --bg-rgb: 15,15,15;
+
+  --grey-50: var(--bg-secondary);
+  --grey-100: #242424;
+  --grey-200: var(--border);
+  --grey-400: var(--text-muted);
+  --grey-900: var(--text-primary);
+
+  --bg-1: var(--bg-secondary);
+  --bg-2: var(--bg-card);
+  --bg-3: var(--bg-secondary);
+  --border-2: var(--border);
+  --text: var(--text-primary);
+  --text-2: var(--text-secondary);
+  --text-3: var(--text-muted);
+  --orange-dim: var(--orange-light);
+  --hover-overlay: rgba(255,255,255,.06);
+  --card-shadow: var(--shadow);
+  --header-bg: rgba(15,15,15,.85);
+  --hairline: var(--border);
+  --hint-faint: var(--border);
+  --placeholder: var(--text-muted);
+
+  --swiggy-orange: var(--orange);
+  --swiggy-orange-dark: var(--orange-dark);
+  --swiggy-bg: var(--bg);
+  --swiggy-surface: var(--bg-card);
+  --swiggy-surface-2: var(--bg-secondary);
+  --swiggy-border: var(--border);
+  --swiggy-text: var(--text-primary);
+  --swiggy-text-2: var(--text-secondary);
+  --swiggy-text-3: var(--text-muted);
+  --swiggy-placeholder: var(--placeholder);
+  --swiggy-header-bg: var(--header-bg);
+  --swiggy-nav-bg: var(--header-bg);
+  --swiggy-hairline: var(--hairline);
+  --swiggy-hover-overlay: var(--hover-overlay);
+  --swiggy-card-shadow: var(--card-shadow);
+  --swiggy-hint-faint: var(--hint-faint);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; min-width:0; }
+html { scroll-behavior:smooth; }
+button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid #FC8019; outline-offset: 2px;
+}
+body {
+  font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; line-height:1.5; font-weight:400;
+  background:var(--swiggy-bg); color:var(--swiggy-text); min-height:100vh; overflow-x:hidden;
+  position:relative;
+}
+.top-bar { height:1px; width:100%; background:linear-gradient(90deg, transparent, #FC8019, transparent); }
+/* Lucide renders each icon as an inline <svg class="lucide">. Sizing it
+   at 1em lets every existing "icon-holder { font-size:Npx; color:... }"
+   rule in this file keep controlling icon size/color unchanged. */
+svg.lucide { width:1em; height:1em; display:inline-block; vertical-align:middle; stroke-width:1.5; }
+
+/* Typography scale */
+.label-text { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
+.section-label-text { font-size:0.65rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--grey-400); }
+.caption-text { font-size:12px; color:var(--text-3); }
+.mono-text { font-family:'SF Mono','Courier New',monospace; color:var(--text); }
+
+.section-divider { height:1px; background:var(--border); margin:4px 20px 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
