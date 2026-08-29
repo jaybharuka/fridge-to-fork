@@ -838,6 +838,21 @@
     .choice-btn-primary .choice-meta { color:#fff; }
     .choice-btn-outline .choice-meta { color:#FC8019; }
 
+    /* Powered-by-Swiggy attribution — required (Integration Agreement
+       Clause 3.4(ii)) wherever the MCP-backed ordering flow is shown.
+       Deliberately understated: small muted text with a Swiggy-orange
+       accent on the brand name only, not a competing banner. */
+    .powered-by-swiggy {
+      text-align:center; margin-top:14px; font-size:11px; font-weight:500;
+      color:var(--text-muted); letter-spacing:.02em;
+    }
+    .powered-by-swiggy strong { color:var(--orange); font-weight:600; }
+    .powered-by-swiggy-sheet {
+      text-align:center; margin:-4px 0 16px 0; font-size:11px; font-weight:500;
+      color:rgba(255,255,255,0.35); letter-spacing:.02em;
+    }
+    .powered-by-swiggy-sheet strong { color:#FC8019; font-weight:600; }
+
     /* Order preview + Top Up upsell bottom sheet — opens when the user
        taps "Order missing items from Instamart", before the real
        auth/order flow (chooseAction) actually fires. Always dark,
@@ -2085,6 +2100,8 @@
         <h3 id="orderSheetTitle">Your order</h3>
         <p id="orderSheetSubtitle"></p>
       </div>
+
+      <p class="powered-by-swiggy-sheet">Powered by <strong>Swiggy</strong></p>
 
       <div id="orderSheetItems"></div>
 
@@ -3807,6 +3824,7 @@
             ${groceriesBtn}
             ${dishBtn}
           </div>
+          <p class="powered-by-swiggy">Powered by <strong>Swiggy</strong></p>
         </div>`;
       document.getElementById('orderCard').innerHTML = '';
       try { lucide.createIcons(); } catch {}
