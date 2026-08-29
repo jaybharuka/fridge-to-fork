@@ -1,0 +1,210 @@
+/* Ported from templates/index.html — full-overlay loading state and the
+   photo-scan screen. Class names differ (CSS Modules scope them) but
+   selectors/values match the source 1:1. */
+
+/* Full-overlay loading state — templates/index.html:1307-1316 */
+.loadingOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0a0a0a; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.loadingOverlay.show { opacity: 1; pointer-events: auto; }
+
+/* Background particles — templates/index.html:1547-1559 */
+.loadingParticles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.loadingParticle {
+  position: absolute; bottom: 0; width: 3px; height: 3px; border-radius: 50%;
+  background: rgba(252, 128, 25, 0.1);
+  animation-name: particleFloat; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+@keyframes particleFloat {
+  0%   { transform: translateY(100vh) translateX(0); opacity: 0; }
+  8%   { opacity: 0.10; }
+  92%  { opacity: 0.10; }
+  100% { transform: translateY(-40px) translateX(var(--drift)); opacity: 0; }
+}
+
+/* Zone 1 — fridge illustration — templates/index.html:1561-1600 */
+.loadingFridgeZone {
+  position: relative; z-index: 1; width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+}
+.loadingFridge {
+  position: relative; width: 110px; height: 150px; border-radius: 16px; margin: 0 auto;
+  background: #141414; border: 1.5px solid rgba(252, 128, 25, 0.25); overflow: hidden;
+}
+.loadingFridgeFreezerLine {
+  position: absolute; top: 30%; left: 0; right: 0; height: 2px; background: rgba(255, 255, 255, 0.1);
+}
+.loadingFridgeShelf {
+  position: absolute; left: 0; right: 0; height: 1px; background: rgba(255, 255, 255, 0.06);
+}
+.loadingFridgeHandle {
+  position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+  width: 3px; height: 24px; border-radius: 999px; background: rgba(255, 255, 255, 0.15);
+}
+.loadingFridgeScanline {
+  position: absolute; left: 0; right: 0; top: 0; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(252, 128, 25, 0.8), transparent);
+  animation: scanSweep 2.4s ease-in-out infinite;
+}
+@keyframes scanSweep {
+  0%   { top: 0%;   opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.loadingFridgeDots { position: absolute; inset: 0; }
+.loadingFridgeDot {
+  position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #FC8019;
+  opacity: 0; animation: dotPop 0.4s ease forwards;
+}
+@keyframes dotPop {
+  0%   { transform: scale(0);   opacity: 0; }
+  60%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1);   opacity: 0.9; }
+}
+
+/* Zone 2 — AI progress stages — templates/index.html:1602-1645 */
+.loadingStatusZone { position: relative; z-index: 1; max-width: 280px; width: 100%; margin: 36px auto 0; }
+.loadingHeadline {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 17px; font-weight: 700;
+  color: rgba(255, 255, 255, 0.95); text-align: center; margin-bottom: 28px;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .35s ease-out, transform .35s ease-out;
+}
+.loadingHeadline.entered { opacity: 1; transform: translateY(0); }
+.loadingStages { display: flex; flex-direction: column; gap: 16px; }
+.loadingStage {
+  display: flex; align-items: center; gap: 12px;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .35s ease-out, transform .35s ease-out;
+}
+.loadingStage.entered { opacity: 1; transform: translateY(0); }
+.loadingStageIcon {
+  position: relative; flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.15); display: flex; align-items: center; justify-content: center;
+  transition: border-color .3s ease, background .3s ease;
+}
+.loadingStageLabel {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 500;
+  color: rgba(255, 255, 255, 0.35); transition: color .3s ease, font-weight .3s ease;
+}
+.loadingStage.active .loadingStageIcon { border-color: #FC8019; }
+.loadingStage.active .loadingStageIcon::before {
+  content: ''; position: absolute; inset: -1.5px; border-radius: 50%;
+  border: 1.5px solid transparent; border-top-color: #FC8019;
+  animation: stageSpin .8s linear infinite;
+}
+.loadingStage.active .loadingStageLabel { color: rgba(255, 255, 255, 0.95); font-weight: 600; }
+@keyframes stageSpin { to { transform: rotate(360deg); } }
+.loadingStage.done .loadingStageIcon { border-color: #FC8019; background: #FC8019; }
+.loadingStage.done .loadingStageIcon::after {
+  content: ''; position: absolute; left: 7px; top: 4px; width: 5px; height: 9px;
+  border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
+}
+.loadingStage.done .loadingStageLabel { color: rgba(255, 255, 255, 0.55); }
+
+/* Photo scan screen — templates/index.html:1325-1546 */
+.photoScanScreen {
+  position: fixed; inset: 0;
+  background-color: #0a0a0a;
+  background-image: radial-gradient(ellipse at 50% 25%, rgba(252, 128, 25, 0.05) 0%, #0a0a0a 65%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 9999; opacity: 0; transition: opacity .4s ease; overflow: hidden;
+}
+.photoScanScreen.show { opacity: 1; }
+.photoScanContent {
+  width: 100%; max-width: 400px; max-height: 100%; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 60px 24px 40px 24px;
+}
+.photoScanContainer {
+  position: relative; width: 100%; max-width: 320px; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.fridgePhotoPreview { width: 100%; height: auto; display: block; border-radius: 20px; max-height: 55vh; object-fit: cover; }
+.photoScanLine {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(252, 128, 25, 0.85), transparent);
+  animation: photoScanSweep 2.4s ease-in-out infinite;
+  pointer-events: none; z-index: 2; transition: opacity .3s ease;
+}
+.photoScanLine.stopped { animation-play-state: paused; opacity: 0; }
+@keyframes photoScanSweep {
+  0%   { top: 0%;   opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.photoScanThumbStrip { display: none; gap: 8px; justify-content: center; margin-top: 12px; }
+.photoScanThumbStrip.show { display: flex; }
+.scanThumb {
+  width: 48px; height: 48px; border-radius: 8px; object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.15); opacity: 0.7; cursor: pointer;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.scanThumb.active { opacity: 1; border-color: #FC8019; }
+.photoScanStatus {
+  margin-top: 20px; font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
+  text-align: center; letter-spacing: 0.01em; min-height: 20px;
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+.photoScanStatus.complete { color: #FC8019; }
+.photoScanSubStatus {
+  margin-top: 6px; font-size: 12px; font-weight: 400; font-style: italic;
+  color: rgba(255, 255, 255, 0.38); text-align: center; min-height: 16px;
+  transition: opacity 0.3s ease;
+}
+.detectedItemsList {
+  width: 100%; max-width: 320px; margin-top: 16px;
+  display: flex; flex-direction: column; gap: 0;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 16px;
+  padding: 4px 16px; max-height: 35vh; overflow-y: auto; scrollbar-width: none;
+}
+.detectedItemsList::-webkit-scrollbar { display: none; }
+.detectedItemsListEmpty { margin-top: 0; border-color: transparent; background: transparent; }
+.detectedItemRow {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  opacity: 0; transform: translateX(-8px);
+  animation: itemSlideIn 0.3s ease-out forwards;
+}
+.detectedItemRow:last-child { border-bottom: none; }
+@keyframes itemSlideIn { to { opacity: 1; transform: translateX(0); } }
+.detectedItemCheck {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06); border: 1.5px solid rgba(255, 255, 255, 0.12);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.detectedItemCheck svg { width: 14px; height: 14px; stroke: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.3); stroke-width: 2.5; }
+.detectedItemName {
+  flex: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.92); text-transform: capitalize;
+}
+.detectedItemRow.high .detectedItemCheck { background: rgba(52, 199, 89, 0.12); border-color: rgba(52, 199, 89, 0.3); }
+.detectedItemRow.high .detectedItemCheck svg { stroke: #34C759; color: #34C759; }
+.detectedItemRow.medium .detectedItemCheck { background: rgba(252, 128, 25, 0.12); border-color: rgba(252, 128, 25, 0.3); }
+.detectedItemRow.medium .detectedItemCheck svg { stroke: #FC8019; color: #FC8019; }
+.photoScanTimeoutState {
+  margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center; max-width: 280px;
+  opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.photoScanTimeoutState.hidden { display: none; }
+.photoScanTimeoutState.visible { opacity: 1; transform: translateY(0); }
+.photoScanTimeoutState svg { color: #FC8019; margin-bottom: 4px; }
+.photoScanTimeoutHeading {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
+}
+.photoScanTimeoutSub { font-size: 12px; color: rgba(255, 255, 255, 0.5); line-height: 1.5; }
+.photoScanRetryBtn {
+  margin-top: 6px; height: 40px; padding: 0 22px; border-radius: 999px;
+  background: #FC8019; color: #fff; border: none; font-weight: 600; font-size: 13px;
+  cursor: pointer; font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.photoScanRetryBtn:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+.photoScanRetryBtn:active { transform: translateY(0) scale(.98); }
