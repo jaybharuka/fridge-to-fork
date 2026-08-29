@@ -197,4 +197,26 @@
   align-items: center; justify-content: center; color: white; transition: background 0.15s ease; z-index: 1;
 }
 .fridgeLightboxClose:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Dish hero image — templates/index.html:1078-1157 (CSS), 1980-1987
+   (markup), 3599-3652 (waterfall). Dark-only by design, matches the page
+   background rather than following the light/dark toggle — see the
+   comment above #dishHeroSection in the source. */
+.dishHeroSection { margin: -20px -20px 24px -20px; border-radius: 0 0 20px 20px; overflow: hidden; }
+.dishHeroImageWrap { position: relative; width: 100%; height: 220px; background: #1a1a1a; overflow: hidden; }
+.dishHeroImg { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s ease; }
+.dishHeroImg.loaded { opacity: 1; }
+.dishHeroGradient {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to bottom, transparent 20%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.85) 100%);
+}
+.dishHeroOverlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px; z-index: 2; }
+.dishHeroName { font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 4px 0; line-height: 1.2; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.dishHeroMeta { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.75); margin: 0; }
+.dishHeroPlaceholder {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #1a1a1a, #2a2a2a); z-index: 0; transition: opacity 0.4s ease;
+}
+.dishHeroPlaceholder.hidden { opacity: 0; }
+.dishHeroInitial { font-size: 64px; font-weight: 800; color: rgba(252,128,25,0.3); font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1; }
 .fridgeLightboxClose svg { width: 18px; height: 18px; stroke-width: 2; }
