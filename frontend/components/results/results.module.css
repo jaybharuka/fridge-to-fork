@@ -335,3 +335,59 @@
 .topupSheetInfo { padding: 10px 10px 12px 10px; }
 .topupSheetName { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topupSheetPrice { font-size: 13px; font-weight: 700; color: #FC8019; margin: 0; }
+
+/* Toast — templates/index.html:1670-1677 (CSS), 2077 (markup) */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+  background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); color: var(--swiggy-text);
+  padding: 12px 18px; border-radius: 12px; font-size: 13px; z-index: 60; opacity: 0;
+  transition: opacity .3s ease, transform .3s ease; pointer-events: none; max-width: 90%; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Connect Swiggy (auth_required) — templates/index.html:953-966 */
+.authCard { background: transparent; border: none; box-shadow: none; border-radius: 0; padding: 20px; margin-bottom: 32px; text-align: center; }
+.authCardIcon {
+  width: 56px; height: 56px; border-radius: 50%; background: var(--orange-light); border: 1px solid var(--border);
+  color: var(--text-muted); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
+}
+.authCardIcon svg { width: 32px; height: 32px; }
+.authCardTitle { font-weight: 700; font-size: 18px; color: var(--swiggy-text); }
+.authCardSub { font-size: 13px; color: var(--grey-400); margin-top: 6px; margin-bottom: 16px; overflow-wrap: break-word; word-break: normal; }
+.authCta {
+  width: 100%; height: 52px; border-radius: 14px; background: var(--swiggy-orange); color: #fff; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font-size: 14px; border: none; cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+.authCta:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.authCta:active { background: #D4640A; transform: translateY(0) scale(.98); }
+.authCta svg { width: 20px; height: 20px; }
+
+/* Order confirmed — templates/index.html:968-979 */
+.orderCard { background: transparent; border: none; box-shadow: none; border-radius: 0; padding: 20px; margin-bottom: 32px; }
+.orderIconWrap { text-align: center; margin-bottom: 8px; }
+.orderIconWrap svg {
+  color: var(--swiggy-green); display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; border-radius: 50%; background: var(--orange-light);
+}
+.orderTitle { text-align: center; color: var(--swiggy-green); font-size: 18px; font-weight: 700; }
+.orderId { text-align: center; font-family: 'Courier New', monospace; color: var(--swiggy-text-2); font-size: 13px; margin-top: 6px; overflow-wrap: break-word; word-break: break-all; }
+.orderDetails { margin-top: 14px; }
+.orderRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--swiggy-hairline); flex-wrap: wrap; }
+.orderRow:first-child { border-top: none; }
+.orderLabel { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--swiggy-text-3); flex-shrink: 0; }
+.orderValue { font-size: 13px; font-weight: 400; color: var(--swiggy-text); text-align: right; min-width: 0; overflow-wrap: break-word; word-break: normal; }
+.orderValue.eta { color: var(--swiggy-orange); font-weight: 700; }
+
+/* Cook confirmed — templates/index.html:981-985 */
+.cookCard { background: transparent; border: none; box-shadow: none; border-radius: 0; padding: 20px; margin-bottom: 32px; text-align: center; }
+.cookCard svg { font-size: 24px; color: var(--swiggy-green); margin-bottom: 8px; display: inline-block; width: 24px; height: 24px; }
+.cookCardTitle { color: var(--swiggy-green); font-weight: 600; font-size: 16px; }
+.cookCardSub { color: var(--swiggy-text-2); font-size: 13px; margin-top: 6px; }
+
+/* Error card (inline, resultsAlreadyShown) — templates/index.html:987-1004 */
+.errorCard {
+  background: var(--red-dim); border: 1px solid var(--red-border); border-radius: 16px; padding: 16px; font-size: 13px;
+  color: var(--swiggy-red); overflow-wrap: break-word; word-break: normal; display: flex; align-items: flex-start; gap: 8px;
+}
+.errorCard svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
