@@ -70,6 +70,8 @@ export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose
           </p>
         </div>
 
+        <p className={styles.orderSheetSwiggy}>Powered by <strong>Swiggy</strong></p>
+
         <div className={styles.orderSheetItems}>
           {itemsToOrder.map((item, i) => {
             const { unit, qty } = getMissingIngredientDefaults(item.name);

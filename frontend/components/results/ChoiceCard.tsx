@@ -110,7 +110,7 @@ export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGr
           <div className={styles.choiceMeta}>30 min</div>
         </button>
       </div>
-      <p className={styles.choiceAttribution}>Powered by Swiggy</p>
+      <p className={styles.choiceAttribution}>Powered by <strong>Swiggy</strong></p>
     </div>
   );
 }
