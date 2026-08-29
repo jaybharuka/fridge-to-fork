@@ -1,0 +1,87 @@
+/* Recipe checklist card — the hero result section.
+   Ported from templates/index.html:582-664. */
+.card {
+  padding: 0;
+  margin-bottom: 32px;
+  border-radius: 0;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.statsRow { padding: 0; }
+.statLine { font-size: 15px; font-weight: 500; color: var(--text-secondary); padding: 16px 20px; }
+.statZ { color: var(--orange); font-weight: 700; }
+
+.hookLine { font-size: 13px; font-style: italic; font-weight: 400; color: var(--grey-400); padding: 16px 20px; }
+
+/* Ingredient checklist scrolls within itself once it's long enough (e.g. a
+   20-item Dal Makhani list) instead of pushing the choice cards below it
+   off-screen. .rowsWrap is the positioning context for the bottom fade;
+   .rows itself is the actual scroll container. A short list that fits
+   within max-height never triggers overflow, so no scrollbar/fade appears
+   — nothing extra needed for that case. */
+.rowsWrap { position: relative; }
+.rows {
+  display: flex;
+  flex-direction: column;
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+@media (min-width: 481px) {
+  .rows { max-height: 52vh; }
+}
+.rows::-webkit-scrollbar { width: 6px; }
+.rows::-webkit-scrollbar-track { background: transparent; }
+.rows::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+.rows::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* "More below" affordance — toggled via the hasMoreBelow class below.
+   Fades to --bg-card, matching .row's own background exactly (not --bg,
+   the page background behind the card) so the gradient blends seamlessly
+   instead of showing a visible seam at the card's own background. */
+.rowsFade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 36px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0), var(--bg-card));
+  pointer-events: none; opacity: 0; transition: opacity .2s ease;
+}
+.hasMoreBelow .rowsFade { opacity: 1; }
+
+.row {
+  display: flex; align-items: center; gap: 10px; padding: 16px 20px; cursor: pointer;
+  border-bottom: 1px solid var(--border); background: var(--bg-card); transition: opacity .12s ease, background .1s ease;
+}
+.rows .row:hover { background: var(--bg-secondary); }
+.rows .row:last-child { border-bottom: none; }
+.rowCheckbox {
+  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 1.5px solid var(--grey-200);
+  display: flex; align-items: center; justify-content: center; font-size: 20px; transition: border-color .12s ease;
+}
+.rowCheckbox svg { color: var(--success); width: 16px; height: 16px; }
+/* Staple rows still get a pre-checked circle, but muted grey rather than
+   green — it's an assumption, not something the vision scan actually saw. */
+.row.isStaple .rowCheckbox svg { color: var(--text-muted); }
+.rowInfo { flex: 1; min-width: 0; }
+.rowName { font-size: 15px; font-weight: 500; color: var(--grey-900); overflow-wrap: break-word; word-break: normal; }
+.rowQty { font-size: 13px; font-weight: 400; color: var(--grey-400); margin-top: 6px; overflow-wrap: break-word; word-break: normal; }
+
+@keyframes checkPop { 0% { transform: scale(.9); } 100% { transform: scale(1); } }
+.row.checked .rowCheckbox { border-color: transparent; animation: checkPop .15s ease; }
+.row.checked .rowName,
+.row.checked .rowQty { text-decoration: line-through; color: var(--grey-400); }
+
+.rowRight { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.rowTag {
+  flex-shrink: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey-400); background: var(--grey-100);
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.rowTag svg { width: 12px; height: 12px; }
+.rowTagStaple { color: var(--text-muted); background: var(--bg-secondary); }
+.rowTagFridge { color: #2E7D32; background: #E8F5E9; }
+:global([data-theme="dark"]) .rowTagFridge { color: #81C784; background: rgba(46,125,50,0.2); }
+.rowTagWillOrder { font-size: 12px; font-style: italic; color: var(--text-muted); white-space: nowrap; }
