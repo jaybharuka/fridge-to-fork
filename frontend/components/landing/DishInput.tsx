@@ -3,6 +3,15 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useAutocomplete } from '@/hooks/useAutocomplete';
 import styles from './landing.module.css';
 
+// Contract for whoever composes Landing.tsx (Task 13): DishInput is a
+// controlled input — the parent owns `value` and passes it down to both
+// DishInput and PopularDishes. PopularDishes doesn't call into DishInput
+// directly; wire PopularDishes' onSelectDish to the same setter you pass
+// here as onChange (e.g. `onSelectDish={setDish}` / `onChange={setDish}`).
+// This is a deliberate simplification vs. the brief's literal
+// `DishInput.onSelectDish` shape: two thin controlled components sharing
+// one piece of parent state is simpler than routing PopularDishes' clicks
+// through DishInput.
 interface DishInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -41,10 +50,18 @@ export function DishInput({ value, onChange }: DishInputProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Set right before a selection-driven onChange (click/Enter), so the
+  // suggestions-changed effect below knows not to reopen the dropdown for
+  // the value change it caused. A real keystroke never touches this flag.
+  const selectingRef = useRef(false);
 
   // Reopen (or close, if the query no longer matches) whenever the
   // suggestion list itself changes — i.e. whenever the query text changes.
   useEffect(() => {
+    if (selectingRef.current) {
+      selectingRef.current = false;
+      return;
+    }
     setOpen(suggestions.length > 0);
     setActiveIndex(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,6 +78,7 @@ export function DishInput({ value, onChange }: DishInputProps) {
   }, []);
 
   function selectSuggestion(dish: string) {
+    selectingRef.current = true;
     onChange(dish);
     setOpen(false);
     setActiveIndex(-1);
