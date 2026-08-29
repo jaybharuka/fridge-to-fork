@@ -40,3 +40,4 @@ scripts/
 
 # Runtime data
 inventory.db
+.worktrees/
