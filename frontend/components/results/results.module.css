@@ -220,3 +220,115 @@
 .dishHeroPlaceholder.hidden { opacity: 0; }
 .dishHeroInitial { font-size: 64px; font-weight: 800; color: rgba(252,128,25,0.3); font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1; }
 .fridgeLightboxClose svg { width: 18px; height: 18px; stroke-width: 2; }
+
+/* Generic result-card shell — templates/index.html:410-414, 530-531 */
+@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes contentFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.card {
+  background: transparent; border: none; border-radius: 0; box-shadow: none; padding: 20px;
+  overflow-wrap: break-word; word-break: normal; opacity: 0; animation: fadeSlideUp .35s ease forwards;
+  margin-bottom: 32px;
+}
+.contentFadeIn { animation: contentFadeIn .25s ease-out forwards; }
+
+/* Choice card (Instamart / Swiggy) — templates/index.html:3772-3813
+   (markup), 787-839 (CSS), including the ::before spotlight-glow that
+   follows the cursor (805-816, driven here per-button via --spot-x/-y set
+   through React state instead of a global document listener). */
+.choiceHeaderRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.choiceLabel { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.choiceSubtitle { font-size: 13px; font-weight: 400; color: var(--grey-400); font-style: italic; line-height: 1.5; margin: 10px 0 12px; overflow-wrap: break-word; word-break: normal; }
+.choiceButtons { display: flex; flex-direction: column; gap: 14px; }
+.choiceBtn {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  border-radius: var(--radius); padding: 16px;
+  cursor: pointer; font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  --spot-x: 50%; --spot-y: 50%;
+}
+.choiceBtn:hover:not(:disabled):not(.loading) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.choiceBtn:active:not(:disabled):not(.loading) { transform: translateY(0) scale(.98); }
+.choiceBtn::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+.choiceBtn.spotlightActive::before { opacity: 1; }
+.choiceBtnPrimary::before { background: radial-gradient(circle 140px at var(--spot-x) var(--spot-y), rgba(255,255,255,0.25), transparent 70%); }
+.choiceBtnOutline::before { background: radial-gradient(circle 140px at var(--spot-x) var(--spot-y), rgba(252,128,25,0.15), transparent 70%); }
+.choiceBtn:disabled:not(.loading) { opacity: .45; cursor: not-allowed; }
+.choiceBtn.loading { opacity: .7; cursor: not-allowed; }
+.choiceBtnPrimary { background: var(--orange); border: none; color: #fff; }
+.choiceBtnPrimary:hover:not(:disabled) { background: #E8700A; }
+.choiceBtnPrimary:active:not(:disabled) { background: #D4640A; }
+.choiceBtnOutline { background: transparent; border: 1.5px solid rgba(252,128,25,0.4); color: #FC8019; }
+.choiceBtnOutline:hover:not(:disabled) { background: var(--orange-light); }
+.choiceIconCircle { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; }
+.choiceIconCircle svg { width: 20px; height: 20px; }
+.choiceBtnPrimary .choiceIconCircle { background: var(--orange-dark); color: #fff; }
+.choiceBtnOutline .choiceIconCircle { background: var(--orange-light); color: #FC8019; }
+.choiceText { flex: 1; min-width: 0; }
+.choiceBtnTitle { font-size: 16px; font-weight: 600; overflow-wrap: break-word; word-break: normal; }
+.choiceBtnPrimary .choiceBtnTitle { color: #fff; }
+.choiceBtnOutline .choiceBtnTitle { color: #FC8019; }
+.choiceBtnSub { font-size: 13px; margin-top: 6px; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal; }
+.choiceBtnPrimary .choiceBtnSub { color: rgba(255,255,255,.85); }
+.choiceBtnOutline .choiceBtnSub { color: #FC8019; }
+.choiceMeta { flex-shrink: 0; white-space: nowrap; font-size: 13px; font-weight: 700; text-align: right; }
+.choiceBtnPrimary .choiceMeta { color: #fff; }
+.choiceBtnOutline .choiceMeta { color: #FC8019; }
+.choiceAttribution { font-size: 11px; font-weight: 500; color: var(--text-muted); text-align: center; margin: 14px 0 0; }
+
+/* Order preview + Top Up upsell bottom sheet — templates/index.html:2079-2098
+   (markup), 841-936 (CSS). Always dark, independent of site theme — same
+   reasoning as the dish hero. */
+.orderBottomSheet { position: fixed; inset: 0; z-index: 500; }
+.orderSheetBackdrop {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.orderSheetBackdrop.visible { opacity: 1; }
+.orderSheetPanel {
+  position: absolute; bottom: 0; left: 50%; width: 100%; max-width: 480px; margin: 0 auto;
+  background: #111111; border-radius: 24px 24px 0 0; padding: 8px 20px 40px 20px;
+  max-height: 85vh; overflow-y: auto;
+  transform: translateX(-50%) translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.orderSheetPanel.visible { transform: translateX(-50%) translateY(0); }
+.orderSheetHandle { width: 36px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.2); margin: 14px auto 20px auto; }
+.orderSheetHeader { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.orderSheetTitle { font-size: 18px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0 0 4px 0; }
+.orderSheetSubtitle { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.4); margin: 0; }
+.orderSheetItems { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+.orderSheetItem {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85);
+}
+.orderSheetItemQty { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.35); }
+.orderSheetTopUpLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin: 0 0 12px 0; }
+.orderSheetTopUpCards { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; margin-bottom: 8px; }
+.orderSheetTopUpCards::-webkit-scrollbar { display: none; }
+.orderSheetConfirm {
+  width: 100%; padding: 16px; background: #FC8019; color: white;
+  font-size: 16px; font-weight: 700; border: none; border-radius: 14px;
+  cursor: pointer; margin-top: 24px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.orderSheetConfirm:hover { background: #E8700A; }
+.orderSheetConfirm:active { transform: scale(0.98); }
+
+/* Top Up cards inside the order sheet — templates/index.html:3910-3918
+   (markup), 913-936 (CSS). Emoji fallback sits underneath at all times; the
+   real Unsplash photo cross-fades in once (if) it loads. */
+.topupSheetCard {
+  flex-shrink: 0; width: 130px; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+  overflow: hidden; cursor: pointer; transition: transform 0.15s ease;
+}
+.topupSheetCard:active { transform: scale(0.97); }
+.topupSheetImgWrap { width: 100%; height: 90px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
+.topupSheetImg { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; }
+.topupSheetImg.loaded { opacity: 1; }
+.topupSheetEmojiFallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+.topupSheetInfo { padding: 10px 10px 12px 10px; }
+.topupSheetName { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topupSheetPrice { font-size: 13px; font-weight: 700; color: #FC8019; margin: 0; }
