@@ -9,6 +9,18 @@ interface FridgeChipsDropdownProps {
   matchedFridgeItems: string[];
   open: boolean;
   onClose: () => void;
+  /** Wires the empty state's "Try again" button — templates/index.html:4496
+   *  calls resetToLanding() directly. Left optional so the actual
+   *  navigation logic can be supplied by whoever owns routing (page.tsx /
+   *  Task 13); the button itself is always shown when nothing was
+   *  detected, matching the source. */
+  onResetToLanding?: () => void;
+  /** The clickable summary row (FridgeSummaryHeader's rowRef) — excluded
+   *  from the click-outside check below, mirroring outsideFridgeClick()'s
+   *  `!row.contains(e.target)` guard (templates/index.html:2936). Without
+   *  it, clicking the row while open fires both the row's own toggle
+   *  handler AND this component's onClose on the same click. */
+  excludeRef?: React.RefObject<HTMLElement | null>;
 }
 
 // confClass() — templates/index.html:2808-2810
@@ -29,7 +41,14 @@ function Chip({ ingredient, other }: { ingredient: DetectedIngredient; other: bo
 // 416-466 (CSS), and the matched/other split + toggle logic from
 // buildFridgeChip()/rerenderFridgeChips()/toggleOtherFridgeItems()
 // (lines 2808-2896). Empty state ported from lines 4490-4497.
-export function FridgeChipsDropdown({ ingredients, matchedFridgeItems, open, onClose }: FridgeChipsDropdownProps) {
+export function FridgeChipsDropdown({
+  ingredients,
+  matchedFridgeItems,
+  open,
+  onClose,
+  onResetToLanding,
+  excludeRef,
+}: FridgeChipsDropdownProps) {
   const [expanded, setExpanded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +59,10 @@ export function FridgeChipsDropdown({ ingredients, matchedFridgeItems, open, onC
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideDropdown = dropdownRef.current?.contains(target) ?? false;
+      const insideRow = excludeRef?.current?.contains(target) ?? false;
+      if (!insideDropdown && !insideRow) {
         onClose();
       }
     }
@@ -49,7 +71,7 @@ export function FridgeChipsDropdown({ ingredients, matchedFridgeItems, open, onC
       clearTimeout(id);
       document.removeEventListener('click', handleClick);
     };
-  }, [open, onClose]);
+  }, [open, onClose, excludeRef]);
 
   // rerenderFridgeChips()'s split: only splits when matchedFridgeItems is
   // populated AND doing so actually separates something; otherwise every
@@ -81,6 +103,11 @@ export function FridgeChipsDropdown({ ingredients, matchedFridgeItems, open, onC
             <Refrigerator className={styles.scanStateIcon} />
             <div className={styles.scanStateHeading}>Nothing detected in your fridge</div>
             <div className={styles.scanStateSub}>Try a clearer photo with better lighting, or continue without a photo</div>
+            {onResetToLanding && (
+              <button type="button" className={styles.ctaSecondaryBtn} onClick={onResetToLanding}>
+                Try again
+              </button>
+            )}
           </div>
         ) : (
           <>
