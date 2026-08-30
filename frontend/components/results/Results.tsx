@@ -33,6 +33,9 @@ interface ResultsProps {
   /** False while PhotoScanScreen is still covering the page; flips to true
    *  on its onRevealComplete, driving the shared-element crossfade. */
   fridgeVisible: boolean;
+  /** True once results have actually been shown to the user — an error then
+   *  renders as the inline strip rather than the full-page "try again" card. */
+  resultsAlreadyShown: boolean;
   fetchVideos: (dishName: string) => Promise<YoutubeData>;
   fetchYoutubeFirstThumbnail: () => Promise<string>;
   onToggleChecklistItem: (index: number) => void;
@@ -57,6 +60,7 @@ export function Results({
   recipeHasUnreadDot,
   heroPhotoUrl,
   fridgeVisible,
+  resultsAlreadyShown,
   fetchVideos,
   fetchYoutubeFirstThumbnail,
   onToggleChecklistItem,
@@ -115,7 +119,11 @@ export function Results({
 
         {tab === 'order' && (
           <div>
-            {state.hasPhoto && (
+            {/* Mounted from step1 on (well before the reveal ends, so it has
+                settled into its final layout position by the time the
+                crossfade starts) — but never rendered as an empty
+                "0 items detected" row when a scan errored before step1. */}
+            {state.hasPhoto && state.detectedIngredients.length > 0 && (
               <FridgeSummaryHeader
                 rowRef={fridgeRowRef}
                 visible={fridgeVisible}
@@ -165,7 +173,7 @@ export function Results({
 
             <OrderResultCard
               result={state.orderResult}
-              resultsAlreadyShown={state.phase === 'results'}
+              resultsAlreadyShown={resultsAlreadyShown}
               onRetry={onResetToLanding}
             />
           </div>

@@ -19,6 +19,8 @@ const SUB_MESSAGE_INTERVAL_MS = 3500;
 const SUB_MESSAGE_FADE_MS = 300;
 const REVEAL_STEP_MS = 180;
 const REVEAL_SETTLE_MS = 800;
+// Matches `.photoScanScreen { transition: opacity .4s }` in loading.module.css.
+const FADE_MS = 400;
 
 interface PhotoScanScreenProps {
   visible: boolean;
@@ -47,7 +49,28 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
   const [statusText, setStatusText] = useState('Scanning your fridge...');
   const [statusComplete, setStatusComplete] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  // Same delayed-unmount pattern as LoadingOverlay: drop the .show class
+  // first, let the .4s opacity transition play, unmount after. Without it
+  // the handoff to the results thumbnail is a jump cut, not a crossfade.
+  const [shouldRender, setShouldRender] = useState(visible);
+  const [shown, setShown] = useState(false);
   const revealStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      return;
+    }
+    setShown(false);
+    const t = setTimeout(() => setShouldRender(false), FADE_MS);
+    return () => clearTimeout(t);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const frame = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(frame);
+  }, [visible]);
 
   const names = (detectedIngredients ?? []).filter(i => i.name && i.name.trim() !== '');
   const scanStopped = detectedIngredients !== null;
@@ -126,12 +149,12 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, scanStopped]);
 
-  if (!visible) return null;
+  if (!shouldRender) return null;
 
   const revealed = names.slice(0, revealedCount);
 
   return (
-    <div className={`${styles.photoScanScreen} ${styles.show}`}>
+    <div className={`${styles.photoScanScreen} ${shown ? styles.show : ''}`}>
       <div className={styles.photoScanContent}>
         <div className={styles.photoScanContainer}>
           <img className={styles.fridgePhotoPreview} src={photoUrls[activeIndex] ?? photoUrls[0]} alt="Your fridge" />

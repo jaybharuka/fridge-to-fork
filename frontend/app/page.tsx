@@ -89,7 +89,22 @@ export default function Home() {
   }, [state.checklist, state.recommendedMeal, placeOrder]);
 
   const showLanding = state.phase === 'idle';
-  const showPhotoScan = state.phase === 'photo-scanning' && !photoDetectionRevealed;
+  // Ruling B: once the scan screen is up it stays up until its OWN
+  // onRevealComplete fires — `complete`/`error` can (and for a fast backend
+  // routinely does) move `phase` off 'photo-scanning' mid-reveal, and that
+  // must not yank the screen and strand the reveal timers. Hence keyed on
+  // the reveal flag, not `phase`. The one `phase`-ish term left is the
+  // detected-ingredients check: an error before step1 means no reveal will
+  // ever run, so the screen must give way to the error card.
+  const showPhotoScan =
+    state.hasPhoto &&
+    !photoDetectionRevealed &&
+    (state.phase === 'photo-scanning' || state.detectedIngredients.length > 0);
+  // "Has the user actually seen results yet" — drives OrderResultCard's
+  // inline-strip vs. full-page error variant. `phase === 'results'` alone
+  // misses an error that lands after the reveal finished but before
+  // 'complete' (phase is 'error' by then, but results ARE on screen).
+  const resultsAlreadyShown = state.phase === 'results' || (state.hasPhoto && photoDetectionRevealed);
   // Mounted for the whole photo-scanning phase (behind the fixed overlay) so
   // FridgeSummaryHeader's thumbnail already occupies its final position when
   // the crossfade starts — see its comment on the FLIP-clone replacement.
@@ -135,7 +150,8 @@ export default function Home() {
           onLockedTabClick={() => toast.show('Still loading your recipe...')}
           recipeHasUnreadDot={!recipeDotDismissed}
           heroPhotoUrl={heroPhotoUrl}
-          fridgeVisible={photoDetectionRevealed || !state.hasPhoto}
+          fridgeVisible={!showPhotoScan}
+          resultsAlreadyShown={resultsAlreadyShown}
           fetchVideos={fetchVideos}
           fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
           onToggleChecklistItem={toggleChecklistItem}
