@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fridge to Fork — Next.js frontend
 
-## Getting Started
+Next.js (App Router + TypeScript) port of the vanilla `templates/index.html`
+UI. It has no backend of its own: the dev server proxies `/api/*` and
+`/auth/*` to the FastAPI app in the repo root (`app.py`) on port 8000, so
+both must be running.
 
-First, run the development server:
+## Running locally
+
+### 1. Backend (repo root)
+
+Install the project's dependencies (see `pyproject.toml`) into a venv, copy
+`.env.example` to `.env` and fill it in, then:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+APP_BASE_URL=http://localhost:3000 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+On Windows PowerShell:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+$env:APP_BASE_URL = "http://localhost:3000"
+.\.venv\Scripts\uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Frontend (this directory)
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open <http://localhost:3000>. Do **not** use <http://localhost:8000> — that
+serves the old vanilla frontend.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Required: `APP_BASE_URL=http://localhost:3000`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The Swiggy OAuth `redirect_uri` is built from the backend's `APP_BASE_URL`,
+which defaults to `http://localhost:8000`. With the default, signing in to
+Swiggy sends the browser to `localhost:8000/auth/callback` — bypassing this
+frontend's proxy — and the backend's post-auth redirect to `/` then lands
+the user on the **old vanilla UI on :8000**, with the in-progress scan lost.
 
-## Deploy on Vercel
+So when you run this frontend, set `APP_BASE_URL=http://localhost:3000` in
+the backend's environment (shell export as above, or in the root `.env`).
+Leave the committed default at `:8000` — that is correct for anyone using
+the vanilla frontend directly. This is a per-developer override.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — dev server on :3000 with the `/api` + `/auth` proxy (see `next.config.js`)
+- `npm run build` — production build
+- `npx tsc --noEmit` — type check
+- `npm run lint` — ESLint
