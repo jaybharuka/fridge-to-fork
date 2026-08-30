@@ -12,6 +12,8 @@ interface ChoiceCardProps {
   itemsToOrder: ChecklistItem[];
   onOrderGroceries: () => void;
   onOrderDish: () => void;
+  /** /api/order round trip in flight — disables both buttons. */
+  orderPlacing: boolean;
 }
 
 // Ported from templates/index.html:3760-3770 (isInternalReasoning/
@@ -59,9 +61,13 @@ function useSpotlight() {
 // Ported from templates/index.html:3772-3813 (renderChoiceCard) and CSS
 // (lines 787-849, incl. the ::before spotlight-glow at 805-816). Instamart
 // is the primary filled CTA, Swiggy a secondary outline button.
-export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGroceries, onOrderDish }: ChoiceCardProps) {
+export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGroceries, onOrderDish, orderPlacing }: ChoiceCardProps) {
   const groceriesSpotlight = useSpotlight();
   const dishSpotlight = useSpotlight();
+  // Which button started the order — the spinner swaps only that one's icon
+  // (templates/index.html:3853-3855). Groceries goes via the preview sheet,
+  // so this is set on click and only *reads* once orderPlacing flips true.
+  const [clicked, setClicked] = useState<'groceries' | 'dish' | null>(null);
 
   const missingText = buildMissingSummaryText(itemsToOrder);
   const mealName = recommendedMeal || 'this dish';
@@ -76,16 +82,19 @@ export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGr
       <div className={styles.choiceButtons}>
         <button
           type="button"
-          className={`${styles.choiceBtn} ${styles.choiceBtnPrimary} ${groceriesSpotlight.className}`}
+          className={`${styles.choiceBtn} ${styles.choiceBtnPrimary} ${groceriesSpotlight.className} ${orderPlacing && clicked === 'groceries' ? styles.loading : ''}`}
           style={groceriesSpotlight.style}
           onMouseMove={groceriesSpotlight.onMouseMove}
           onMouseLeave={groceriesSpotlight.onMouseLeave}
           onTouchMove={groceriesSpotlight.onTouchMove}
           onTouchEnd={groceriesSpotlight.onTouchEnd}
           onTouchCancel={groceriesSpotlight.onTouchCancel}
-          onClick={onOrderGroceries}
+          disabled={orderPlacing}
+          onClick={() => { setClicked('groceries'); onOrderGroceries(); }}
         >
-          <div className={styles.choiceIconCircle}><ShoppingCart /></div>
+          <div className={styles.choiceIconCircle}>
+            {orderPlacing && clicked === 'groceries' ? <div className={styles.spin} /> : <ShoppingCart />}
+          </div>
           <div className={styles.choiceText}>
             <div className={styles.choiceBtnTitle}>Order missing items from Instamart</div>
             <div className={styles.choiceBtnSub}>{missingText}</div>
@@ -93,16 +102,19 @@ export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGr
         </button>
         <button
           type="button"
-          className={`${styles.choiceBtn} ${styles.choiceBtnOutline} ${dishSpotlight.className}`}
+          className={`${styles.choiceBtn} ${styles.choiceBtnOutline} ${dishSpotlight.className} ${orderPlacing && clicked === 'dish' ? styles.loading : ''}`}
           style={dishSpotlight.style}
           onMouseMove={dishSpotlight.onMouseMove}
           onMouseLeave={dishSpotlight.onMouseLeave}
           onTouchMove={dishSpotlight.onTouchMove}
           onTouchEnd={dishSpotlight.onTouchEnd}
           onTouchCancel={dishSpotlight.onTouchCancel}
-          onClick={onOrderDish}
+          disabled={orderPlacing}
+          onClick={() => { setClicked('dish'); onOrderDish(); }}
         >
-          <div className={styles.choiceIconCircle}><Bike /></div>
+          <div className={styles.choiceIconCircle}>
+            {orderPlacing && clicked === 'dish' ? <div className={styles.spin} /> : <Bike />}
+          </div>
           <div className={styles.choiceText}>
             <div className={styles.choiceBtnTitle}>Order the dish from Swiggy</div>
             <div className={styles.choiceBtnSub}>Get {mealName} delivered</div>

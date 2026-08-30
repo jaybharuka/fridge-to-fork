@@ -13,6 +13,7 @@ import { FridgeLightbox } from './FridgeLightbox';
 import { MealSuggestionsSection } from './MealSuggestionsSection';
 import { IngredientChecklistCard } from './IngredientChecklistCard';
 import { ChoiceCard } from './ChoiceCard';
+import { ChecklistSkeleton, ChoiceSkeleton } from './ResultsSkeleton';
 import { OrderResultCard } from './OrderResultCard';
 import { OrderBottomSheet } from './OrderBottomSheet';
 import { RecipeStepsSection } from './RecipeStepsSection';
@@ -86,6 +87,13 @@ export function Results({
   // handleEvent()'s step2 branch — templates/index.html:4595-4598.
   const recSuggestion =
     state.suggestions.find(s => s.name === state.recommendedMeal) ?? state.suggestions[0];
+  // step1 flips recipe mode straight into results while step2 is still
+  // streaming, leaving several seconds with nothing on screen — the source
+  // fills that gap with skeletons from step1 until each section's own event
+  // lands (templates/index.html:4526-4527). awaiting_user_choice is the last
+  // of those events, so it marks the end of the gap.
+  const contentPending = !state.awaitingChoice && !state.scanError;
+
   const cookTime = recSuggestion?.prep_time_minutes ? `${recSuggestion.prep_time_minutes} min` : null;
 
   return (
@@ -154,21 +162,26 @@ export function Results({
             )}
 
             {/* No recipe_ingredients → no checklist at all (lines 3219-3223). */}
-            {state.checklist.length > 0 && (
+            {state.checklist.length > 0 ? (
               <IngredientChecklistCard
                 checklist={state.checklist}
                 toggleChecklistItem={onToggleChecklistItem}
               />
+            ) : (
+              contentPending && <ChecklistSkeleton />
             )}
 
-            {state.awaitingChoice && (
+            {state.awaitingChoice ? (
               <ChoiceCard
                 recommendedMeal={dishName}
                 reasoning={state.reasoning}
                 itemsToOrder={itemsToOrder}
                 onOrderGroceries={onOrderGroceries}
                 onOrderDish={onOrderDish}
+                orderPlacing={state.orderPlacing}
               />
+            ) : (
+              contentPending && <ChoiceSkeleton />
             )}
 
             <OrderResultCard
