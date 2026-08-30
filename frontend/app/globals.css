@@ -151,3 +151,6 @@ svg.lucide { width:1em; height:1em; display:inline-block; vertical-align:middle;
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 }
+
+/* Page content gutter — templates/index.html:179 */
+.wrap { padding:20px 20px 32px; }

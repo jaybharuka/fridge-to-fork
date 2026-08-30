@@ -138,6 +138,12 @@ function reducer(state: ScanState, action: Action): ScanState {
     case 'error':
       return {
         ...state,
+        // The original's error branch calls hideLoadingOverlay() +
+        // revealResultsSection() (templates/index.html:4693-4695), so an
+        // error must leave 'loading'/'photo-scanning' or the overlay hangs
+        // forever. Results that were already on screen stay 'results' —
+        // OrderResultCard keys its inline-vs-full error card off that.
+        phase: state.phase === 'results' ? 'results' : 'error',
         orderResult: { kind: 'error', message: action.message },
         scanError: action.message,
       };
