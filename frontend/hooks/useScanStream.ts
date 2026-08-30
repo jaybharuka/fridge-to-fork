@@ -26,12 +26,17 @@ export interface ScanState {
     | { kind: 'error'; message: string };
   scanError: string | null;
   timedOutVision: boolean;
+  /** True for the whole /api/order round trip — ChoiceCard disables its
+   *  buttons and spins the clicked one (templates/index.html:3849-3856). */
+  orderPlacing: boolean;
 }
 
 type Action =
   | ScanEvent
   | { type: 'SCAN_START'; hasPhoto: boolean }
   | { type: 'TOGGLE_ITEM'; index: number }
+  | { type: 'ORDER_START' }
+  | { type: 'ORDER_END' }
   | { type: 'RESET' };
 
 const initialState: ScanState = {
@@ -50,6 +55,7 @@ const initialState: ScanState = {
   orderResult: null,
   scanError: null,
   timedOutVision: false,
+  orderPlacing: false,
 };
 
 function reducer(state: ScanState, action: Action): ScanState {
@@ -151,6 +157,15 @@ function reducer(state: ScanState, action: Action): ScanState {
     case 'auth_required':
       return { ...state, orderResult: { kind: 'auth_required', message: action.message } };
 
+    // chooseAction() clears the order card before a retry
+    // (templates/index.html:3858) so a stale error doesn't linger for the
+    // whole second attempt.
+    case 'ORDER_START':
+      return { ...state, orderPlacing: true, orderResult: null, scanError: null };
+
+    case 'ORDER_END':
+      return { ...state, orderPlacing: false };
+
     case 'TOGGLE_ITEM':
       return {
         ...state,
@@ -204,6 +219,7 @@ export function useScanStream() {
     async (action: 'cook' | 'order_groceries' | 'order_dish', mealName: string, missingIngredientNames: string[]) => {
       if (orderInFlight.current) return;
       orderInFlight.current = true;
+      dispatch({ type: 'ORDER_START' });
       const form = new FormData();
       form.append('action', action);
       form.append('meal_name', mealName || '');
@@ -216,6 +232,7 @@ export function useScanStream() {
         dispatch({ type: 'error', message: 'Something went wrong. Try again.' });
       } finally {
         orderInFlight.current = false;
+        dispatch({ type: 'ORDER_END' });
       }
     },
     []
