@@ -41,3 +41,8 @@ scripts/
 # Runtime data
 inventory.db
 .worktrees/
+
+# GCP service account keys — never commit these
+*-key.json
+service-account*.json
+gcp-credentials*.json

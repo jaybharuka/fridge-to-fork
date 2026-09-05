@@ -29,6 +29,12 @@ export interface ScanState {
   /** True for the whole /api/order round trip — ChoiceCard disables its
    *  buttons and spins the clicked one (templates/index.html:3849-3856). */
   orderPlacing: boolean;
+  /** True once the 'step1' event has actually arrived, even if it detected
+   *  zero ingredients. Distinguishes "not scanned yet" from "scanned, found
+   *  nothing" — both leave `detectedIngredients` as `[]`, so consumers that
+   *  need to react only once real (possibly empty) results are in must key
+   *  on this, not `detectedIngredients.length`. */
+  step1Received: boolean;
 }
 
 type Action =
@@ -56,6 +62,7 @@ const initialState: ScanState = {
   scanError: null,
   timedOutVision: false,
   orderPlacing: false,
+  step1Received: false,
 };
 
 function reducer(state: ScanState, action: Action): ScanState {
@@ -72,6 +79,7 @@ function reducer(state: ScanState, action: Action): ScanState {
         ...state,
         detectedIngredients: action.ingredients,
         timedOutVision: !!action.timed_out,
+        step1Received: true,
         // A photo scan stays in 'photo-scanning' — the PhotoScanScreen
         // component owns the reveal animation and its own transition to
         // 'results'. Recipe-only mode has no such screen, so go straight
@@ -205,7 +213,7 @@ export function useScanStream() {
       if (targetDish) form.append('target_dish', targetDish);
       form.append('servings', String(servings));
       try {
-        const res = await fetch('/api/scan', { method: 'POST', body: form, credentials: 'same-origin' });
+        const res = await fetch('/api/scan', { method: 'POST', body: form, credentials: 'include' });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         await readSSEStream(res, ev => dispatch(ev));
       } catch {
@@ -225,7 +233,7 @@ export function useScanStream() {
       form.append('meal_name', mealName || '');
       form.append('missing_ingredients', missingIngredientNames.join(','));
       try {
-        const res = await fetch('/api/order', { method: 'POST', body: form, credentials: 'same-origin' });
+        const res = await fetch('/api/order', { method: 'POST', body: form, credentials: 'include' });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         await readSSEStream(res, ev => dispatch(ev));
       } catch {
