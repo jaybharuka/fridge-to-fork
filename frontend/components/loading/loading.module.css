@@ -147,6 +147,7 @@
   transition: opacity 0.15s ease, border-color 0.15s ease;
 }
 .scanThumb.active { opacity: 1; border-color: #FC8019; }
+.scanThumb:hover:not(.active) { opacity: 0.9; }
 .photoScanStatus {
   margin-top: 20px; font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
   text-align: center; letter-spacing: 0.01em; min-height: 20px;
@@ -195,7 +196,10 @@
 }
 .photoScanTimeoutState.hidden { display: none; }
 .photoScanTimeoutState.visible { opacity: 1; transform: translateY(0); }
-.photoScanTimeoutState svg { color: #FC8019; margin-bottom: 4px; }
+/* soft: calm, no alert icon, no accent color on the copy — reads as
+   reassurance, not a problem. hard: the original warning treatment. */
+.photoScanTimeoutState.hard svg { color: #FC8019; margin-bottom: 4px; }
+.photoScanTimeoutState.soft .photoScanTimeoutHeading { color: rgba(255, 255, 255, 0.75); }
 .photoScanTimeoutHeading {
   font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
 }
@@ -208,3 +212,13 @@
 }
 .photoScanRetryBtn:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
 .photoScanRetryBtn:active { transform: translateY(0) scale(.98); }
+/* Same "Try again" action during the soft notice, deliberately quieter —
+   a text-style link rather than a filled button, so it doesn't compete
+   with the reassuring tone. */
+.photoScanRetryBtnSubtle {
+  margin-top: 6px; background: none; border: none; padding: 4px 8px;
+  color: rgba(255, 255, 255, 0.55); font-weight: 600; font-size: 12px;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: inherit;
+  transition: color 0.15s ease;
+}
+.photoScanRetryBtnSubtle:hover { color: rgba(255, 255, 255, 0.85); }
