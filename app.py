@@ -55,14 +55,27 @@ DEFAULT_DELIVERY_ADDRESS = "Mumbai, India"
 
 # SessionMiddleware must wrap the app before CORSMiddleware so it can
 # read/write cookies before CORS headers are added.
+#
+# same_site="none" + https_only=True is required for the session cookie to
+# survive a cross-origin request (frontend on Vercel, backend on Railway) —
+# SameSite=None cookies must be Secure or browsers drop them. It's a
+# harmless superset locally too (dev runs over http, so https_only is
+# effectively bypassed by browsers for localhost).
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SECRET_KEY", "dev-secret-fallback-change-in-prod"),
     max_age=5 * 24 * 60 * 60,  # 5 days, matching Swiggy token lifetime
+    same_site="none",
+    https_only=True,
 )
+
+# FRONTEND_ORIGIN: the deployed frontend's origin (e.g. Vercel URL), unset
+# in local dev where next.config.js proxies same-origin instead.
+_frontend_origin = os.environ.get("FRONTEND_ORIGIN", "")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[_frontend_origin] if _frontend_origin else ["*"],
+    allow_credentials=bool(_frontend_origin),
     allow_methods=["*"],
     allow_headers=["*"],
 )

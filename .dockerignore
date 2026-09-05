@@ -1,0 +1,15 @@
+.env
+.env.*
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+frontend/
+docs/
+tests/
+.worktrees/
+*.md
+inventory.db
