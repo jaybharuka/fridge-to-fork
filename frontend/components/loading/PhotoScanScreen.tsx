@@ -4,15 +4,27 @@ import { Check, CircleAlert } from 'lucide-react';
 import type { DetectedIngredient } from '@/lib/types';
 import styles from './loading.module.css';
 
-// Ported from templates/index.html:2231 (PHOTO_SCAN_TIMEOUT_MS).
-const PHOTO_SCAN_TIMEOUT_MS = 35000;
+// Real-world latency on the deployed backend is a Render cold start (can
+// be several seconds alone) plus a two-pass Gemini vision call, regularly
+// landing in the 15-60s range — the original 35s threshold (ported from
+// templates/index.html:2231) fired well inside normal scan time and read
+// as a false alarm. Two thresholds now: a soft, reassuring notice once
+// something genuinely unusual is happening, and a hard one only once it's
+// long enough to actually look like a stall.
+const SOFT_NOTICE_MS = 60000;
+const HARD_NOTICE_MS = 90000;
 
-// Ported from templates/index.html:2415-2419 (PHOTO_SCAN_SUB_MESSAGES) —
-// deliberately says nothing about the tech stack: users care what it's
-// doing for them, not what's doing it.
+// Ported from templates/index.html:2415-2419 (PHOTO_SCAN_SUB_MESSAGES),
+// extended to cover a full 60s before the soft notice without visibly
+// looping — deliberately says nothing about the tech stack: users care
+// what it's doing for them, not what's doing it.
 const PHOTO_SCAN_SUB_MESSAGES = [
   'Reading shelf by shelf',
   'Checking every corner of your fridge',
+  'Making sure nothing gets missed',
+  'Almost done, double-checking the shelves',
+  'Cross-referencing what is inside',
+  'Just a few more seconds',
   'Almost there, hang tight',
 ];
 const SUB_MESSAGE_INTERVAL_MS = 3500;
@@ -48,7 +60,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
   const [revealedCount, setRevealedCount] = useState(0);
   const [statusText, setStatusText] = useState('Scanning your fridge...');
   const [statusComplete, setStatusComplete] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
+  const [noticeLevel, setNoticeLevel] = useState<'none' | 'soft' | 'hard'>('none');
   // Same delayed-unmount pattern as LoadingOverlay: drop the .show class
   // first, let the .4s opacity transition play, unmount after. Without it
   // the handoff to the results thumbnail is a jump cut, not a crossfade.
@@ -86,7 +98,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
     setRevealedCount(0);
     setStatusText('Scanning your fridge...');
     setStatusComplete(false);
-    setTimedOut(false);
+    setNoticeLevel('none');
     revealStartedRef.current = false;
   }, [visible, scanStopped]);
 
@@ -104,13 +116,21 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
     return () => clearInterval(interval);
   }, [visible]);
 
-  // 35s timeout notice — startPhotoScanTimeoutTimer/onPhotoScanTimeout
-  // (lines 2523-2544), cleared the instant ingredients arrive
-  // (clearPhotoScanTimeoutTimer, mirrored by the `scanStopped` guard).
+  // Soft/hard "still going" notices — adapted from
+  // startPhotoScanTimeoutTimer/onPhotoScanTimeout (lines 2523-2544), split
+  // into two thresholds (see SOFT_NOTICE_MS/HARD_NOTICE_MS above). Both
+  // clear the instant ingredients arrive (mirrored by the `scanStopped`
+  // guard) — a real `error` SSE event or network failure is a separate
+  // path entirely (state.phase === 'error' in useScanStream), never routed
+  // through this soft/hard notice UI.
   useEffect(() => {
     if (!visible || scanStopped) return;
-    const t = setTimeout(() => setTimedOut(true), PHOTO_SCAN_TIMEOUT_MS);
-    return () => clearTimeout(t);
+    const soft = setTimeout(() => setNoticeLevel('soft'), SOFT_NOTICE_MS);
+    const hard = setTimeout(() => setNoticeLevel('hard'), HARD_NOTICE_MS);
+    return () => {
+      clearTimeout(soft);
+      clearTimeout(hard);
+    };
   }, [visible, scanStopped]);
 
   // Staggered detected-items reveal — showDetectionChips()
@@ -119,7 +139,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
   useEffect(() => {
     if (!visible || !scanStopped || revealStartedRef.current) return;
     revealStartedRef.current = true;
-    setTimedOut(false);
+    setNoticeLevel('none');
 
     if (names.length === 0) {
       setStatusText('No ingredients found');
@@ -198,11 +218,23 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
           })}
         </div>
 
-        <div className={`${styles.photoScanTimeoutState} ${timedOut ? styles.visible : styles.hidden}`}>
-          <CircleAlert size={26} />
-          <p className={styles.photoScanTimeoutHeading}>This is taking longer than usual</p>
-          <p className={styles.photoScanTimeoutSub}>The vision service may be busy right now. You can keep waiting or try again.</p>
-          <button type="button" className={styles.photoScanRetryBtn} onClick={onRetry}>
+        <div
+          className={`${styles.photoScanTimeoutState} ${noticeLevel === 'none' ? styles.hidden : styles.visible} ${noticeLevel === 'hard' ? styles.hard : styles.soft}`}
+        >
+          {noticeLevel === 'hard' && <CircleAlert size={26} />}
+          <p className={styles.photoScanTimeoutHeading}>
+            {noticeLevel === 'hard' ? 'This is taking longer than usual' : 'Still scanning, almost there'}
+          </p>
+          <p className={styles.photoScanTimeoutSub}>
+            {noticeLevel === 'hard'
+              ? 'This is unusual — you can keep waiting or try again.'
+              : 'A thorough scan can take a little while. Feel free to keep waiting.'}
+          </p>
+          <button
+            type="button"
+            className={noticeLevel === 'hard' ? styles.photoScanRetryBtn : styles.photoScanRetryBtnSubtle}
+            onClick={onRetry}
+          >
             Try again
           </button>
         </div>
