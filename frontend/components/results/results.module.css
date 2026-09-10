@@ -323,6 +323,24 @@
 }
 .orderSheetConfirm:hover { background: #E8700A; }
 .orderSheetConfirm:active { transform: scale(0.98); }
+.orderSheetConfirm:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Inline auth/error notices — shown in place of (rather than instead of
+   closing) the sheet when a confirm attempt can't complete, so the sheet
+   never just vanishes with no explanation and top-up selections survive. */
+.orderSheetAuthNotice {
+  margin-top: 20px; padding: 14px 16px; background: rgba(252,128,25,0.1);
+  border: 1px solid rgba(252,128,25,0.3); border-radius: 14px; text-align: center;
+}
+.orderSheetAuthNotice p { font-size: 13px; color: rgba(255,255,255,0.75); margin: 0 0 12px 0; }
+.orderSheetAuthCta {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
+  background: #FC8019; color: #fff; font-weight: 600; font-size: 14px;
+  border-radius: 10px; text-decoration: none; transition: background 0.15s ease;
+}
+.orderSheetAuthCta:hover { background: #E8700A; }
+.orderSheetAuthCta svg { width: 16px; height: 16px; }
+.orderSheetErrorNotice { margin-top: 16px; font-size: 13px; color: #ff6b6b; text-align: center; }
 
 /* Top Up cards inside the order sheet — templates/index.html:3910-3918
    (markup), 913-936 (CSS). Emoji fallback sits underneath at all times; the

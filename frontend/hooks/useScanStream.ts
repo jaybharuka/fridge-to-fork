@@ -43,7 +43,14 @@ type Action =
   | { type: 'TOGGLE_ITEM'; index: number }
   | { type: 'ORDER_START' }
   | { type: 'ORDER_END' }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | {
+      type: 'RESTORE';
+      recommendedMeal: string;
+      reasoning: string;
+      checklist: ChecklistItem[];
+      topUpSuggestions: TopUpSuggestion[];
+    };
 
 const initialState: ScanState = {
   phase: 'idle',
@@ -185,6 +192,26 @@ function reducer(state: ScanState, action: Action): ScanState {
     case 'RESET':
       return initialState;
 
+    // Rehydrates just enough of the Order tab (checklist + top-up
+    // suggestions) to reopen the order sheet after the full-page OAuth
+    // redirect — see lib/pendingOrder.ts. Recipe tab content (cooking
+    // steps, suggestions) intentionally isn't restored: it was never
+    // persisted, since the user's goal here is finishing the order, not
+    // rereading the recipe.
+    case 'RESTORE':
+      return {
+        ...initialState,
+        phase: 'results',
+        hasPhoto: false,
+        step1Received: true,
+        recommendedMeal: action.recommendedMeal,
+        reasoning: action.reasoning,
+        checklist: action.checklist,
+        topUpSuggestions: action.topUpSuggestions,
+        awaitingChoice: true,
+        recipeTabUnlocked: true,
+      };
+
     // 'progress' and 'step2_partial' don't drive any state the UI reads
     // (matches old handleEvent()'s dead-tracked streamedIngredientNames).
     case 'progress':
@@ -264,5 +291,12 @@ export function useScanStream() {
     dispatch({ type: 'RESET' });
   }, []);
 
-  return { state, startScan, placeOrder, toggleChecklistItem, reset };
+  const restore = useCallback(
+    (payload: { recommendedMeal: string; reasoning: string; checklist: ChecklistItem[]; topUpSuggestions: TopUpSuggestion[] }) => {
+      dispatch({ type: 'RESTORE', ...payload });
+    },
+    []
+  );
+
+  return { state, startScan, placeOrder, toggleChecklistItem, reset, restore };
 }
