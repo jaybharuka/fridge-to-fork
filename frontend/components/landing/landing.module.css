@@ -3,7 +3,7 @@
    (CSS Modules scope them) but selectors/values match the source 1:1. */
 
 /* Hero — templates/index.html:206-216 */
-.hero { padding: 24px 20px 16px; }
+.hero { max-width: 480px; margin: 0 auto; padding: 24px 20px 16px; }
 .heroTitle {
   font-family: 'Plus Jakarta Sans', sans-serif; font-size: 36px; font-weight: 800; letter-spacing: -0.02em;
   color: rgba(255, 255, 255, 0.95); line-height: 1.15; margin-top: 8px; overflow-wrap: break-word; word-break: normal;

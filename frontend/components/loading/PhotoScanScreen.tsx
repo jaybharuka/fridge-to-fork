@@ -227,7 +227,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
           </p>
           <p className={styles.photoScanTimeoutSub}>
             {noticeLevel === 'hard'
-              ? 'This is unusual — you can keep waiting or try again.'
+              ? 'This is unusual. You can keep waiting or try again.'
               : 'A thorough scan can take a little while. Feel free to keep waiting.'}
           </p>
           <button

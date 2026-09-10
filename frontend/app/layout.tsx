@@ -4,7 +4,7 @@ import { Footer } from "@/components/shared/Footer";
 import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
 import "./globals.css";
 
-const TITLE = "Fridge to Fork — Cook anything. Order what's missing.";
+const TITLE = "Fridge to Fork: Cook anything. Order what's missing.";
 const DESCRIPTION =
   "Scan your fridge, get a recipe you can actually make, and order whatever's missing straight from Instamart or Swiggy.";
 

@@ -21,6 +21,6 @@ export function buildRecipeHookText(checklist: ChecklistItem[]): string {
 
 export function buildMissingSummaryText(items: ChecklistItem[]): string {
   const names = items.map(i => i.name);
-  if (!names.length) return 'Nothing — you have everything';
+  if (!names.length) return 'Nothing. You have everything.';
   return names.length > 3 ? `${names.slice(0, 3).join(', ')} + ${names.length - 3} more` : names.join(', ');
 }

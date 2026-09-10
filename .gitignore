@@ -53,5 +53,8 @@ gcp-credentials*.json
 # dev scripts.
 !frontend/public/icons/**/*.png
 !frontend/app/apple-icon.png
+!frontend/app/icon.png
+!frontend/app/og-logo.png
+!frontend/public/logo-mark.png
 !frontend/scripts/
 !frontend/scripts/**
