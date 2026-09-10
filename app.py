@@ -100,6 +100,24 @@ def _app_base_url() -> str:
     return os.environ.get("APP_BASE_URL", "http://localhost:8000").rstrip("/")
 
 
+def _safe_next_path(next_param: str | None) -> str:
+    """
+    Only ever redirect to a same-origin relative path after OAuth — a raw
+    user-supplied `next` value redirected to unvalidated is an open redirect.
+    Anything with a scheme or netloc (http://evil.com, //evil.com,
+    javascript:...) or that isn't a real absolute-path ("/...") is rejected
+    in favor of the safe "/" default.
+    """
+    if not next_param:
+        return "/"
+    parsed = urllib.parse.urlsplit(next_param)
+    if parsed.scheme or parsed.netloc:
+        return "/"
+    if not next_param.startswith("/") or next_param.startswith("//"):
+        return "/"
+    return next_param
+
+
 def _token_valid(request: Request) -> bool:
     token = request.session.get("access_token")
     expires_at = request.session.get("expires_at")
@@ -397,7 +415,7 @@ async def cart_fill(request: Request):
     access_token = request.session.get("access_token")
 
     async def stream():
-        if not access_token:
+        if not _token_valid(request):
             yield _sse({"type": "auth_required"})
             return
 
@@ -475,13 +493,17 @@ async def cart_fill(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.get("/auth/login")
-async def auth_login(request: Request):
+async def auth_login(request: Request, next: str = "/"):
     verifier = _pkce_verifier()
     challenge = _pkce_challenge(verifier)
     state = secrets.token_urlsafe(16)
 
     request.session["pkce_verifier"] = verifier
     request.session["oauth_state"] = state
+    # Stored server-side in the signed session, keyed implicitly to this
+    # login attempt (popped alongside pkce_verifier/oauth_state in the
+    # callback below) rather than passed through as a raw redirect URL.
+    request.session["oauth_next"] = _safe_next_path(next)
 
     client_id = os.environ.get("SWIGGY_CLIENT_ID", "")
     redirect_uri = _app_base_url() + "/auth/callback"
@@ -510,6 +532,9 @@ async def auth_callback(request: Request, code: str = "", state: str = ""):
 
     verifier = request.session.pop("pkce_verifier", None)
     request.session.pop("oauth_state", None)
+    # Re-validated on the way out too — defense in depth against a session
+    # value ever ending up somewhere unexpected.
+    next_path = _safe_next_path(request.session.pop("oauth_next", None))
     redirect_uri = _app_base_url() + "/auth/callback"
 
     async with httpx.AsyncClient() as client:
@@ -532,7 +557,7 @@ async def auth_callback(request: Request, code: str = "", state: str = ""):
     request.session["access_token"] = token_data["access_token"]
     request.session["expires_at"] = expires_at
 
-    return RedirectResponse("/")
+    return RedirectResponse(next_path)
 
 
 @app.get("/auth/status")
@@ -927,7 +952,7 @@ async def place_order(
                 yield _sse({"type": "complete"})
                 return
 
-            if not access_token:
+            if not _token_valid(request):
                 yield _sse({
                     "type": "auth_required",
                     "message": "Connect your Swiggy account to place this order",
