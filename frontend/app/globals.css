@@ -153,4 +153,28 @@ svg.lucide { width:1em; height:1em; display:inline-block; vertical-align:middle;
 }
 
 /* Page content gutter — templates/index.html:179 */
-.wrap { padding:20px 20px 32px; }
+/* Main content column — matches the 480px width StaticPage.module.css and
+   the order sheet panel already use, so the whole app reads as one
+   consistent column instead of stretching edge-to-edge on wide viewports. */
+.wrap { max-width:480px; margin:0 auto; padding:20px 20px 32px; }
+
+/* Skip-to-content link — off-screen until keyboard-focused, then docks at
+   the top-left so a keyboard user can jump past the header straight to
+   #main-content. Not part of the original vanilla app; a pure accessibility
+   addition, styled with the same tokens as everything else. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  padding: 12px 20px;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 0 0 10px 0;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+}

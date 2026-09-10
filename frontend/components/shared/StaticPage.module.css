@@ -1,0 +1,49 @@
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+}
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.lead {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+.content {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+.content h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 28px 0 10px;
+  color: var(--text-primary);
+}
+.content p {
+  margin-bottom: 14px;
+  color: var(--text-secondary);
+}
+.content a {
+  color: var(--orange);
+  font-weight: 600;
+}
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--orange);
+  text-decoration: none;
+}
+.backLink:hover {
+  color: var(--orange-dark);
+}

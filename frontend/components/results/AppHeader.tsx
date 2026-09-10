@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Moon, Sun, Utensils } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import styles from './results.module.css';
 
@@ -24,7 +24,7 @@ export function AppHeader() {
     <header className={styles.appHeader}>
       <div className={styles.appHeaderInner}>
         <div className={styles.brand}>
-          <Utensils />
+          <img src="/logo-mark.png" alt="" className={styles.brandLogo} width={20} height={20} />
           <span>Fridge to Fork</span>
         </div>
         <div className={styles.headerActions}>
