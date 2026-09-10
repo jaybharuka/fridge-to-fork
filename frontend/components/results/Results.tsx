@@ -44,7 +44,7 @@ interface ResultsProps {
   onOrderDish: () => void;
   orderSheetOpen: boolean;
   onCloseOrderSheet: () => void;
-  onConfirmOrderSheet: () => void;
+  onConfirmOrderSheet: (selectedTopUpNames: string[]) => void;
   onResetToLanding: () => void;
 }
 
@@ -129,9 +129,14 @@ export function Results({
           <div>
             {/* Mounted from step1 on (well before the reveal ends, so it has
                 settled into its final layout position by the time the
-                crossfade starts) — but never rendered as an empty
-                "0 items detected" row when a scan errored before step1. */}
-            {state.hasPhoto && state.detectedIngredients.length > 0 && (
+                crossfade starts) — but never rendered before step1 has ever
+                fired. Keyed on step1Received, not detectedIngredients.length:
+                a scan that genuinely finds zero ingredients still needs this
+                row, so the user can open the dropdown and see the "Nothing
+                detected, try again" card (FridgeChipsDropdown's own
+                ingredients.length === 0 branch) instead of it being
+                unreachable. */}
+            {state.hasPhoto && state.step1Received && (
               <FridgeSummaryHeader
                 rowRef={fridgeRowRef}
                 visible={fridgeVisible}
