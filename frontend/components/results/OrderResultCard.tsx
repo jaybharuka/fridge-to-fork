@@ -6,6 +6,23 @@ interface OrderResultCardProps {
   result: ScanState['orderResult'];
   resultsAlreadyShown: boolean;
   onRetry: () => void;
+  /** Fired just before the auth card's "Connect with Swiggy" CTA navigates
+   *  away, so the caller can stash current state to resume after the OAuth
+   *  redirect (lib/pendingOrder.ts). */
+  onConnectClick: () => void;
+}
+
+// Backend error strings are mostly already friendly ("Unable to place
+// order.") — the one exception is app.py's httpx.HTTPStatusError branch,
+// which surfaces a bare HTTP status code ("Order service error: 502"). We
+// can't edit app.py, so this normalizes just that one raw-looking pattern
+// before it reaches the inline error strip below; every other message
+// passes through unchanged.
+function friendlyErrorMessage(message: string): string {
+  if (/^Order service error: \d+$/.test(message)) {
+    return "The order service is having trouble right now. Please try again in a moment.";
+  }
+  return message;
 }
 
 // Port of handleEvent()'s cook_confirmed/step3/error/auth_required branches
@@ -13,7 +30,7 @@ interface OrderResultCardProps {
 // .order-card/.order-row etc. 968-979, .error-card 987-1004, .auth-card/
 // .auth-cta 953-966). React auto-escapes text content, so this needs no
 // escapeHtml() equivalent.
-export function OrderResultCard({ result, resultsAlreadyShown, onRetry }: OrderResultCardProps) {
+export function OrderResultCard({ result, resultsAlreadyShown, onRetry, onConnectClick }: OrderResultCardProps) {
   if (!result) return null;
 
   if (result.kind === 'cook_confirmed') {
@@ -65,7 +82,7 @@ export function OrderResultCard({ result, resultsAlreadyShown, onRetry }: OrderR
       return (
         <div className={styles.errorCard}>
           <CircleAlert />
-          <span>{result.message}</span>
+          <span>{friendlyErrorMessage(result.message)}</span>
         </div>
       );
     }
@@ -88,7 +105,7 @@ export function OrderResultCard({ result, resultsAlreadyShown, onRetry }: OrderR
       <div className={styles.authCardIcon}><Bike /></div>
       <div className={styles.authCardTitle}>Connect your Swiggy account</div>
       <div className={styles.authCardSub}>{result.message || 'Login to place this order instantly'}</div>
-      <a className={styles.authCta} href="/auth/login"><Link2 /> Connect with Swiggy</a>
+      <a className={styles.authCta} href="/auth/login?next=/" onClick={onConnectClick}><Link2 /> Connect with Swiggy</a>
     </div>
   );
 }

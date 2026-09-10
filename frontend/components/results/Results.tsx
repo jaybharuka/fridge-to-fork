@@ -45,6 +45,14 @@ interface ResultsProps {
   orderSheetOpen: boolean;
   onCloseOrderSheet: () => void;
   onConfirmOrderSheet: (selectedTopUpNames: string[]) => void;
+  /** Fired just before the sheet's "Connect with Swiggy" CTA navigates —
+   *  stashes state to resume after the OAuth round trip (lib/pendingOrder.ts). */
+  onSheetConnectClick: (selectedTopUpNames: string[]) => void;
+  /** Top-up names to pre-select when the sheet reopens after an OAuth
+   *  round trip; undefined for a normal open (starts with nothing selected). */
+  initialSelectedTopUpNames?: string[];
+  /** Same stash, for the sheet-less "Order the dish from Swiggy" auth card. */
+  onResultCardConnectClick: () => void;
   onResetToLanding: () => void;
 }
 
@@ -70,6 +78,9 @@ export function Results({
   orderSheetOpen,
   onCloseOrderSheet,
   onConfirmOrderSheet,
+  onSheetConnectClick,
+  initialSelectedTopUpNames,
+  onResultCardConnectClick,
   onResetToLanding,
 }: ResultsProps) {
   // Owned here rather than in page.tsx: nothing outside Results reads them.
@@ -193,6 +204,7 @@ export function Results({
               result={state.orderResult}
               resultsAlreadyShown={resultsAlreadyShown}
               onRetry={onResetToLanding}
+              onConnectClick={onResultCardConnectClick}
             />
           </div>
         )}
@@ -210,8 +222,12 @@ export function Results({
         open={orderSheetOpen}
         itemsToOrder={itemsToOrder}
         topUpSuggestions={state.topUpSuggestions}
+        orderPlacing={state.orderPlacing}
+        orderResult={state.orderResult}
+        initialSelectedTopUpNames={initialSelectedTopUpNames}
         onClose={onCloseOrderSheet}
         onConfirm={onConfirmOrderSheet}
+        onConnectClick={onSheetConnectClick}
       />
     </div>
   );

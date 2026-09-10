@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useScanStream } from '@/hooks/useScanStream';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useYoutubeVideos } from '@/hooks/useYoutubeVideos';
 import { useToast } from '@/hooks/useToast';
 import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
+import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
 import { Landing } from '@/components/landing/Landing';
 import { LoadingOverlay } from '@/components/loading/LoadingOverlay';
 import { PhotoScanScreen } from '@/components/loading/PhotoScanScreen';
@@ -30,7 +31,7 @@ export default function Home() {
   const [recipeDotDismissed, setRecipeDotDismissed] = useState(false);
 
   const photos = usePhotoUpload();
-  const { state, startScan, placeOrder, toggleChecklistItem, reset } = useScanStream();
+  const { state, startScan, placeOrder, toggleChecklistItem, reset, restore } = useScanStream();
   const { fetchVideos } = useYoutubeVideos();
   const toast = useToast();
 
@@ -84,13 +85,72 @@ export default function Home() {
   // missing) until the moment of submission, where both genuinely need to
   // reach the backend as one combined item list.
   const handleConfirmOrderSheet = useCallback((selectedTopUpNames: string[]) => {
-    setOrderSheetOpen(false);
     placeOrder(
       'order_groceries',
       state.recommendedMeal ?? '',
       [...getItemsToOrder(state.checklist).map(i => i.name), ...selectedTopUpNames]
     );
   }, [state.checklist, state.recommendedMeal, placeOrder]);
+
+  // Stashes just enough state to resume the in-progress order after the
+  // full-page OAuth redirect a "Connect with Swiggy" click triggers — see
+  // lib/pendingOrder.ts. Two call sites: the order sheet's inline CTA
+  // (reopens the sheet with top-up picks intact) and OrderResultCard's CTA
+  // for the sheet-less order_dish flow (no top-ups, sheet not reopened).
+  const handleSheetConnectClick = useCallback((selectedTopUpNames: string[]) => {
+    savePendingOrder({
+      recommendedMeal: state.recommendedMeal ?? '',
+      reasoning: state.reasoning,
+      checklist: state.checklist,
+      topUpSuggestions: state.topUpSuggestions,
+      selectedTopUpNames,
+      reopenOrderSheet: true,
+    });
+  }, [state.recommendedMeal, state.reasoning, state.checklist, state.topUpSuggestions]);
+
+  const handleResultCardConnectClick = useCallback(() => {
+    savePendingOrder({
+      recommendedMeal: state.recommendedMeal ?? '',
+      reasoning: state.reasoning,
+      checklist: state.checklist,
+      topUpSuggestions: state.topUpSuggestions,
+      selectedTopUpNames: [],
+      reopenOrderSheet: false,
+    });
+  }, [state.recommendedMeal, state.reasoning, state.checklist, state.topUpSuggestions]);
+
+  // The sheet used to close the instant Confirm was tapped, before the
+  // request even resolved — if the response turned out to be auth_required
+  // or an error, it closed anyway, silently, with nothing on screen to
+  // explain why. Now it only closes once the order genuinely succeeds;
+  // OrderBottomSheet shows auth/error state inline and stays open otherwise,
+  // so the user's top-up selections survive a failed attempt.
+  useEffect(() => {
+    if (orderSheetOpen && state.orderResult?.kind === 'order_placed') {
+      setOrderSheetOpen(false);
+    }
+  }, [orderSheetOpen, state.orderResult]);
+
+  // Resumes state stashed in lib/pendingOrder.ts right before a "Connect
+  // with Swiggy" click sent the user through the full-page OAuth redirect
+  // (/auth/login -> Swiggy -> /auth/callback -> back here). The lazy
+  // initializer reads (and clears) the stash exactly once, synchronously,
+  // before anything else can — consumePendingOrder() is one-shot, so it
+  // must not be called a second time on the same mount.
+  const [restoredOrder] = useState(() => consumePendingOrder());
+
+  useEffect(() => {
+    if (!restoredOrder) return;
+    restore({
+      recommendedMeal: restoredOrder.recommendedMeal,
+      reasoning: restoredOrder.reasoning,
+      checklist: restoredOrder.checklist,
+      topUpSuggestions: restoredOrder.topUpSuggestions,
+    });
+    setTab('order');
+    if (restoredOrder.reopenOrderSheet) setOrderSheetOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const showLanding = state.phase === 'idle';
   // Ruling B: once the scan screen is up it stays up until its OWN
@@ -168,6 +228,9 @@ export default function Home() {
           orderSheetOpen={orderSheetOpen}
           onCloseOrderSheet={() => setOrderSheetOpen(false)}
           onConfirmOrderSheet={handleConfirmOrderSheet}
+          onSheetConnectClick={handleSheetConnectClick}
+          initialSelectedTopUpNames={restoredOrder?.reopenOrderSheet ? restoredOrder.selectedTopUpNames : undefined}
+          onResultCardConnectClick={handleResultCardConnectClick}
           onResetToLanding={handleResetToLanding}
         />
       )}

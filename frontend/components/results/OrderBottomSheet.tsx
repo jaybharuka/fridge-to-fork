@@ -1,7 +1,9 @@
 'use client';
 
+import { Link2 } from 'lucide-react';
 import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import type { ChecklistItem, TopUpSuggestion } from '@/lib/types';
+import type { ScanState } from '@/hooks/useScanStream';
 import { getMissingIngredientDefaults } from '@/lib/quantity';
 import { TopUpCard } from './TopUpCard';
 import styles from './results.module.css';
@@ -10,10 +12,22 @@ interface OrderBottomSheetProps {
   open: boolean;
   itemsToOrder: ChecklistItem[];
   topUpSuggestions: TopUpSuggestion[];
+  /** /api/order round trip in flight — disables Confirm and shows a spinner. */
+  orderPlacing: boolean;
+  /** Result of the last order attempt made from this sheet. auth_required
+   *  and error results are shown inline (sheet stays open, selections
+   *  survive); the caller closes the sheet on order_placed. */
+  orderResult: ScanState['orderResult'];
+  /** Pre-selects these top-ups on open instead of starting empty — used
+   *  when the sheet is reopening after an OAuth round trip (lib/pendingOrder.ts). */
+  initialSelectedTopUpNames?: string[];
   onClose: () => void;
   /** Selected top-up item names (optional add-ons), separate from
    *  itemsToOrder — merged into the order payload by the caller. */
   onConfirm: (selectedTopUpNames: string[]) => void;
+  /** Fired just before the "Connect with Swiggy" CTA navigates away, so the
+   *  caller can stash current selections to resume after the redirect. */
+  onConnectClick: (selectedTopUpNames: string[]) => void;
 }
 
 // Ported from templates/index.html:2079-2098 (markup), 856-951 (CSS),
@@ -25,7 +39,7 @@ interface OrderBottomSheetProps {
 // original's closeOrderSheet setTimeout) before the sheet actually unmounts,
 // so the slide-down animation is visible instead of the panel vanishing
 // instantly.
-export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose, onConfirm }: OrderBottomSheetProps) {
+export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, orderPlacing, orderResult, initialSelectedTopUpNames, onClose, onConfirm, onConnectClick }: OrderBottomSheetProps) {
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
   const [selectedTopUps, setSelectedTopUps] = useState<Set<string>>(new Set());
@@ -34,13 +48,16 @@ export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose
   useEffect(() => {
     if (open) {
       setMounted(true);
-      setSelectedTopUps(new Set()); // fresh selection each time the sheet opens
+      // Fresh selection on a normal open; restores the caller's picks when
+      // reopening after the OAuth round trip.
+      setSelectedTopUps(new Set(initialSelectedTopUpNames ?? []));
       const raf = requestAnimationFrame(() => setVisible(true));
       return () => cancelAnimationFrame(raf);
     }
     setVisible(false);
     const timer = setTimeout(() => setMounted(false), 400);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const toggleTopUp = (name: string) => {
@@ -114,12 +131,30 @@ export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose
           </div>
         )}
 
+        {orderResult?.kind === 'auth_required' && (
+          <div className={styles.orderSheetAuthNotice}>
+            <p>{orderResult.message || 'Connect your Swiggy account to place this order.'}</p>
+            <a
+              className={styles.orderSheetAuthCta}
+              href="/auth/login?next=/"
+              onClick={() => onConnectClick(Array.from(selectedTopUps))}
+            >
+              <Link2 /> Connect with Swiggy
+            </a>
+          </div>
+        )}
+
+        {orderResult?.kind === 'error' && (
+          <p className={styles.orderSheetErrorNotice}>{orderResult.message}</p>
+        )}
+
         <button
           type="button"
           className={styles.orderSheetConfirm}
+          disabled={orderPlacing}
           onClick={() => onConfirm(Array.from(selectedTopUps))}
         >
-          Confirm order
+          {orderPlacing ? 'Placing order…' : 'Confirm order'}
         </button>
       </div>
     </div>
