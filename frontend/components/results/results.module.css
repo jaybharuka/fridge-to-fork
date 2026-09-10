@@ -230,6 +230,11 @@
   margin-bottom: 32px;
 }
 .contentFadeIn { animation: contentFadeIn .25s ease-out forwards; }
+/* ChoiceCard combines .card + .contentFadeIn on one element — both declare
+   `animation`, and same-specificity + source-order is a fragile way to
+   decide which one wins. This combined selector (0,2,0) settles it
+   unambiguously instead of relying on rule order. */
+.card.contentFadeIn { animation: contentFadeIn .25s ease-out forwards; }
 
 /* Choice card (Instamart / Swiggy) — templates/index.html:3772-3813
    (markup), 787-839 (CSS), including the ::before spotlight-glow that
@@ -323,15 +328,24 @@
    (markup), 913-936 (CSS). Emoji fallback sits underneath at all times; the
    real Unsplash photo cross-fades in once (if) it loads. */
 .topupSheetCard {
+  /* button reset — this is a real <button> now (click-to-add), not a div */
+  display: block; font: inherit; text-align: left; padding: 0; margin: 0;
   flex-shrink: 0; width: 130px; background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
-  overflow: hidden; cursor: pointer; transition: transform 0.15s ease;
+  overflow: hidden; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .topupSheetCard:active { transform: scale(0.97); }
+.topupSheetCard.selected { border-color: #FC8019; background: rgba(252,128,25,0.12); }
 .topupSheetImgWrap { width: 100%; height: 90px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
 .topupSheetImg { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; }
 .topupSheetImg.loaded { opacity: 1; }
 .topupSheetEmojiFallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+.topupSheetCheckBadge {
+  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+  background: #FC8019; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.topupSheetCheckBadge svg { width: 15px; height: 15px; stroke: #fff; color: #fff; }
 .topupSheetInfo { padding: 10px 10px 12px 10px; }
 .topupSheetName { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topupSheetPrice { font-size: 13px; font-weight: 700; color: #FC8019; margin: 0; }

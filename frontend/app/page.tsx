@@ -79,12 +79,16 @@ export default function Home() {
     setOrderSheetOpen(true);
   }, [state.checklist, state.recommendedMeal, placeOrder]);
 
-  const handleConfirmOrderSheet = useCallback(() => {
+  // Top-up items are optional add-ons the user picked in the sheet, kept
+  // separate from the missing-ingredients list (things already known to be
+  // missing) until the moment of submission, where both genuinely need to
+  // reach the backend as one combined item list.
+  const handleConfirmOrderSheet = useCallback((selectedTopUpNames: string[]) => {
     setOrderSheetOpen(false);
     placeOrder(
       'order_groceries',
       state.recommendedMeal ?? '',
-      getItemsToOrder(state.checklist).map(i => i.name)
+      [...getItemsToOrder(state.checklist).map(i => i.name), ...selectedTopUpNames]
     );
   }, [state.checklist, state.recommendedMeal, placeOrder]);
 
@@ -93,13 +97,16 @@ export default function Home() {
   // onRevealComplete fires — `complete`/`error` can (and for a fast backend
   // routinely does) move `phase` off 'photo-scanning' mid-reveal, and that
   // must not yank the screen and strand the reveal timers. Hence keyed on
-  // the reveal flag, not `phase`. The one `phase`-ish term left is the
-  // detected-ingredients check: an error before step1 means no reveal will
-  // ever run, so the screen must give way to the error card.
+  // the reveal flag, not `phase`. The one `phase`-ish term left is
+  // step1Received (not `detectedIngredients.length` — a scan that finds
+  // zero ingredients also leaves that array empty, and must still get its
+  // reveal/settle beat rather than being treated as "step1 never fired"):
+  // an error before step1 means no reveal will ever run, so the screen must
+  // give way to the error card.
   const showPhotoScan =
     state.hasPhoto &&
     !photoDetectionRevealed &&
-    (state.phase === 'photo-scanning' || state.detectedIngredients.length > 0);
+    (state.phase === 'photo-scanning' || state.step1Received);
   // "Has the user actually seen results yet" — drives OrderResultCard's
   // inline-strip vs. full-page error variant. `phase === 'results'` alone
   // misses an error that lands after the reveal finished but before
@@ -115,6 +122,7 @@ export default function Home() {
     <div>
       <AppHeader />
 
+      <main id="main-content">
       {showLanding && (
         <Landing
           targetDish={targetDish}
@@ -136,7 +144,7 @@ export default function Home() {
       <PhotoScanScreen
         visible={showPhotoScan}
         photoUrls={photos.thumbnailUrls}
-        detectedIngredients={state.detectedIngredients.length ? state.detectedIngredients : null}
+        detectedIngredients={state.step1Received ? state.detectedIngredients : null}
         onRevealComplete={() => setPhotoDetectionRevealed(true)}
         onRetry={handleGetRecipe}
       />
@@ -163,6 +171,7 @@ export default function Home() {
           onResetToLanding={handleResetToLanding}
         />
       )}
+      </main>
 
       <Toast message={toast.message} />
     </div>

@@ -11,7 +11,9 @@ interface OrderBottomSheetProps {
   itemsToOrder: ChecklistItem[];
   topUpSuggestions: TopUpSuggestion[];
   onClose: () => void;
-  onConfirm: () => void;
+  /** Selected top-up item names (optional add-ons), separate from
+   *  itemsToOrder — merged into the order payload by the caller. */
+  onConfirm: (selectedTopUpNames: string[]) => void;
 }
 
 // Ported from templates/index.html:2079-2098 (markup), 856-951 (CSS),
@@ -26,11 +28,13 @@ interface OrderBottomSheetProps {
 export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose, onConfirm }: OrderBottomSheetProps) {
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
+  const [selectedTopUps, setSelectedTopUps] = useState<Set<string>>(new Set());
   const touchStartY = useRef(0);
 
   useEffect(() => {
     if (open) {
       setMounted(true);
+      setSelectedTopUps(new Set()); // fresh selection each time the sheet opens
       const raf = requestAnimationFrame(() => setVisible(true));
       return () => cancelAnimationFrame(raf);
     }
@@ -38,6 +42,15 @@ export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose
     const timer = setTimeout(() => setMounted(false), 400);
     return () => clearTimeout(timer);
   }, [open]);
+
+  const toggleTopUp = (name: string) => {
+    setSelectedTopUps(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
 
   if (!mounted) return null;
 
@@ -66,7 +79,8 @@ export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose
         <div className={styles.orderSheetHeader}>
           <h3 className={styles.orderSheetTitle}>Your order</h3>
           <p className={styles.orderSheetSubtitle}>
-            {itemsToOrder.length} item{itemsToOrder.length === 1 ? '' : 's'} to order
+            {itemsToOrder.length + selectedTopUps.size} item
+            {itemsToOrder.length + selectedTopUps.size === 1 ? '' : 's'} to order
           </p>
         </div>
 
@@ -89,13 +103,22 @@ export function OrderBottomSheet({ open, itemsToOrder, topUpSuggestions, onClose
             <p className={styles.orderSheetTopUpLabel}>Add to your order?</p>
             <div className={styles.orderSheetTopUpCards}>
               {topItems.map((item, i) => (
-                <TopUpCard key={i} item={item} />
+                <TopUpCard
+                  key={i}
+                  item={item}
+                  selected={selectedTopUps.has(item.name)}
+                  onToggle={() => toggleTopUp(item.name)}
+                />
               ))}
             </div>
           </div>
         )}
 
-        <button type="button" className={styles.orderSheetConfirm} onClick={onConfirm}>
+        <button
+          type="button"
+          className={styles.orderSheetConfirm}
+          onClick={() => onConfirm(Array.from(selectedTopUps))}
+        >
           Confirm order
         </button>
       </div>
