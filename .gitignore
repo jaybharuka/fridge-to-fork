@@ -46,3 +46,12 @@ inventory.db
 *-key.json
 service-account*.json
 gcp-credentials*.json
+
+# frontend/ genuinely needs its own PNGs (PWA icons) and a build-time
+# script — exempt from the blanket *.png / scripts/ rules above, which
+# were written for the unrelated Python project's root-level images and
+# dev scripts.
+!frontend/public/icons/**/*.png
+!frontend/app/apple-icon.png
+!frontend/scripts/
+!frontend/scripts/**
