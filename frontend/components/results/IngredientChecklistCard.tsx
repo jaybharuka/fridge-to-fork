@@ -78,6 +78,9 @@ export function IngredientChecklistCard({ checklist, toggleChecklistItem }: Ingr
         </p>
       </div>
       <p className={styles.hookLine}>{buildRecipeHookText(checklist)}</p>
+      <p className={styles.hintLine}>
+        Checked items are already covered. Uncheck anything you&apos;d like to order, or check off what you don&apos;t need.
+      </p>
       <div className={`${styles.rowsWrap} ${hasMoreBelow ? styles.hasMoreBelow : ''}`}>
         <div className={styles.rows} ref={rowsRef}>
           {checklist.map((ing, idx) => {

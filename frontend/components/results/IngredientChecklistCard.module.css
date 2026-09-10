@@ -15,6 +15,10 @@
 
 .hookLine { font-size: 13px; font-style: italic; font-weight: 400; color: var(--grey-400); padding: 16px 20px; }
 
+/* Explains what tapping a row does — plain, not italic, so it doesn't
+   read as more of the encouragement copy above it. */
+.hintLine { font-size: 12px; font-weight: 400; color: var(--text-muted); padding: 0 20px 12px; }
+
 /* Ingredient checklist scrolls within itself once it's long enough (e.g. a
    20-item Dal Makhani list) instead of pushing the choice cards below it
    off-screen. .rowsWrap is the positioning context for the bottom fade;
