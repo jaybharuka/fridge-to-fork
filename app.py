@@ -87,6 +87,31 @@ def _app_base_url() -> str:
     return os.environ.get("APP_BASE_URL", "http://localhost:8000").rstrip("/")
 
 
+_swiggy_client_id: str | None = None
+
+
+async def _get_swiggy_client_id() -> str:
+    """Register once via RFC 7591 Dynamic Client Registration, then cache."""
+    global _swiggy_client_id
+    if _swiggy_client_id:
+        return _swiggy_client_id
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            f"{SWIGGY_AUTH_BASE}/auth/register",
+            json={
+                "client_name": "Fridge to Fork",
+                "redirect_uris": [_app_base_url() + "/auth/callback"],
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+            },
+        )
+        resp.raise_for_status()
+    _swiggy_client_id = resp.json()["client_id"]
+    return _swiggy_client_id
+
+
 def _safe_next_path(next_param: str | None) -> str:
     """
     Only ever redirect to a same-origin relative path after OAuth — a raw
@@ -492,7 +517,13 @@ async def auth_login(request: Request, next: str = "/"):
     # callback below) rather than passed through as a raw redirect URL.
     request.session["oauth_next"] = _safe_next_path(next)
 
-    client_id = os.environ.get("SWIGGY_CLIENT_ID", "")
+    try:
+        client_id = await _get_swiggy_client_id()
+    except (httpx.HTTPError, KeyError, ValueError):
+        return HTMLResponse(
+            "<h2>Couldn't reach Swiggy to start login.</h2><p><a href='/'>Go back</a></p>",
+            status_code=502,
+        )
     redirect_uri = _app_base_url() + "/auth/callback"
 
     params = urllib.parse.urlencode({
@@ -523,6 +554,7 @@ async def auth_callback(request: Request, code: str = "", state: str = ""):
     # value ever ending up somewhere unexpected.
     next_path = _safe_next_path(request.session.pop("oauth_next", None))
     redirect_uri = _app_base_url() + "/auth/callback"
+    client_id = await _get_swiggy_client_id()
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -532,7 +564,7 @@ async def auth_callback(request: Request, code: str = "", state: str = ""):
                 "code": code,
                 "code_verifier": verifier,
                 "redirect_uri": redirect_uri,
-                "client_id": os.environ.get("SWIGGY_CLIENT_ID", ""),
+                "client_id": client_id,
             },
         )
         resp.raise_for_status()
