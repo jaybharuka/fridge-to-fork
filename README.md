@@ -126,7 +126,7 @@ On the same machine: `http://localhost:8000`. On your phone, over the same WiFi 
 
 **6. (Optional) Connect Swiggy**
 
-Set `SWIGGY_CLIENT_ID` and `APP_BASE_URL` in `.env`, then tap "Connect Swiggy" in the header. Without this, the app still works end to end using dry run order simulation.
+Set `APP_BASE_URL` in `.env` (the app registers itself with Swiggy via Dynamic Client Registration, so no client ID is needed), then tap "Connect Swiggy" in the header. Without this, the app still works end to end using dry run order simulation.
 
 **7. Run the test suite**
 
@@ -147,7 +147,6 @@ All network calls and LLM calls in the test suite are mocked, so no API key is r
 | `SWIGGY_INSTAMART_MCP_URL` | Optional | Swiggy Instamart MCP endpoint (default `https://mcp.swiggy.com/im`) |
 | `SWIGGY_DINEOUT_MCP_URL` | Optional | Swiggy Dineout MCP endpoint (default `https://mcp.swiggy.com/dineout`) |
 | `SWIGGY_AGENT_MODEL` | Optional | Gemini model the ADK agent uses for tool selection (default `gemini-2.5-flash`) |
-| `SWIGGY_CLIENT_ID` | For real orders | OAuth 2.1 client ID for the Swiggy PKCE login flow |
 | `APP_BASE_URL` | For real orders | Base URL this app is reachable at, used to build the OAuth redirect URI |
 | `SECRET_KEY` | Recommended | Signs session cookies via `itsdangerous`, set a real random value in production |
 | `DELIVERY_ADDRESS` | Optional | Default delivery address passed to the agent (default `Mumbai, India`) |
