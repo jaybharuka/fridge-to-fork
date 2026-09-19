@@ -3,6 +3,7 @@
 import { useCallback, useReducer, useRef } from 'react';
 import { authHeaders, markDisconnected } from '../lib/auth';
 import { BACKEND_URL } from '../lib/backend';
+import { FOOD_ORDERING_ENABLED, FOOD_UNAVAILABLE_MESSAGE } from '../lib/features';
 import { readSSEStream } from '../lib/sse';
 import type { ChecklistItem, DetectedIngredient, MealSuggestion, ScanEvent, TopUpSuggestion } from '../lib/types';
 
@@ -264,6 +265,11 @@ export function useScanStream() {
 
   const placeOrder = useCallback(
     async (action: 'cook' | 'order_dish', mealName: string) => {
+      if (action === 'order_dish' && !FOOD_ORDERING_ENABLED) {
+        // Even if a caller bypasses the disabled card: never send a Food order.
+        dispatch({ type: 'error', message: FOOD_UNAVAILABLE_MESSAGE });
+        return;
+      }
       if (orderInFlight.current) return;
       orderInFlight.current = true;
       dispatch({ type: 'ORDER_START' });

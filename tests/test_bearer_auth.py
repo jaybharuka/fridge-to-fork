@@ -11,9 +11,9 @@ from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 import app as a
+from fridge_to_fork import instamart_orders
 
 client = TestClient(a.app)
-ORDER = {"action": "order_dish", "meal_name": "Test"}
 
 
 def _exp(delta: timedelta) -> str:
@@ -39,19 +39,21 @@ class TestBearerAuth(unittest.TestCase):
             r = client.get("/auth/status", headers={"Authorization": f"Bearer {bad}"})
             self.assertFalse(r.json()["authenticated"], bad)
 
-    def test_order_without_credentials_is_auth_required(self):
-        self.assertIn('"auth_required"', client.post("/api/order", data=ORDER).text)
+    # /api/order used to be the probe for these; the Food dish path is switched off (refused before auth),
+    # so the bearer gate is exercised through an Instamart route, which is where it matters now.
+    def test_instamart_route_without_credentials_is_auth_required(self):
+        self.assertEqual(client.post("/api/instamart/orders", json={}).json()["error"]["code"], "auth_required")
 
-    def test_order_with_bad_bearer_is_auth_required(self):
-        r = client.post("/api/order", data=ORDER, headers={"Authorization": "Bearer nope"})
-        self.assertIn('"auth_required"', r.text)
+    def test_instamart_route_with_bad_bearer_is_auth_required(self):
+        r = client.post("/api/instamart/orders", json={}, headers={"Authorization": "Bearer nope"})
+        self.assertEqual(r.json()["error"]["code"], "auth_required")
 
-    def test_order_with_valid_bearer_passes_the_auth_gate(self):
+    def test_instamart_route_with_valid_bearer_passes_the_auth_gate(self):
         tok = a._issue_bearer("swiggy-tok", _exp(timedelta(days=1)))
-        with patch.object(a, "order_dish_from_swiggy", AsyncMock(return_value=None)) as order:
-            r = client.post("/api/order", data=ORDER, headers={"Authorization": f"Bearer {tok}"})
-        self.assertNotIn("auth_required", r.text)
-        self.assertEqual(order.await_args.args[-1], "swiggy-tok")  # the Swiggy token, not our signed wrapper
+        with patch.object(instamart_orders, "list_orders", AsyncMock(return_value={"orders": [], "hasMore": False})) as fn:
+            r = client.post("/api/instamart/orders", json={}, headers={"Authorization": f"Bearer {tok}"})
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(fn.await_args.args[0], "swiggy-tok")  # the Swiggy token, not our signed wrapper
 
     def test_session_token_endpoint_requires_the_cookie_session(self):
         r = client.get("/auth/session-token", headers={"Authorization": "Bearer x"})
