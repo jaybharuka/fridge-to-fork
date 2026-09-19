@@ -2,6 +2,7 @@
 
 import { useCallback, useReducer, useRef } from 'react';
 import { authHeaders, markDisconnected } from '../lib/auth';
+import { BACKEND_URL } from '../lib/backend';
 import { readSSEStream } from '../lib/sse';
 import type { ChecklistItem, DetectedIngredient, MealSuggestion, ScanEvent, TopUpSuggestion } from '../lib/types';
 
@@ -233,7 +234,6 @@ function reducer(state: ScanState, action: Action): ScanState {
 // Authorization bearer (lib/auth.ts) because the session cookie is host-only
 // on the Vercel origin and never reaches this one. Falls back to the same-origin proxy path when unset
 // (local dev, where next.config.js's own BACKEND_URL default handles it).
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 export function useScanStream() {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -263,14 +263,13 @@ export function useScanStream() {
   );
 
   const placeOrder = useCallback(
-    async (action: 'cook' | 'order_groceries' | 'order_dish', mealName: string, missingIngredientNames: string[]) => {
+    async (action: 'cook' | 'order_dish', mealName: string) => {
       if (orderInFlight.current) return;
       orderInFlight.current = true;
       dispatch({ type: 'ORDER_START' });
       const form = new FormData();
       form.append('action', action);
       form.append('meal_name', mealName || '');
-      form.append('missing_ingredients', missingIngredientNames.join(','));
       try {
         const res = await fetch(`${BACKEND_URL}/api/order`, { method: 'POST', body: form, credentials: 'include', headers: await authHeaders() });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);

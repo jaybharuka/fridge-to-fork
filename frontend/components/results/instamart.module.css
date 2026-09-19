@@ -1,0 +1,82 @@
+/* Instamart order sheet — picker, cart review, outcome. Lives inside the same
+   always-dark panel as results.module.css's .orderSheetPanel. */
+
+.address { font-size: 12px; color: rgba(255,255,255,0.45); margin: 0 0 14px 0; line-height: 1.4; }
+.address strong { color: rgba(255,255,255,0.8); font-weight: 600; }
+
+.notice, .warn, .blocker, .adjust {
+  font-size: 13px; line-height: 1.45; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px 0;
+}
+.notice, .warn, .adjust { background: rgba(252,128,25,0.1); border: 1px solid rgba(252,128,25,0.3); color: rgba(255,255,255,0.8); }
+.blocker { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.35); color: #ff8f8f; }
+
+.list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+.row { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 12px; }
+.rowHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ingredient { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+.picked { display: flex; align-items: center; gap: 12px; }
+.thumb { width: 56px; height: 56px; border-radius: 12px; background: #fff; object-fit: contain; flex-shrink: 0; }
+.thumbFallback { width: 56px; height: 56px; border-radius: 12px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.info { flex: 1; min-width: 0; }
+.name { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.92); margin: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.meta { font-size: 12px; color: rgba(255,255,255,0.4); margin: 2px 0 0 0; }
+.price { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 4px 0 0 0; }
+.mrp { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.35); text-decoration: line-through; margin-left: 6px; }
+.skipped, .none { font-size: 13px; color: rgba(255,255,255,0.4); margin: 0; }
+.actions { display: flex; gap: 16px; margin-top: 10px; }
+.linkBtn { background: none; border: none; padding: 4px 0; font-size: 13px; font-weight: 600; color: #FC8019; cursor: pointer; }
+.linkBtn:disabled { opacity: .5; cursor: not-allowed; }
+.linkBtn.muted { color: rgba(255,255,255,0.45); }
+
+.stepper { display: flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.06); border-radius: 10px; flex-shrink: 0; }
+.stepper button { width: 32px; height: 32px; background: none; border: none; color: #FC8019; font-size: 18px; font-weight: 700; cursor: pointer; }
+.stepper button:disabled { color: rgba(255,255,255,0.2); cursor: not-allowed; }
+.stepper span { min-width: 20px; text-align: center; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); }
+
+.options { list-style: none; margin: 10px 0 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.option {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; cursor: pointer; color: inherit;
+}
+.option.on { border-color: #FC8019; background: rgba(252,128,25,0.08); }
+.option:disabled { opacity: .45; cursor: not-allowed; }
+.option .thumb, .option .thumbFallback { width: 40px; height: 40px; border-radius: 8px; font-size: 16px; }
+.oos { font-size: 11px; color: #ff8f8f; font-weight: 600; }
+
+.sectionLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin: 16px 0 12px 0; }
+
+.primary {
+  width: 100%; padding: 16px; margin-top: 20px; background: #FC8019; color: #fff; font-size: 16px; font-weight: 700;
+  border: none; border-radius: 14px; cursor: pointer; transition: background .15s ease, transform .15s ease;
+}
+.primary:hover { background: #E8700A; }
+.primary:active { transform: scale(0.98); }
+.primary:disabled { opacity: .5; cursor: not-allowed; }
+.secondary {
+  width: 100%; padding: 13px; margin-top: 10px; background: transparent; color: rgba(255,255,255,0.75); font-size: 14px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; cursor: pointer;
+}
+.secondary:disabled { opacity: .5; cursor: not-allowed; }
+.hint { font-size: 12px; color: rgba(255,255,255,0.4); text-align: center; margin: 8px 0 0 0; }
+
+.skeleton { height: 96px; border-radius: 16px; background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04)); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.cartItem { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.cartItem .thumb, .cartItem .thumbFallback { width: 44px; height: 44px; font-size: 18px; }
+.lineTotal { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); flex-shrink: 0; }
+.bill { margin: 14px 0 4px 0; }
+.billRow { display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.55); padding: 4px 0; }
+.billTotal { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.95); padding: 10px 0 0 0; margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); }
+.payment { font-size: 13px; color: rgba(255,255,255,0.6); margin: 12px 0 0 0; }
+.payment strong { color: rgba(255,255,255,0.9); }
+
+.centered { text-align: center; padding: 8px 0; }
+.bigIcon { width: 44px; height: 44px; margin: 8px auto 12px auto; display: block; }
+.bigIcon.ok { color: #2ECC71; }
+.bigIcon.warnIcon { color: #FC8019; }
+.bigIcon.bad { color: #ff6b6b; }
+.outcomeTitle { font-size: 18px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0 0 6px 0; }
+.outcomeBody { font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.65); margin: 0 0 8px 0; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -2,7 +2,7 @@ import type { ChecklistItem } from '@/lib/types';
 
 // Direct ports of templates/index.html:3482-3488 (buildRecipeHookText),
 // 3720-3724 (toggleRecipeItem's "missing" filter, generalized here as
-// getItemsToOrder for reuse by ChoiceCard/OrderBottomSheet, Task 10).
+// getItemsToOrder for reuse by ChoiceCard/InstamartOrderSheet).
 // escapeHtml calls in the original are dropped since React auto-escapes
 // text content — these functions return plain strings for React to render
 // as text nodes, not dangerouslySetInnerHTML.
