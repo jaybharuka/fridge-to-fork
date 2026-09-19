@@ -1,17 +1,36 @@
 'use client';
 
-import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
+import { CircleAlert, CircleCheck, ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react';
 import type { InstamartOutcome as Outcome } from '@/lib/instamart';
 import styles from './instamart.module.css';
 
 interface OutcomeProps {
   outcome: Outcome;
+  /** True when the chosen payment was cash on delivery (nothing was paid online). */
+  payOnDelivery: boolean;
   onClose: () => void;
   onBackToCart: () => void;
 }
 
-export function InstamartOutcome({ outcome, onClose, onBackToCart }: OutcomeProps) {
+export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
+
+  if (outcome.status === 'pending_payment' && outcome.payment) {
+    // The parent hook is polling payment-status; this screen just gives the user the payment page.
+    return (
+      <div className={styles.centered}>
+        <LoaderCircle className={`${styles.bigIcon} ${styles.warnIcon} ${styles.spin}`} />
+        <h4 className={styles.outcomeTitle}>Complete your payment</h4>
+        <p className={styles.outcomeBody}>Open Swiggy&apos;s payment page to scan the QR or tap to pay in your UPI app. We&apos;ll update this screen as soon as it goes through.</p>
+        <a className={styles.primary} style={{ display: 'block', textDecoration: 'none' }} href={outcome.payment.bridgeUrl} target="_blank" rel="noopener noreferrer">
+          <ExternalLink style={{ width: 16, height: 16, verticalAlign: '-3px' }} /> Open payment page
+        </a>
+        <p className={styles.hint}>Waiting for your payment… If you&apos;ve already paid, you can close this — check the Swiggy app for the order.</p>
+        <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
+      </div>
+    );
+  }
+
   if (outcome.status === 'placed') {
     return (
       <div className={styles.centered}>
@@ -19,7 +38,7 @@ export function InstamartOutcome({ outcome, onClose, onBackToCart }: OutcomeProp
         <h4 className={styles.outcomeTitle}>Order placed</h4>
         <p className={styles.outcomeBody}>
           {ids && <>Order {ids}. </>}
-          {outcome.total && <>Pay {outcome.total} on delivery. </>}
+          {payOnDelivery && outcome.total ? <>Pay {outcome.total} on delivery. </> : !payOnDelivery ? <>Payment received. </> : null}
           Track it in the Swiggy app.
         </p>
         {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy — it&apos;s worth a glance in the app.</p>}
@@ -32,13 +51,13 @@ export function InstamartOutcome({ outcome, onClose, onBackToCart }: OutcomeProp
       <div className={styles.centered}>
         <CircleAlert className={`${styles.bigIcon} ${styles.bad}`} />
         <h4 className={styles.outcomeTitle}>Order not placed</h4>
-        <p className={styles.outcomeBody}>{outcome.message} Nothing was charged.</p>
+        <p className={styles.outcomeBody}>{outcome.message}</p>
         <button type="button" className={styles.primary} onClick={onBackToCart}>Back to your cart</button>
         <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
       </div>
     );
   }
-  // partial / unknown: never offer a retry — the order may exist.
+  // partial / unknown (and a pending payment with no usable page): never offer a retry — the order may exist.
   return (
     <div className={styles.centered}>
       <TriangleAlert className={`${styles.bigIcon} ${styles.warnIcon}`} />

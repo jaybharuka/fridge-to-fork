@@ -86,6 +86,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
   if (!mounted) return null;
 
   const placing = state.stage === 'placing';
+  const selectedPayment = state.review?.payment.options.find(o => o.key === state.paymentKey) ?? null;
   const close = () => { if (!placing) onClose(); }; // a request is in flight: the user must see its outcome
 
   const selectedTopUps = new Set(state.extras);
@@ -136,7 +137,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <InstamartOutcome outcome={state.outcome} onClose={onClose} onBackToCart={order.backToPicking} />
+          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} />
         ) : state.stage === 'picking' ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
@@ -175,17 +176,27 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
         ) : state.review ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
-            <InstamartReview review={state.review} adjustments={state.adjustments} />
+            <InstamartReview
+              review={state.review}
+              adjustments={state.adjustments}
+              coupons={state.coupons}
+              appliedCoupon={state.appliedCoupon}
+              couponBusy={state.couponBusy}
+              paymentKey={state.paymentKey}
+              disabled={placing}
+              onSelectPayment={order.selectPayment}
+              onApplyCoupon={code => order.applyCoupon(state.review!.address.id!, code)}
+            />
             <button
               type="button"
               className={styles.primary}
-              disabled={placing || !state.review.canCheckout || !state.review.address.id || !state.review.total || !state.idempotencyKey}
-              onClick={() => order.placeOrder(state.review!.address.id!, state.review!.total!, state.idempotencyKey!)}
+              disabled={placing || state.couponBusy !== null || !selectedPayment || !state.review.canCheckout || !state.review.address.id || !state.review.total || !state.idempotencyKey}
+              onClick={() => order.placeOrder(state.review!.address.id!, state.review!.total!, state.idempotencyKey!, selectedPayment!.key)}
             >
               {placing ? (
                 <><LoaderCircle className={styles.spin} style={{ width: 16, height: 16, verticalAlign: '-3px' }} /> Placing your order…</>
               ) : (
-                `Place order · ${state.review.total} · Pay on delivery`
+                selectedPayment?.type === 'cod' ? `Place order · ${state.review.total} · Pay on delivery` : `Continue to payment · ${state.review.total}`
               )}
             </button>
             <button type="button" className={styles.secondary} disabled={placing} onClick={order.backToPicking}>Edit items</button>
