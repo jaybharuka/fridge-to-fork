@@ -6,6 +6,7 @@ import type { ChecklistItem, TopUpSuggestion } from '@/lib/types';
 import { selectionsFrom, useInstamartOrder, type Stage } from '@/hooks/useInstamartOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { formatInr } from '@/lib/instamart';
+import { openOrders } from '@/lib/ordersUi';
 import { InstamartOutcome } from './InstamartOutcome';
 import { estimateSubtotal, InstamartPicker } from './InstamartPicker';
 import { InstamartReview } from './InstamartReview';
@@ -137,7 +138,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} />
+          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id); }} />
         ) : state.stage === 'picking' ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}

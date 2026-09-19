@@ -10,6 +10,7 @@ import { usePrefetchProducts } from '@/hooks/useInstamartProducts';
 import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
 import { ConnectGate } from '@/components/auth/ConnectGate';
+import { InstamartOrdersSheet } from '@/components/results/InstamartOrdersSheet';
 import { Landing } from '@/components/landing/Landing';
 import { LoadingOverlay } from '@/components/loading/LoadingOverlay';
 import { PhotoScanScreen } from '@/components/loading/PhotoScanScreen';
@@ -238,6 +239,7 @@ export default function Home() {
       )}
       </main>
 
+      {connected && <InstamartOrdersSheet />}
       <Toast message={toast.message} />
     </div>
   );

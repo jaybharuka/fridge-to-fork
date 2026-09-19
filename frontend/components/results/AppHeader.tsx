@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Check, Moon, Sun } from 'lucide-react';
+import { Check, Moon, Package, Sun } from 'lucide-react';
+import { openOrders } from '@/lib/ordersUi';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import styles from './results.module.css';
@@ -34,6 +35,11 @@ export function AppHeader() {
             <span className={styles.connectedChip} role="status" aria-label="Swiggy account connected" title="Swiggy account connected">
               <Check aria-hidden /> Connected
             </span>
+          )}
+          {status === 'connected' && (
+            <button type="button" className={styles.themeToggle} onClick={() => openOrders()} aria-label="Your Instamart orders">
+              <Package />
+            </button>
           )}
           <button
             type="button"

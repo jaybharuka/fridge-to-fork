@@ -146,3 +146,61 @@ export function newIdempotencyKey(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
+
+// ---- Order history, live status, details (backend: fridge_to_fork/instamart_orders.py) ----
+
+export interface OrderSummary {
+  orderId: string;
+  status: string;
+  createdAt: string | null;
+  estimatedDeliveryTime: string | null;
+  itemCount: number | null;
+  totalAmount: number | null;
+  paymentMethod: string | null;
+  items: { name: string; quantity: number | null }[];
+  deliveryAddress: string | null;
+  /** Recovered by matching the order's address text to a saved address; null if it can't be identified. */
+  addressId: string | null;
+}
+
+export interface DeliveryStatus {
+  statusText: string | null;
+  etaText: string | null;
+  minutesLeft: number | null;
+  delivered: boolean;
+  cancelled: boolean;
+  /** Swiggy: stop polling once delivered or cancelled. */
+  terminal: boolean;
+  pollIntervalSec: number;
+}
+
+export interface OrderStatusResult {
+  delivery: DeliveryStatus | null;
+  /** track_order data; only present when real delivery coordinates were supplied (none exist today). */
+  tracking: unknown | null;
+  notes: string[];
+}
+
+export type OrderDetails =
+  | {
+      available: true;
+      orderId: string | null;
+      status: string | null;
+      totalBill: number | null;
+      hasRefunds: boolean;
+      items: { name: string; quantity: number | null; finalPrice: number | null; removed: boolean }[];
+      bill: { lineItems: { name: string | null; amount: string | null }[]; grandTotal: string | null };
+    }
+  | { available: false; message: string };
+
+export const instamartOrders = (activeOnly = false) =>
+  post<{ orders: OrderSummary[]; hasMore: boolean }>('orders', { active_only: activeOnly });
+
+export const instamartOrderStatus = (orderId: string, addressId: string | null) =>
+  post<OrderStatusResult>('order-status', { order_id: orderId, ...(addressId ? { address_id: addressId } : {}) });
+
+export const instamartOrderDetails = (orderId: string) =>
+  post<{ details: OrderDetails }>('order-details', { order_id: orderId });
+
+/** Delivered / cancelled orders are history: no live polling. ("Out for delivery" is still live.) */
+export const isPastOrder = (status: string): boolean => /\bdelivered\b|cancel|reject|fail/i.test(status);
