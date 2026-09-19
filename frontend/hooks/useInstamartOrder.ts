@@ -4,14 +4,16 @@ import {
   InstamartApiError,
   instamartCart,
   instamartCheckout,
-  instamartSearch,
   newIdempotencyKey,
+  topAvailable,
   type CartSelection,
   type InstamartAddress,
   type InstamartOutcome,
   type InstamartReview,
   type InstamartSearchResult,
 } from '../lib/instamart';
+import { productCache } from '../lib/instamartSearch';
+import { keyOf } from '../lib/searchCache';
 
 export type Stage = 'searching' | 'picking' | 'building' | 'reviewing' | 'placing' | 'done' | 'error';
 
@@ -60,8 +62,7 @@ const initial: InstamartState = {
 
 /** The top in-stock match is pre-picked (Swiggy's own ranking); the user reviews, swaps or skips. */
 function defaultChoice(result: InstamartSearchResult): Choice {
-  const top = result.options.find(o => o.available);
-  return { spinId: top?.spinId ?? null, quantity: 1 };
+  return { spinId: topAvailable(result)?.spinId ?? null, quantity: 1 };
 }
 
 function reducer(state: InstamartState, action: Action): InstamartState {
@@ -146,8 +147,15 @@ export function useInstamartOrder() {
       return;
     }
     try {
-      const { address, results } = await instamartSearch(ingredients);
-      if (run.current === id) dispatch({ type: 'SEARCH_OK', address, results });
+      // Served from the shared cache when the checklist already searched these.
+      const { address, entries, error } = await productCache.ensure(ingredients);
+      if (run.current !== id) return;
+      if (!address) throw error ?? new Error('search failed');
+      const results = [...new Map(ingredients.map(n => [keyOf(n), n])).values()].map(name => {
+        const hit = entries.get(keyOf(name))?.result;
+        return hit ? { ...hit, ingredient: name } : { ingredient: name, options: [], note: "Couldn't search this item" };
+      });
+      dispatch({ type: 'SEARCH_OK', address, results });
     } catch (e) {
       const d = describe(e);
       if (run.current === id) dispatch({ type: 'FAIL', message: d.message, authNeeded: d.authNeeded, stage: 'error' });
@@ -158,8 +166,11 @@ export function useInstamartOrder() {
     const id = run.current;
     dispatch({ type: 'EXTRA_ADD', ingredient });
     try {
-      const { address, results } = await instamartSearch([ingredient]);
-      if (run.current === id && results[0]) dispatch({ type: 'EXTRA_OK', address, result: results[0] });
+      const { address, entries, error } = await productCache.ensure([ingredient]);
+      if (run.current !== id) return;
+      const hit = entries.get(keyOf(ingredient))?.result;
+      if (!address || !hit) throw error ?? new Error('search failed');
+      dispatch({ type: 'EXTRA_OK', address, result: { ...hit, ingredient } });
     } catch (e) {
       const d = describe(e);
       if (run.current === id) dispatch({ type: 'BACK', notice: d.message });

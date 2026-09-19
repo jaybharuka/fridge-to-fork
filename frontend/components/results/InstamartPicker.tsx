@@ -2,17 +2,15 @@
 
 import { useState } from 'react';
 import type { Choice } from '@/hooks/useInstamartOrder';
-import { formatInr, type InstamartOption, type InstamartSearchResult } from '@/lib/instamart';
+import { formatInr, topAvailable, type InstamartOption, type InstamartSearchResult } from '@/lib/instamart';
+import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
 
 const MAX_QTY = 20;
 
-function Thumb({ url }: { url: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) return <div className={styles.thumbFallback} aria-hidden>🛒</div>;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img className={styles.thumb} src={url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
-}
+const Thumb = ({ url }: { url: string | null }) => (
+  <ProductThumb url={url} className={styles.thumb} fallbackClassName={styles.thumbFallback} />
+);
 
 function Price({ option }: { option: InstamartOption }) {
   if (option.price === null) return null;
@@ -37,6 +35,7 @@ function OptionSummary({ option }: { option: InstamartOption }) {
 }
 
 interface RowProps {
+  focused: boolean;
   result: InstamartSearchResult;
   choice: Choice;
   removable: boolean;
@@ -45,14 +44,14 @@ interface RowProps {
   onRemove: () => void;
 }
 
-function IngredientRow({ result, choice, removable, onPick, onQuantity, onRemove }: RowProps) {
+function IngredientRow({ focused, result, choice, removable, onPick, onQuantity, onRemove }: RowProps) {
   const [open, setOpen] = useState(false);
   const selected = result.options.find(o => o.spinId === choice.spinId) ?? null;
-  const topAvailable = result.options.find(o => o.available) ?? null;
+  const best = topAvailable(result);
   const maxQty = Math.min(selected?.maxQuantity ?? 10, MAX_QTY);
 
   return (
-    <section className={styles.row}>
+    <section className={`${styles.row} ${focused ? styles.focused : ''}`} data-ingredient={result.ingredient}>
       <div className={styles.rowHead}>
         <span className={styles.ingredient}>{result.ingredient}</span>
         {removable && <button type="button" className={`${styles.linkBtn} ${styles.muted}`} onClick={onRemove}>Remove</button>}
@@ -80,8 +79,8 @@ function IngredientRow({ result, choice, removable, onPick, onQuantity, onRemove
         )}
         {selected ? (
           <button type="button" className={`${styles.linkBtn} ${styles.muted}`} onClick={() => onPick(null)}>Skip</button>
-        ) : topAvailable ? (
-          <button type="button" className={styles.linkBtn} onClick={() => onPick(topAvailable.spinId)}>Add back</button>
+        ) : best ? (
+          <button type="button" className={styles.linkBtn} onClick={() => onPick(best.spinId)}>Add back</button>
         ) : null}
       </div>
 
@@ -112,12 +111,14 @@ interface PickerProps {
   choices: Record<string, Choice>;
   /** Ingredient names added via the add-on cards (removable here). */
   extras: ReadonlySet<string>;
+  /** Ingredient the user tapped in the checklist; its row is highlighted. */
+  focusIngredient?: string | null;
   onPick: (ingredient: string, spinId: string | null) => void;
   onQuantity: (ingredient: string, quantity: number) => void;
   onRemoveExtra: (ingredient: string) => void;
 }
 
-export function InstamartPicker({ results, choices, extras, onPick, onQuantity, onRemoveExtra }: PickerProps) {
+export function InstamartPicker({ results, choices, extras, focusIngredient, onPick, onQuantity, onRemoveExtra }: PickerProps) {
   if (results.length === 0) {
     return <p className={styles.none}>Nothing is missing from your recipe — add extras below if you like.</p>;
   }
@@ -126,6 +127,7 @@ export function InstamartPicker({ results, choices, extras, onPick, onQuantity, 
       {results.map(result => (
         <IngredientRow
           key={result.ingredient}
+          focused={result.ingredient === focusIngredient}
           result={result}
           choice={choices[result.ingredient] ?? { spinId: null, quantity: 1 }}
           removable={extras.has(result.ingredient)}

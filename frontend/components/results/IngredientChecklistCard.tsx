@@ -4,11 +4,48 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Camera, CircleCheck } from 'lucide-react';
 import type { ChecklistItem } from '@/lib/types';
 import { buildRecipeHookText } from '@/hooks/useRecipeChecklist';
+import { useProductMatches } from '@/hooks/useInstamartProducts';
+import { formatInr, topAvailable } from '@/lib/instamart';
+import { keyOf, type CacheEntry } from '@/lib/searchCache';
+import { ProductThumb } from './ProductThumb';
 import styles from './IngredientChecklistCard.module.css';
 
 interface IngredientChecklistCardProps {
   checklist: ChecklistItem[];
   toggleChecklistItem: (index: number) => void;
+  /** Tapping a row's Instamart match hands off to the order sheet, focused on that item. */
+  onOpenProduct: (ingredientName: string) => void;
+}
+
+// The real Instamart product Swiggy ranks first for a missing ingredient. Any
+// non-answer (search failed, no match, all out of stock, still unknown) renders
+// nothing, so that row is exactly the plain name + quantity it always was.
+function ProductMatch({ ingredient, entry, onOpen }: { ingredient: string; entry: CacheEntry | undefined; onOpen: () => void }) {
+  if (!entry || entry.status === 'failed') return null;
+  if (entry.status === 'loading') return <div className={styles.matchLoading} aria-label={`Finding ${ingredient} on Instamart`} />;
+  const product = topAvailable(entry.result);
+  if (!product) return null;
+  const discounted = product.price !== null && product.mrp !== null && product.mrp > product.price;
+  return (
+    <button
+      type="button"
+      className={styles.match}
+      aria-label={`Review ${product.name} for ${ingredient}`}
+      onClick={e => { e.stopPropagation(); onOpen(); }} // don't also toggle the row's checkbox
+    >
+      <ProductThumb url={product.imageUrl} className={styles.matchThumb} fallbackClassName={styles.matchThumbFallback} />
+      <span className={styles.matchBody}>
+        <span className={styles.matchName}>{product.name}</span>
+        <span className={styles.matchSub}>{[product.brand, product.size].filter(Boolean).join(' · ') || 'On Instamart'}</span>
+      </span>
+      {product.price !== null && (
+        <span className={styles.matchPrice}>
+          {formatInr(product.price)}
+          {discounted && <span className={styles.matchMrp}>{formatInr(product.mrp)}</span>}
+        </span>
+      )}
+    </button>
+  );
 }
 
 // Counts a stat number up from 0 to `target` over 600ms, eased — ported
@@ -45,7 +82,8 @@ function StatNumber({ target, className }: { target: number; className?: string 
 // (Task 7, position: sticky) under the page body, not a parent or child of
 // them. A short checklist that fits within max-height never overflows, so
 // no scrollbar/fade appears for it.
-export function IngredientChecklistCard({ checklist, toggleChecklistItem }: IngredientChecklistCardProps) {
+export function IngredientChecklistCard({ checklist, toggleChecklistItem, onOpenProduct }: IngredientChecklistCardProps) {
+  const { entries } = useProductMatches();
   const rowsRef = useRef<HTMLDivElement>(null);
   const [hasMoreBelow, setHasMoreBelow] = useState(false);
 
@@ -109,6 +147,9 @@ export function IngredientChecklistCard({ checklist, toggleChecklistItem }: Ingr
                 <div className={styles.rowInfo}>
                   <div className={styles.rowName}>{ing.name}</div>
                   <div className={styles.rowQty}>{ing.quantity}</div>
+                  {!ing.checked && (
+                    <ProductMatch ingredient={ing.name} entry={entries.get(keyOf(ing.name))} onOpen={() => onOpenProduct(ing.name)} />
+                  )}
                 </div>
                 <div className={styles.rowRight}>{tag}</div>
               </div>

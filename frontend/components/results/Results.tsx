@@ -41,6 +41,10 @@ interface ResultsProps {
   fetchYoutubeFirstThumbnail: () => Promise<string>;
   onToggleChecklistItem: (index: number) => void;
   onOrderGroceries: () => void;
+  /** Tapping a checklist row's Instamart match: opens the order sheet on that item. */
+  onOpenProduct: (ingredientName: string) => void;
+  /** Which checklist item the order sheet should scroll to and highlight. */
+  focusIngredient?: string | null;
   onOrderDish: () => void;
   orderSheetOpen: boolean;
   onCloseOrderSheet: () => void;
@@ -73,6 +77,8 @@ export function Results({
   fetchYoutubeFirstThumbnail,
   onToggleChecklistItem,
   onOrderGroceries,
+  onOpenProduct,
+  focusIngredient,
   onOrderDish,
   orderSheetOpen,
   onCloseOrderSheet,
@@ -180,6 +186,7 @@ export function Results({
               <IngredientChecklistCard
                 checklist={state.checklist}
                 toggleChecklistItem={onToggleChecklistItem}
+                onOpenProduct={onOpenProduct}
               />
             ) : (
               contentPending && <ChecklistSkeleton />
@@ -221,6 +228,7 @@ export function Results({
         itemsToOrder={itemsToOrder}
         topUpSuggestions={state.topUpSuggestions}
         initialSelectedTopUpNames={initialSelectedTopUpNames}
+        focusIngredient={focusIngredient}
         onClose={onCloseOrderSheet}
         onConnectClick={onSheetConnectClick}
       />

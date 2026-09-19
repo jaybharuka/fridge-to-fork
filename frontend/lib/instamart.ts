@@ -91,6 +91,11 @@ export const instamartCheckout = (addressId: string, expectedTotal: string, idem
     idempotency_key: idempotencyKey,
   });
 
+/** Swiggy's own top-ranked in-stock match: what gets pre-picked, and what the checklist previews. */
+export function topAvailable(result: InstamartSearchResult | null): InstamartOption | null {
+  return result?.options.find(o => o.available) ?? null;
+}
+
 export function formatInr(amount: number | null): string {
   if (amount === null) return '';
   return `₹${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
