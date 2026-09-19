@@ -44,6 +44,7 @@ def _ascii_safe(value) -> str:
 
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals_stream
+from fridge_to_fork.features import FOOD_ORDERING_ENABLED, FOOD_UNAVAILABLE_MESSAGE
 from fridge_to_fork.instamart_routes import make_router as make_instamart_router
 from fridge_to_fork.step3_order_router import order_dish_from_swiggy
 from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
@@ -944,6 +945,12 @@ async def place_order(
 
             if action not in ("order_dish",):
                 yield _sse({"type": "error", "message": f"Unknown action: {action}"})
+                yield _sse({"type": "complete"})
+                return
+
+            if not FOOD_ORDERING_ENABLED:
+                # Refused before auth or the agent: a bypassed frontend guard still can't place a Food order.
+                yield _sse({"type": "error", "message": FOOD_UNAVAILABLE_MESSAGE})
                 yield _sse({"type": "complete"})
                 return
 

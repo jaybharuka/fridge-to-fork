@@ -1,5 +1,6 @@
 'use client';
 
+import { FOOD_ORDERING_ENABLED, FOOD_UNAVAILABLE_MESSAGE } from '@/lib/features';
 import { useState, type CSSProperties, type MouseEvent, type TouchEvent } from 'react';
 import { ShoppingCart, Bike } from 'lucide-react';
 import type { ChecklistItem } from '@/lib/types';
@@ -109,7 +110,7 @@ export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGr
           onTouchMove={dishSpotlight.onTouchMove}
           onTouchEnd={dishSpotlight.onTouchEnd}
           onTouchCancel={dishSpotlight.onTouchCancel}
-          disabled={orderPlacing}
+          disabled={orderPlacing || !FOOD_ORDERING_ENABLED}
           onClick={() => { setClicked('dish'); onOrderDish(); }}
         >
           <div className={styles.choiceIconCircle}>
@@ -117,11 +118,12 @@ export function ChoiceCard({ recommendedMeal, reasoning, itemsToOrder, onOrderGr
           </div>
           <div className={styles.choiceText}>
             <div className={styles.choiceBtnTitle}>Order the dish from Swiggy</div>
-            <div className={styles.choiceBtnSub}>Get {mealName} delivered</div>
+            <div className={styles.choiceBtnSub}>{FOOD_ORDERING_ENABLED ? `Get ${mealName} delivered` : 'Temporarily unavailable'}</div>
           </div>
-          <div className={styles.choiceMeta}>30 min</div>
+          {FOOD_ORDERING_ENABLED && <div className={styles.choiceMeta}>30 min</div>}
         </button>
       </div>
+      {!FOOD_ORDERING_ENABLED && <p className={styles.choiceUnavailable} role="note">{FOOD_UNAVAILABLE_MESSAGE}</p>}
       <p className={styles.choiceAttribution}>Powered by <strong>Swiggy</strong></p>
     </div>
   );

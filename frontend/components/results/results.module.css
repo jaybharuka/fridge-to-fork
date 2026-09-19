@@ -556,3 +556,5 @@
   border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0;
 }
 .choiceBtnOutline .spin { border-color: rgba(252,128,25,.3); border-top-color: #FC8019; }
+
+.choiceUnavailable { margin: 10px 0 0 0; font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
