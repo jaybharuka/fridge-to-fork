@@ -27,6 +27,29 @@ export interface InstamartCartItem {
   quantity: number; price: number | null; mrp: number | null; imageUrl: string | null; available: boolean;
 }
 
+/** A way to pay that Swiggy currently offers for this cart (from get_payment_options). */
+export interface PaymentOption {
+  /** Stable id sent back at checkout, where the server re-validates it against Swiggy. */
+  key: string;
+  type: 'cod' | 'upi_qr' | 'upi_intent';
+  label: string;
+}
+
+export interface Coupon {
+  code: string;
+  title: string;
+  description: string | null;
+  applicable: boolean;
+  /** Why it can't be applied (or extra detail), as Swiggy worded it. */
+  message: string | null;
+  terms: string[];
+}
+
+/** `available: false` means Swiggy doesn't offer coupons on this account (not rolled out to everyone). */
+export interface CouponList { available: boolean; items: Coupon[] }
+
+export interface AppliedCoupon { code: string; title: string; savings: number | null }
+
 export interface InstamartReview {
   address: { id: string | null; text: string; label: string | null };
   items: InstamartCartItem[];
@@ -38,15 +61,25 @@ export interface InstamartReview {
   warning: string | null;
   blockers: string[];
   canCheckout: boolean;
-  paymentMethod: string;
+  payment: { options: PaymentOption[]; amount: string | null };
+}
+
+/** A started UPI payment: open `bridgeUrl` (scan-or-tap page) while we poll payment-status. */
+export interface PendingPayment {
+  orderId: string;
+  paasId: string;
+  bridgeUrl: string;
+  pollIntervalMs: number;
+  maxPollMs: number;
 }
 
 export interface InstamartOutcome {
-  status: 'placed' | 'partial' | 'failed' | 'unknown';
+  status: 'placed' | 'partial' | 'failed' | 'unknown' | 'pending_payment';
   orderIds: string[];
   message: string;
   verified: boolean;
   total: string | null;
+  payment: PendingPayment | null;
 }
 
 export interface CartSelection { spin_id: string; sku_id: string; quantity: number }
@@ -82,14 +115,21 @@ export const instamartSearch = (items: string[]) =>
   post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', { items });
 
 export const instamartCart = (addressId: string, selections: CartSelection[]) =>
-  post<{ review: InstamartReview; adjustments: string[] }>('cart', { address_id: addressId, selections });
+  post<{ review: InstamartReview; adjustments: string[]; coupons: CouponList }>('cart', { address_id: addressId, selections });
 
-export const instamartCheckout = (addressId: string, expectedTotal: string, idempotencyKey: string) =>
+export const instamartApplyCoupon = (addressId: string, couponCode: string) =>
+  post<{ review: InstamartReview; coupon: AppliedCoupon; coupons: CouponList }>('coupon', { address_id: addressId, coupon_code: couponCode });
+
+export const instamartCheckout = (addressId: string, expectedTotal: string, idempotencyKey: string, paymentKey: string) =>
   post<{ order: InstamartOutcome }>('checkout', {
     address_id: addressId,
     expected_total: expectedTotal,
     idempotency_key: idempotencyKey,
+    payment_key: paymentKey,
   });
+
+export const instamartPaymentStatus = (orderId: string, paasId: string, final: boolean) =>
+  post<{ order: InstamartOutcome }>('payment-status', { order_id: orderId, paas_id: paasId, final });
 
 /** Swiggy's own top-ranked in-stock match: what gets pre-picked, and what the checklist previews. */
 export function topAvailable(result: InstamartSearchResult | null): InstamartOption | null {

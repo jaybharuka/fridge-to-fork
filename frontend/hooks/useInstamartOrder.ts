@@ -2,15 +2,20 @@
 import { useCallback, useReducer, useRef } from 'react';
 import {
   InstamartApiError,
+  instamartApplyCoupon,
   instamartCart,
   instamartCheckout,
+  instamartPaymentStatus,
   newIdempotencyKey,
   topAvailable,
+  type AppliedCoupon,
   type CartSelection,
+  type CouponList,
   type InstamartAddress,
   type InstamartOutcome,
   type InstamartReview,
   type InstamartSearchResult,
+  type PendingPayment,
 } from '../lib/instamart';
 import { productCache } from '../lib/instamartSearch';
 import { keyOf } from '../lib/searchCache';
@@ -29,6 +34,13 @@ export interface InstamartState {
   choices: Record<string, Choice>;
   review: InstamartReview | null;
   adjustments: string[];
+  coupons: CouponList;
+  /** Set once Swiggy's cart actually shows the discount; there is no remove-coupon tool. */
+  appliedCoupon: AppliedCoupon | null;
+  /** Code currently being applied (disables the coupon buttons). */
+  couponBusy: string | null;
+  /** Key of the chosen PaymentOption; re-validated server-side at checkout. */
+  paymentKey: string | null;
   idempotencyKey: string | null;
   outcome: InstamartOutcome | null;
   /** Shown as a banner on the current step. */
@@ -47,7 +59,11 @@ type Action =
   | { type: 'PICK'; ingredient: string; spinId: string | null }
   | { type: 'QTY'; ingredient: string; quantity: number }
   | { type: 'BUILD_START' }
-  | { type: 'BUILD_OK'; review: InstamartReview; adjustments: string[]; key: string }
+  | { type: 'BUILD_OK'; review: InstamartReview; adjustments: string[]; coupons: CouponList; key: string }
+  | { type: 'SELECT_PAYMENT'; key: string }
+  | { type: 'COUPON_START'; code: string }
+  | { type: 'COUPON_OK'; review: InstamartReview; coupons: CouponList; coupon: AppliedCoupon; key: string }
+  | { type: 'COUPON_FAIL'; notice: string; unusableCode?: string }
   | { type: 'PLACE_START' }
   | { type: 'PLACE_OK'; outcome: InstamartOutcome }
   | { type: 'REVIEW_NOTICE'; notice: string }
@@ -55,14 +71,24 @@ type Action =
   | { type: 'FAIL'; message: string; authNeeded: boolean; stage: Stage }
   | { type: 'RESET' };
 
+const NO_COUPONS: CouponList = { available: false, items: [] };
+
 const initial: InstamartState = {
   stage: 'searching', address: null, results: [], extras: [], choices: {}, review: null, adjustments: [],
+  coupons: NO_COUPONS, appliedCoupon: null, couponBusy: null, paymentKey: null,
   idempotencyKey: null, outcome: null, notice: null, error: null, authNeeded: false,
 };
 
 /** The top in-stock match is pre-picked (Swiggy's own ranking); the user reviews, swaps or skips. */
 function defaultChoice(result: InstamartSearchResult): Choice {
   return { spinId: topAvailable(result)?.spinId ?? null, quantity: 1 };
+}
+
+/** Keep the user's payment choice if Swiggy still offers it, else prefer cash on delivery, else the first option. */
+function pickPayment(review: InstamartReview, current: string | null): string | null {
+  const options = review.payment.options;
+  if (current && options.some(o => o.key === current)) return current;
+  return (options.find(o => o.type === 'cod') ?? options[0])?.key ?? null;
 }
 
 function reducer(state: InstamartState, action: Action): InstamartState {
@@ -101,7 +127,42 @@ function reducer(state: InstamartState, action: Action): InstamartState {
     case 'BUILD_START':
       return { ...state, stage: 'building', notice: null, error: null };
     case 'BUILD_OK':
-      return { ...state, stage: 'reviewing', review: action.review, adjustments: action.adjustments, idempotencyKey: action.key, notice: null };
+      return {
+        ...state,
+        stage: 'reviewing',
+        review: action.review,
+        adjustments: action.adjustments,
+        coupons: action.coupons,
+        appliedCoupon: null, // a rebuilt cart starts without a coupon (clear_cart)
+        couponBusy: null,
+        paymentKey: pickPayment(action.review, state.paymentKey),
+        idempotencyKey: action.key,
+        notice: null,
+      };
+    case 'SELECT_PAYMENT':
+      return { ...state, paymentKey: action.key };
+    case 'COUPON_START':
+      return { ...state, couponBusy: action.code, notice: null };
+    case 'COUPON_OK':
+      return {
+        ...state,
+        review: action.review,
+        coupons: action.coupons,
+        appliedCoupon: action.coupon,
+        couponBusy: null,
+        paymentKey: pickPayment(action.review, state.paymentKey),
+        idempotencyKey: action.key, // the cart changed: never reuse a key from before the discount
+        notice: null,
+      };
+    case 'COUPON_FAIL':
+      return {
+        ...state,
+        couponBusy: null,
+        notice: action.notice,
+        coupons: action.unusableCode
+          ? { ...state.coupons, items: state.coupons.items.map(c => (c.code === action.unusableCode ? { ...c, applicable: false, message: action.notice } : c)) }
+          : state.coupons,
+      };
     case 'PLACE_START':
       return { ...state, stage: 'placing', notice: null };
     case 'PLACE_OK':
@@ -109,7 +170,7 @@ function reducer(state: InstamartState, action: Action): InstamartState {
     case 'REVIEW_NOTICE':
       return { ...state, stage: 'reviewing', notice: action.notice };
     case 'BACK':
-      return { ...state, stage: 'picking', review: null, idempotencyKey: null, notice: action.notice ?? null };
+      return { ...state, stage: 'picking', review: null, idempotencyKey: null, appliedCoupon: null, couponBusy: null, notice: action.notice ?? null };
     case 'FAIL':
       return { ...state, stage: action.stage, error: action.message, authNeeded: action.authNeeded };
     case 'RESET':
@@ -128,6 +189,19 @@ export function selectionsFrom(state: InstamartState): CartSelection[] {
 
 // Server-side reasons the reviewed cart is no longer safe to order: go back and rebuild it.
 const REVIEW_AGAIN = new Set(['cart_changed', 'cart_blocked', 'address_mismatch', 'min_order_not_met', 'unserviceable', 'out_of_stock', 'cart_expired']);
+// A coupon Swiggy no longer lists / accepts: mark it unusable, keep the cart.
+const COUPON_UNUSABLE = new Set(['coupon_not_found', 'coupon_not_applicable']);
+
+const UNKNOWN_OUTCOME: InstamartOutcome = {
+  status: 'unknown',
+  orderIds: [],
+  message: "We couldn't confirm whether the order went through. Check the Swiggy app before trying again.",
+  verified: false,
+  total: null,
+  payment: null,
+};
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 function describe(e: unknown): { message: string; authNeeded: boolean; code: string } {
   if (e instanceof InstamartApiError) return { message: e.message, authNeeded: e.code === 'auth_required', code: e.code };
@@ -180,6 +254,7 @@ export function useInstamartOrder() {
   const removeExtra = useCallback((ingredient: string) => dispatch({ type: 'EXTRA_REMOVE', ingredient }), []);
   const pick = useCallback((ingredient: string, spinId: string | null) => dispatch({ type: 'PICK', ingredient, spinId }), []);
   const setQuantity = useCallback((ingredient: string, quantity: number) => dispatch({ type: 'QTY', ingredient, quantity }), []);
+  const selectPayment = useCallback((key: string) => dispatch({ type: 'SELECT_PAYMENT', key }), []);
   const backToPicking = useCallback(() => dispatch({ type: 'BACK' }), []);
   const reset = useCallback(() => { run.current++; dispatch({ type: 'RESET' }); }, []);
 
@@ -187,8 +262,8 @@ export function useInstamartOrder() {
     const id = run.current;
     dispatch({ type: 'BUILD_START' });
     try {
-      const { review, adjustments } = await instamartCart(addressId, selections);
-      if (run.current === id) dispatch({ type: 'BUILD_OK', review, adjustments, key: newIdempotencyKey() });
+      const { review, adjustments, coupons } = await instamartCart(addressId, selections);
+      if (run.current === id) dispatch({ type: 'BUILD_OK', review, adjustments, coupons, key: newIdempotencyKey() });
     } catch (e) {
       const d = describe(e);
       if (run.current !== id) return;
@@ -197,34 +272,64 @@ export function useInstamartOrder() {
     }
   }, []);
 
-  const placeOrder = useCallback(async (addressId: string, expectedTotal: string, key: string) => {
+  const applyCoupon = useCallback(async (addressId: string, code: string) => {
+    const id = run.current;
+    dispatch({ type: 'COUPON_START', code });
+    try {
+      const { review, coupons, coupon } = await instamartApplyCoupon(addressId, code);
+      if (run.current === id) dispatch({ type: 'COUPON_OK', review, coupons, coupon, key: newIdempotencyKey() });
+    } catch (e) {
+      const d = describe(e);
+      if (run.current !== id) return;
+      if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true, stage: 'error' });
+      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.` });
+      dispatch({ type: 'COUPON_FAIL', notice: d.message, unusableCode: COUPON_UNUSABLE.has(d.code) ? code : undefined });
+    }
+  }, []);
+
+  /** Client-driven UPI polling (nothing is held open server-side). At the deadline it asks once more
+   *  with final=true so Swiggy can reconcile a late payment; repeated network failures end as "unknown". */
+  const pollPayment = useCallback(async (payment: PendingPayment) => {
+    const id = run.current;
+    const deadline = Date.now() + payment.maxPollMs;
+    let failures = 0;
+    while (run.current === id) {
+      await sleep(payment.pollIntervalMs);
+      if (run.current !== id) return;
+      const final = Date.now() >= deadline;
+      try {
+        const { order } = await instamartPaymentStatus(payment.orderId, payment.paasId, final);
+        failures = 0;
+        if (order.status !== 'pending_payment') return dispatch({ type: 'PLACE_OK', outcome: order });
+      } catch (e) {
+        const d = describe(e);
+        if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true, stage: 'error' });
+        if (++failures >= 4) return dispatch({ type: 'PLACE_OK', outcome: { ...UNKNOWN_OUTCOME, orderIds: [payment.orderId] } });
+      }
+      if (final) return dispatch({ type: 'PLACE_OK', outcome: { ...UNKNOWN_OUTCOME, orderIds: [payment.orderId] } });
+    }
+  }, []);
+
+  const placeOrder = useCallback(async (addressId: string, expectedTotal: string, key: string, paymentKey: string) => {
     const id = run.current;
     dispatch({ type: 'PLACE_START' });
     try {
-      const { order } = await instamartCheckout(addressId, expectedTotal, key);
-      if (run.current === id) dispatch({ type: 'PLACE_OK', outcome: order });
+      const { order } = await instamartCheckout(addressId, expectedTotal, key, paymentKey);
+      if (run.current !== id) return;
+      dispatch({ type: 'PLACE_OK', outcome: order });
+      if (order.status === 'pending_payment' && order.payment) void pollPayment(order.payment);
     } catch (e) {
       if (run.current !== id) return;
       const d = describe(e);
       if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true, stage: 'error' });
+      if (d.code === 'payment_unavailable') return dispatch({ type: 'REVIEW_NOTICE', notice: d.message });
       if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.` });
       if (d.code === 'checkout_in_progress') return dispatch({ type: 'REVIEW_NOTICE', notice: d.message });
       // No response at all (dropped connection): the order may or may not exist — never invite a blind retry.
       const ambiguous = d.code === 'network' || d.code === 'unexpected_response';
-      dispatch({
-        type: 'PLACE_OK',
-        outcome: {
-          status: ambiguous ? 'unknown' : 'failed',
-          orderIds: [],
-          message: ambiguous
-            ? "We couldn't confirm whether the order went through. Check the Swiggy app before trying again."
-            : d.message,
-          verified: false,
-          total: null,
-        },
-      });
+      dispatch({ type: 'PLACE_OK', outcome: ambiguous ? UNKNOWN_OUTCOME : { ...UNKNOWN_OUTCOME, status: 'failed', message: d.message } });
     }
-  }, []);
+  }, [pollPayment]);
 
-  return { state, search, addExtra, removeExtra, pick, setQuantity, backToPicking, buildCart, placeOrder, reset };
+  return { state, search, addExtra, removeExtra, pick, setQuantity, selectPayment, backToPicking, buildCart, applyCoupon, placeOrder, reset };
 }
