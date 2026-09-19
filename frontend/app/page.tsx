@@ -5,9 +5,11 @@ import { useScanStream } from '@/hooks/useScanStream';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useYoutubeVideos } from '@/hooks/useYoutubeVideos';
 import { useToast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
 import { usePrefetchProducts } from '@/hooks/useInstamartProducts';
 import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
+import { ConnectGate } from '@/components/auth/ConnectGate';
 import { Landing } from '@/components/landing/Landing';
 import { LoadingOverlay } from '@/components/loading/LoadingOverlay';
 import { PhotoScanScreen } from '@/components/loading/PhotoScanScreen';
@@ -36,6 +38,8 @@ export default function Home() {
   const { state, startScan, placeOrder, toggleChecklistItem, reset, restore } = useScanStream();
   const { fetchVideos } = useYoutubeVideos();
   const toast = useToast();
+  const auth = useAuth();
+  const connected = auth.status === 'connected';
 
   const dishName = state.recommendedMeal ?? '';
   const heroPhotoUrl = photos.thumbnailUrls[0] ?? '';
@@ -88,7 +92,7 @@ export default function Home() {
 
   // Start searching Instamart the moment the missing list is known, not when the sheet opens.
   const missingNames = useMemo(() => getItemsToOrder(state.checklist).map(i => i.name), [state.checklist]);
-  usePrefetchProducts(missingNames, true);
+  usePrefetchProducts(missingNames, connected);
 
   // Stashes just enough state to resume the in-progress order after the
   // full-page OAuth redirect a "Connect with Swiggy" click triggers — see
@@ -138,6 +142,11 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The gate can appear mid-session (a 5-day Swiggy token expiring): keep the recipe if there is one.
+  const handleGateConnectClick = useCallback(() => {
+    if (state.checklist.length > 0) handleResultCardConnectClick();
+  }, [state.checklist.length, handleResultCardConnectClick]);
+
   const showLanding = state.phase === 'idle';
   // Ruling B: once the scan screen is up it stays up until its OWN
   // onRevealComplete fires — `complete`/`error` can (and for a fast backend
@@ -169,6 +178,10 @@ export default function Home() {
       <AppHeader />
 
       <main id="main-content">
+      {!connected ? (
+        <ConnectGate checking={auth.status === 'loading'} onConnectClick={handleGateConnectClick} />
+      ) : (
+      <>
       {showLanding && (
         <Landing
           targetDish={targetDish}
@@ -220,6 +233,8 @@ export default function Home() {
           onResultCardConnectClick={handleResultCardConnectClick}
           onResetToLanding={handleResetToLanding}
         />
+      )}
+      </>
       )}
       </main>
 
