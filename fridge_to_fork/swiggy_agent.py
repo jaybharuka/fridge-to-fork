@@ -27,9 +27,6 @@ from .models import Decision, MealPlan, OrderResult
 FOOD_MCP_URL = os.environ.get(
     "SWIGGY_FOOD_MCP_URL", "https://mcp.swiggy.com/food"
 )
-INSTAMART_MCP_URL = os.environ.get(
-    "SWIGGY_INSTAMART_MCP_URL", "https://mcp.swiggy.com/im"
-)
 DINEOUT_MCP_URL = os.environ.get(
     "SWIGGY_DINEOUT_MCP_URL", "https://mcp.swiggy.com/dineout"
 )
@@ -39,24 +36,14 @@ AGENT_MODEL = os.environ.get("SWIGGY_AGENT_MODEL", "gemini-2.5-flash")
 def _build_instruction(plan: MealPlan, delivery_address: str) -> str:
     """Convert a MealPlan into a natural language instruction for the agent."""
     meal_name = plan.recommended_meal.name if plan.recommended_meal else "the meal"
-    missing = plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
 
     if plan.decision == Decision.ORDER_DISH:
         return (
-            f"You have access to Swiggy Food and Instamart tools. "
+            f"You have access to Swiggy Food tools. "
             f"The user wants to order '{meal_name}' as a ready-made dish from "
             f"a restaurant. Use Swiggy Food tools to search for this dish, "
             f"find the best restaurant, and place a delivery order to: {delivery_address}. "
             f"Report the order ID and ETA."
-        )
-    elif plan.decision == Decision.ORDER_GROCERIES:
-        items_str = ", ".join(missing) if missing else "the missing ingredients"
-        return (
-            f"You have access to Swiggy Food and Instamart tools. "
-            f"The user wants to cook '{meal_name}' and needs these ingredients: "
-            f"{items_str}. Use Swiggy Instamart tools to search for each item, "
-            f"add to cart, and checkout for delivery to: {delivery_address}. "
-            f"Report what was ordered and the estimated delivery time."
         )
     else:
         return f"The user has all ingredients to cook '{meal_name}' at home."
@@ -90,6 +77,15 @@ async def run_swiggy_agent(
             estimated_minutes=35 if plan.decision == Decision.ORDER_DISH else 15,
         )
 
+    if plan.decision == Decision.ORDER_GROCERIES:
+        # Real orders for Instamart go through fridge_to_fork.instamart only: this agent
+        # invented order IDs and guessed success from free text. (dry_run above still simulates.)
+        return OrderResult(
+            success=False,
+            platform="swiggy_instamart",
+            error="Instamart orders use the staged flow in fridge_to_fork.instamart",
+        )
+
     if not access_token:
         return OrderResult(
             success=False,
@@ -97,7 +93,7 @@ async def run_swiggy_agent(
             error="auth_required",
         )
 
-    platform = "swiggy_food" if plan.decision == Decision.ORDER_DISH else "swiggy_instamart"
+    platform = "swiggy_food"
 
     auth_headers = {"Authorization": f"Bearer {access_token}"}
 
@@ -105,12 +101,6 @@ async def run_swiggy_agent(
         MCPToolset(
             connection_params=StreamableHTTPConnectionParams(
                 url=FOOD_MCP_URL,
-                headers=auth_headers,
-            )
-        ),
-        MCPToolset(
-            connection_params=StreamableHTTPConnectionParams(
-                url=INSTAMART_MCP_URL,
                 headers=auth_headers,
             )
         ),
@@ -126,9 +116,9 @@ async def run_swiggy_agent(
         name="swiggy_ordering_agent",
         model=AGENT_MODEL,
         instruction=(
-            "You are a smart food assistant integrated with Swiggy's full platform. "
-            "You have access to Swiggy Food (restaurant delivery), Swiggy Instamart "
-            "(grocery delivery), and Swiggy Dineout (table reservations) tools. "
+            "You are a food assistant integrated with Swiggy. "
+            "You have access to Swiggy Food (restaurant delivery) and Swiggy Dineout "
+            "(table reservations) tools. Grocery orders are not handled here. "
             "Choose the right platform and tools based on the user's request. "
             "Always confirm what you ordered or booked and provide the confirmation "
             "ID and ETA or time. Use COD as the default payment method for orders."

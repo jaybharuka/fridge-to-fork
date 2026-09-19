@@ -5,10 +5,10 @@ Routes the meal plan to Swiggy via a real AI agent (Google ADK, see
 swiggy_agent.py) that autonomously selects from Swiggy's available MCP
 tools, rather than following hardcoded per-decision tool-call sequences.
 
-order_dish_from_swiggy() / order_groceries_from_instamart() keep their
-original signatures (app.py calls these two directly) but now delegate
-to the agent under the hood. route_order() is the CLI/plan-level entry
-point that dispatches straight to the agent.
+order_dish_from_swiggy() (app.py calls it directly) delegates to the agent
+under the hood; route_order() is the CLI/plan-level entry point. Instamart
+groceries are NOT ordered here anymore — see instamart.py, which shows the
+user real products and a real cart before checkout.
 """
 
 import argparse
@@ -49,31 +49,6 @@ async def order_dish_from_swiggy(
     result = await run_swiggy_agent(plan, delivery_address, access_token, dry_run=dry_run)
     return result if result is not None else OrderResult(
         success=False, platform="swiggy_food", error="Agent returned no result"
-    )
-
-
-async def order_groceries_from_instamart(
-    items: list[str],
-    delivery_address: str,
-    access_token: str | None,
-    *,
-    dry_run: bool = False,
-) -> OrderResult:
-    """Order `items` from Swiggy Instamart via the ADK agent."""
-    from .swiggy_agent import run_swiggy_agent
-
-    fake_meal = MealSuggestion(
-        name="meal", description="", can_cook_now=False, missing_ingredients=items,
-    )
-    plan = MealPlan(
-        suggestions=[fake_meal],
-        decision=Decision.ORDER_GROCERIES,
-        recommended_meal=fake_meal,
-        reasoning="",
-    )
-    result = await run_swiggy_agent(plan, delivery_address, access_token, dry_run=dry_run)
-    return result if result is not None else OrderResult(
-        success=False, platform="swiggy_instamart", error="Agent returned no result"
     )
 
 

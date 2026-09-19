@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 import app as a
 
 client = TestClient(a.app)
-ORDER = {"action": "order_groceries", "meal_name": "Test", "missing_ingredients": ""}
+ORDER = {"action": "order_dish", "meal_name": "Test"}
 
 
 def _exp(delta: timedelta) -> str:
@@ -48,7 +48,7 @@ class TestBearerAuth(unittest.TestCase):
 
     def test_order_with_valid_bearer_passes_the_auth_gate(self):
         tok = a._issue_bearer("swiggy-tok", _exp(timedelta(days=1)))
-        with patch.object(a, "order_groceries_from_instamart", AsyncMock(return_value=None)) as order:
+        with patch.object(a, "order_dish_from_swiggy", AsyncMock(return_value=None)) as order:
             r = client.post("/api/order", data=ORDER, headers={"Authorization": f"Bearer {tok}"})
         self.assertNotIn("auth_required", r.text)
         self.assertEqual(order.await_args.args[-1], "swiggy-tok")  # the Swiggy token, not our signed wrapper
