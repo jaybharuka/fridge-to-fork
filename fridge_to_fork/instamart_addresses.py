@@ -15,7 +15,7 @@ Name/phone/address text is personal data: it is passed to Swiggy and never logge
 """
 
 from . import instamart
-from .instamart import InstamartError, _call, _options, _public_address, _pick_address, _saved_addresses
+from .instamart import InstamartError, _call, _options, _pick_address, _public_address, _same_address_id, _saved_addresses
 
 MAX_GO_TO_ITEMS = 12
 
@@ -60,7 +60,11 @@ async def create_address(token: str, fields: dict) -> dict:
             address_id = created.get("addressId")
             if not address_id:
                 raise InstamartError("tool_error", "Swiggy didn't confirm the new address. Check your saved addresses and try again.")
-            return {"addressId": str(address_id), **_listing(await _saved_addresses(session))}
+            saved = await _saved_addresses(session)
+            # create_address may report only the base of the compound id get_addresses uses; everything else
+            # (orders, tracking coordinates, the picker) is keyed by the get_addresses form.
+            canonical = next((a["id"] for a in saved if _same_address_id(a["id"], address_id)), address_id)
+            return {"addressId": str(canonical), **_listing(saved)}
     finally:
         _busy.discard(account)
 

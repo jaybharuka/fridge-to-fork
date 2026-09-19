@@ -407,6 +407,27 @@ def _same_place(cart_text: str, saved_line: str) -> bool:
     return bool(a and b and (a in b or b in a))
 
 
+_COMPOUND_SEP = "__"
+
+
+def _same_address_id(full_id, other_id) -> bool:
+    """Is `other_id` the same Swiggy address as `full_id`?
+
+    Confirmed on a real account: get_addresses returns compound ids ("<base>__<token>") while get_cart's
+    selectedAddressDetails.id reports only the base. So `other_id` matches when it is identical, or when it
+    is exactly the part of `full_id` before its FIRST "__". Deliberately narrow: not an arbitrary prefix or
+    substring, not the reverse direction, not a different token on the same base. Anything else is a real
+    mismatch and still blocks.
+    """
+    if _same_id(full_id, other_id):
+        return True
+    if full_id is None or other_id is None:
+        return False
+    base, sep, _ = str(full_id).strip().partition(_COMPOUND_SEP)
+    other = str(other_id).strip()
+    return bool(sep and other and base == other)
+
+
 def _same_id(a, b) -> bool:
     """Ids compare as strings: Swiggy documents them as strings, but nothing guarantees one tool doesn't
     hand back 123 where another hands back "123", and a type difference is not an address change."""
@@ -421,7 +442,7 @@ async def _verify_cart_address(
     stage: str,
     message: str = "The delivery address changed. Please review your cart again.",
     allow_missing: bool = False,
-) -> None:
+) -> dict:
     """Refuse to go on if Swiggy's cart is not for the address the user chose.
 
     On a mismatch it logs both ids (opaque identifiers) and yes/no facts only: whether each id is one of the
@@ -429,10 +450,15 @@ async def _verify_cart_address(
     Together they tell an id-format difference for the same address (cart id not saved, text matches) from
     Swiggy's cart really sitting on another address (cart id saved, or text differs). No address text, name
     or phone is ever logged.
+
+    Returns the review with the address id set to the full `get_addresses` id that was requested: get_cart
+    reports a shorter form, and every later call (list_coupons, checkout) must use the documented full one.
     """
     cart_id = review["address"]["id"]
-    if _same_id(cart_id, address_id) or (allow_missing and cart_id in (None, "")):
-        return
+    if _same_address_id(address_id, cart_id):
+        return {**review, "address": {**review["address"], "id": str(address_id).strip()}}
+    if allow_missing and cart_id in (None, ""):
+        return review
     saved: list[dict] | None
     try:
         saved = await _saved_addresses(session)
@@ -466,9 +492,8 @@ async def build_cart(token: str, address_id: str, selections: list[dict]) -> dic
         cart = await _call(session, "get_cart")
         payment = await _fetch_payment(session, cart)
         coupons = await _coupons_or_none(session, address_id)
-        review = _review(cart, payment)
-        await _verify_cart_address(
-            session, review, address_id, stage="cart", allow_missing=True,
+        review = await _verify_cart_address(
+            session, _review(cart, payment), address_id, stage="cart", allow_missing=True,
             message="The cart's delivery address changed. Please start again.",
         )
     adjustments = [f"{i.get('itemName', 'An item')} was removed (out of stock)." for i in updated.get("removedOutOfStockItems") or []]
@@ -501,7 +526,7 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
     async with _session(token) as session:
         before_cart = await _call(session, "get_cart")
         before = _review(before_cart, await _fetch_payment(session, before_cart))
-        await _verify_cart_address(session, before, address_id, stage="coupon-before")
+        before = await _verify_cart_address(session, before, address_id, stage="coupon-before")
         if before["blockers"]:
             raise InstamartError("cart_blocked", before["blockers"][0])
 
@@ -516,8 +541,7 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
         after_cart = await _call(session, "get_cart")
         payment = await _fetch_payment(session, after_cart)
         relisted = await _coupons_or_none(session, address_id)
-        after = _review(after_cart, payment)
-        await _verify_cart_address(session, after, address_id, stage="coupon-after")
+        after = await _verify_cart_address(session, _review(after_cart, payment), address_id, stage="coupon-after")
     reflected, savings = _discount_reflected(before, after)
     if not reflected:
         raise InstamartError(
@@ -685,8 +709,7 @@ def _checkout_args(address_id: str, choice: dict) -> dict:
 async def _checkout_locked(token: str, address_id: str, expected_total: str, payment_key: str) -> dict:
     async with _session(token) as session:
         cart = await _call(session, "get_cart")
-        review = _review(cart, await _fetch_payment(session, cart))
-        await _verify_cart_address(session, review, address_id, stage="checkout")
+        review = await _verify_cart_address(session, _review(cart, await _fetch_payment(session, cart)), address_id, stage="checkout")
         if review["blockers"]:
             raise InstamartError("cart_blocked", review["blockers"][0])
         # The total the user confirmed already includes any coupon (get_cart bills the discounted
