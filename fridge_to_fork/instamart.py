@@ -254,6 +254,33 @@ def _cart_item(item: dict) -> dict:
     }
 
 
+def _view_methods(view: dict) -> list[dict]:
+    """The payment methods a PaymentOptionsView lists: allMethods, else the platform groups' methods."""
+    return view.get("allMethods") or [
+        m for group in (view.get("platforms") or {}).values() for m in (group or {}).get("methods") or []
+    ]
+
+
+def _explain_methods(view: dict) -> list[str]:
+    """One entry per method Swiggy listed, with why _payment_options offered or dropped it (mirrors its rules)."""
+    seen_qr, out = False, []
+    for m in _view_methods(view)[:20]:
+        method_id, kind, enabled = m.get("id"), m.get("kind"), m.get("enabled")
+        if enabled is False:
+            why = "dropped: enabled=false"
+        elif not method_id:
+            why = "dropped: no id"
+        elif kind == "qr":
+            why = "dropped: extra qr" if seen_qr else "offered"
+            seen_qr = True
+        elif kind == "intent":
+            why = "offered"
+        else:
+            why = f"dropped: kind={kind!r} is not qr/intent"
+        out.append(f"{method_id!r} kind={kind!r} enabled={enabled!r} group={m.get('groupName')!r} -> {why}")
+    return out
+
+
 def _payment_options(view: dict | None) -> list[dict]:
     """PaymentOptionsView -> the choices this app can complete. `methodId` is echoed to
     checkout exactly as Swiggy returned it (never reconstructed). One UPI-QR choice at most:
@@ -267,11 +294,8 @@ def _payment_options(view: dict | None) -> list[dict]:
             "label": cod.get("displayName") or "Cash on delivery",
             "methodId": cod.get("id") or COD_FALLBACK_ID,
         })
-    methods = view.get("allMethods") or [
-        m for group in (view.get("platforms") or {}).values() for m in (group or {}).get("methods") or []
-    ]
     has_qr = False
-    for m in methods:
+    for m in _view_methods(view):
         if m.get("enabled") is False or not m.get("id"):
             continue
         if m.get("kind") == "qr" and not has_qr:
@@ -282,20 +306,39 @@ def _payment_options(view: dict | None) -> list[dict]:
     return options
 
 
-async def _fetch_payment(session: ClientSession, cart: dict) -> dict:
+async def _fetch_payment(session: ClientSession, cart: dict, stage: str = "cart") -> dict:
     """Live payment choices for the current cart. get_cart embeds the same view (`paymentOptions`),
     used as a fallback if get_payment_options itself is unavailable or comes back empty."""
     view: dict | None = None
+    source, tool_error = "get_payment_options", None
     try:
         view = await _call(session, "get_payment_options")
     except InstamartError as exc:
         if exc.code == "auth_required":
             raise
+        source, tool_error = "none", exc.message
     options = _payment_options(view)
     if not options and cart.get("paymentOptions"):
         view = cart["paymentOptions"]
         options = _payment_options(view)
+        source = "cart.paymentOptions (fallback)"
+    _log_payment_view(stage, source, tool_error, view, options, cart)
     return {"options": options, "amount": (view or {}).get("paymentAmount")}
+
+
+def _log_payment_view(stage: str, source: str, tool_error: str | None, view: dict | None, options: list[dict], cart: dict) -> None:
+    """Diagnostic: exactly what Swiggy listed before our filtering, next to the cart's value, so "Swiggy offered
+    only cash" can be told from "we filtered a method out". Identifiers and amounts only; nothing personal."""
+    view = view if isinstance(view, dict) else {}
+    platforms = {name: len((group or {}).get("methods") or []) for name, group in (view.get("platforms") or {}).items()}
+    to_pay = ((cart.get("billBreakdown") or {}).get("toPay") or {}).get("value")
+    log.warning(
+        "[INSTAMART][diag] payment options (%s): source=%s tool_error=%r view_keys=%s cod=%s allMethods=%d platform_methods=%s "
+        "paymentAmount=%r | offered=%s | methods=%s | cart: availablePaymentMethods=%s has_paymentOptions=%s itemTotal=%r toPay=%r",
+        stage, source, tool_error, sorted(view), view.get("cod"), len(view.get("allMethods") or []), platforms,
+        view.get("paymentAmount"), [o["key"] for o in options], _explain_methods(view),
+        cart.get("availablePaymentMethods"), bool(cart.get("paymentOptions")), cart.get("cartTotalAmount"), to_pay,
+    )
 
 
 def _review(cart: dict, payment: dict) -> dict:
@@ -490,7 +533,7 @@ async def build_cart(token: str, address_id: str, selections: list[dict]) -> dic
         await _call(session, "clear_cart")
         updated = await _call(session, "update_cart", selectedAddressId=address_id, items=items)
         cart = await _call(session, "get_cart")
-        payment = await _fetch_payment(session, cart)
+        payment = await _fetch_payment(session, cart, stage="cart")
         coupons = await _coupons_or_none(session, address_id)
         review = await _verify_cart_address(
             session, _review(cart, payment), address_id, stage="cart", allow_missing=True,
@@ -525,7 +568,7 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
     """
     async with _session(token) as session:
         before_cart = await _call(session, "get_cart")
-        before = _review(before_cart, await _fetch_payment(session, before_cart))
+        before = _review(before_cart, await _fetch_payment(session, before_cart, stage="coupon-before"))
         before = await _verify_cart_address(session, before, address_id, stage="coupon-before")
         if before["blockers"]:
             raise InstamartError("cart_blocked", before["blockers"][0])
@@ -539,7 +582,7 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
 
         await _call(session, "apply_coupon", couponCode=match["code"])
         after_cart = await _call(session, "get_cart")
-        payment = await _fetch_payment(session, after_cart)
+        payment = await _fetch_payment(session, after_cart, stage="coupon-after")
         relisted = await _coupons_or_none(session, address_id)
         after = await _verify_cart_address(session, _review(after_cart, payment), address_id, stage="coupon-after")
     reflected, savings = _discount_reflected(before, after)
@@ -709,7 +752,7 @@ def _checkout_args(address_id: str, choice: dict) -> dict:
 async def _checkout_locked(token: str, address_id: str, expected_total: str, payment_key: str) -> dict:
     async with _session(token) as session:
         cart = await _call(session, "get_cart")
-        review = await _verify_cart_address(session, _review(cart, await _fetch_payment(session, cart)), address_id, stage="checkout")
+        review = await _verify_cart_address(session, _review(cart, await _fetch_payment(session, cart, stage="checkout")), address_id, stage="checkout")
         if review["blockers"]:
             raise InstamartError("cart_blocked", review["blockers"][0])
         # The total the user confirmed already includes any coupon (get_cart bills the discounted
