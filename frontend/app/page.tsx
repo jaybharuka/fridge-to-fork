@@ -7,6 +7,7 @@ import { useYoutubeVideos } from '@/hooks/useYoutubeVideos';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrefetchProducts } from '@/hooks/useInstamartProducts';
+import { useSelectedAddressId } from '@/lib/addressStore';
 import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
 import { ConnectGate } from '@/components/auth/ConnectGate';
@@ -93,7 +94,7 @@ export default function Home() {
 
   // Start searching Instamart the moment the missing list is known, not when the sheet opens.
   const missingNames = useMemo(() => getItemsToOrder(state.checklist).map(i => i.name), [state.checklist]);
-  usePrefetchProducts(missingNames, connected);
+  usePrefetchProducts(missingNames, connected, useSelectedAddressId());
 
   // Stashes just enough state to resume the in-progress order after the
   // full-page OAuth redirect a "Connect with Swiggy" click triggers — see

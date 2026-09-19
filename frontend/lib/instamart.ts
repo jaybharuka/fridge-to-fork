@@ -5,7 +5,7 @@
 import { authHeaders, markDisconnected } from './auth';
 import { BACKEND_URL } from './backend';
 
-export interface InstamartAddress { id: string; label: string; addressLine: string }
+export interface InstamartAddress { id: string; label: string; addressLine: string; category?: string | null }
 
 export interface InstamartOption {
   spinId: string;
@@ -111,8 +111,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-export const instamartSearch = (items: string[]) =>
-  post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', { items });
+export const instamartSearch = (items: string[], addressId: string | null = null) =>
+  post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', { items, ...(addressId ? { address_id: addressId } : {}) });
 
 export const instamartCart = (addressId: string, selections: CartSelection[]) =>
   post<{ review: InstamartReview; adjustments: string[]; coupons: CouponList }>('cart', { address_id: addressId, selections });
@@ -174,10 +174,24 @@ export interface DeliveryStatus {
   pollIntervalSec: number;
 }
 
+export interface TrackingInfo {
+  title: string | null;
+  subtitle: string | null;
+  statusMessage: string | null;
+  subStatusMessage: string | null;
+  etaMinutes: number | null;
+  etaText: string | null;
+  store: string | null;
+  paymentMessage: string | null;
+  riderLocation: { lat: number; lng: number } | null;
+  storeLocation: { lat: number; lng: number } | null;
+  pollIntervalSec: number;
+}
+
 export interface OrderStatusResult {
   delivery: DeliveryStatus | null;
-  /** track_order data; only present when real delivery coordinates were supplied (none exist today). */
-  tracking: unknown | null;
+  /** track_order data; only present when real delivery coordinates were supplied (captured at address creation). */
+  tracking: TrackingInfo | null;
   notes: string[];
 }
 
@@ -196,11 +210,45 @@ export type OrderDetails =
 export const instamartOrders = (activeOnly = false) =>
   post<{ orders: OrderSummary[]; hasMore: boolean }>('orders', { active_only: activeOnly });
 
-export const instamartOrderStatus = (orderId: string, addressId: string | null) =>
-  post<OrderStatusResult>('order-status', { order_id: orderId, ...(addressId ? { address_id: addressId } : {}) });
+export const instamartOrderStatus = (orderId: string, addressId: string | null, coords: { lat: number; lng: number } | null = null) =>
+  post<OrderStatusResult>('order-status', {
+    order_id: orderId,
+    ...(addressId ? { address_id: addressId } : {}),
+    ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+  });
 
 export const instamartOrderDetails = (orderId: string) =>
   post<{ details: OrderDetails }>('order-details', { order_id: orderId });
 
 /** Delivered / cancelled orders are history: no live polling. ("Out for delivery" is still live.) */
 export const isPastOrder = (status: string): boolean => /\bdelivered\b|cancel|reject|fail/i.test(status);
+
+// ---- Saved addresses and "your usual items" (backend: fridge_to_fork/instamart_addresses.py) ----
+
+export interface AddressList { addresses: InstamartAddress[]; defaultId: string | null }
+
+/** create_address fields. Swiggy requires the account holder's name and phone. */
+export interface NewAddress {
+  full_address: string;
+  address_line: string;
+  address_line2: string;
+  city: string;
+  postal_code: string;
+  address_category: 'HOME' | 'WORK' | 'OFFICE' | 'FRIENDS_AND_FAMILY' | 'OTHER';
+  user_name: string;
+  user_phone: string;
+  locality?: string;
+  address_tag?: string;
+  /** Real coordinates only (device location the user chose to share); both or neither. */
+  latitude?: number;
+  longitude?: number;
+}
+
+export const instamartAddresses = () => post<AddressList>('addresses', {});
+
+export const instamartCreateAddress = (fields: NewAddress) => post<AddressList & { addressId: string }>('address', fields);
+
+export const instamartDeleteAddress = (addressId: string) => post<AddressList>('address-delete', { address_id: addressId });
+
+export const instamartGoToItems = (addressId: string) =>
+  post<{ results: InstamartSearchResult[] }>('go-to-items', { address_id: addressId });

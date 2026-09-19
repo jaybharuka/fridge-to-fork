@@ -5,12 +5,16 @@ import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import type { ChecklistItem, TopUpSuggestion } from '@/lib/types';
 import { selectionsFrom, useInstamartOrder, type Stage } from '@/hooks/useInstamartOrder';
 import { useAuth } from '@/hooks/useAuth';
+import { useGoToItems } from '@/hooks/useInstamartAddresses';
+import { useSelectedAddressId } from '@/lib/addressStore';
 import { formatInr } from '@/lib/instamart';
 import { openOrders } from '@/lib/ordersUi';
+import { AddressPicker } from './AddressPicker';
 import { InstamartOutcome } from './InstamartOutcome';
 import { estimateSubtotal, InstamartPicker } from './InstamartPicker';
 import { InstamartReview } from './InstamartReview';
 import { TopUpCard } from './TopUpCard';
+import { UsualItems } from './UsualItems';
 import resultsStyles from './results.module.css';
 import styles from './instamart.module.css';
 
@@ -49,6 +53,8 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
 
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
+  const [addressOpen, setAddressOpen] = useState(false);
+  const selectedAddressId = useSelectedAddressId();
   const touchStartY = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +74,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
     if (!open || !connected) return;
     const missing = itemsToOrder.map(i => i.name);
     const restored = (initialSelectedTopUpNames ?? []).filter(n => !missing.includes(n));
-    void order.search([...missing, ...restored], restored);
+    void order.search([...missing, ...restored], restored, selectedAddressId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, connected]);
 
@@ -84,9 +90,14 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
 
+  // Your usual items at this address; the recipe-based suggestions are only the fallback when there are none.
+  const usual = useGoToItems(state.address?.id ?? null, open && state.stage === 'picking');
+
   if (!mounted) return null;
 
   const placing = state.stage === 'placing';
+  const usualFresh = usual.items.filter(r => !state.results.some(x => x.ingredient === r.ingredient));
+  const showTopUps = !usual.loading && usual.items.length === 0 && topUpSuggestions.length > 0;
   const selectedPayment = state.review?.payment.options.find(o => o.key === state.paymentKey) ?? null;
   const close = () => { if (!placing) onClose(); }; // a request is in flight: the user must see its outcome
 
@@ -134,16 +145,29 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
         ) : state.stage === 'error' ? (
           <div className={styles.centered}>
             <p className={styles.outcomeBody}>{state.error}</p>
-            <button type="button" className={styles.primary} onClick={() => order.search([...itemsToOrder.map(i => i.name), ...state.extras], state.extras)}>Try again</button>
+            <button type="button" className={styles.primary} onClick={() => order.search([...itemsToOrder.map(i => i.name), ...state.extras], state.extras, selectedAddressId)}>Try again</button>
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
           </div>
         ) : state.stage === 'done' && state.outcome ? (
           <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id); }} />
+        ) : state.stage === 'picking' && addressOpen ? (
+          <AddressPicker
+            currentId={state.address?.id ?? null}
+            onBack={() => setAddressOpen(false)}
+            onChoose={id => {
+              setAddressOpen(false);
+              // Price and stock depend on the address, so a different one restarts the search (and the cart is rebuilt later).
+              if (id !== state.address?.id) order.search([...itemsToOrder.map(i => i.name), ...state.extras], state.extras, id);
+            }}
+          />
         ) : state.stage === 'picking' ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
             {state.address && state.address.id && (
-              <p className={styles.address}>Delivering to <strong>{state.address.label}</strong> — {state.address.addressLine}</p>
+              <p className={styles.address}>
+                Delivering to <strong>{state.address.label}</strong> — {state.address.addressLine}{' '}
+                <button type="button" className={styles.linkBtn} onClick={() => setAddressOpen(true)}>Change</button>
+              </p>
             )}
             <InstamartPicker
               results={state.results}
@@ -154,7 +178,8 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
               onQuantity={order.setQuantity}
               onRemoveExtra={order.removeExtra}
             />
-            {topUpSuggestions.length > 0 && (
+            {usualFresh.length > 0 && <UsualItems items={usualFresh} onAdd={order.addProduct} />}
+            {showTopUps && (
               <>
                 <p className={styles.sectionLabel}>Add to your order?</p>
                 <div className={resultsStyles.orderSheetTopUpCards}>

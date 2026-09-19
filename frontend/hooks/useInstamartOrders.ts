@@ -7,9 +7,11 @@ import {
   instamartOrderStatus,
   isPastOrder,
   type DeliveryStatus,
+  type TrackingInfo,
   type OrderDetails,
   type OrderSummary,
 } from '../lib/instamart';
+import { coordsFor } from '../lib/addressStore';
 
 const message = (e: unknown) =>
   e instanceof InstamartApiError ? e.message : "Couldn't reach the server. Check your connection and try again.";
@@ -55,7 +57,7 @@ export function useLiveStatus(order: OrderSummary | null) {
   const orderId = order?.orderId ?? null;
   const addressId = order?.addressId ?? null;
   const live = !!order && !isPastOrder(order.status);
-  const [snap, setSnap] = useState<{ orderId: string; delivery: DeliveryStatus | null; notes: string[]; failed: boolean } | null>(null);
+  const [snap, setSnap] = useState<{ orderId: string; delivery: DeliveryStatus | null; tracking: TrackingInfo | null; notes: string[]; failed: boolean } | null>(null);
 
   useEffect(() => {
     if (!orderId || !live) return;
@@ -65,15 +67,16 @@ export function useLiveStatus(order: OrderSummary | null) {
     const tick = async () => {
       let wait = 30;
       try {
-        const { delivery, notes } = await instamartOrderStatus(orderId, addressId);
+        // Coordinates exist only for addresses created here with the user's shared location; else none is sent.
+        const { delivery, tracking, notes } = await instamartOrderStatus(orderId, addressId, coordsFor(addressId));
         if (!alive) return;
         failures = 0;
-        setSnap({ orderId, delivery, notes, failed: false });
-        if (delivery?.terminal || !delivery) return; // finished, or nothing pollable (no address / tool missing)
-        wait = delivery.pollIntervalSec;
+        setSnap({ orderId, delivery, tracking, notes, failed: false });
+        if (delivery?.terminal || (!delivery && !tracking)) return; // finished, or nothing pollable
+        wait = delivery?.pollIntervalSec ?? tracking?.pollIntervalSec ?? wait;
       } catch {
         if (!alive) return;
-        if (++failures >= MAX_STATUS_FAILURES) return setSnap(s => ({ orderId, delivery: s?.delivery ?? null, notes: [], failed: true }));
+        if (++failures >= MAX_STATUS_FAILURES) return setSnap(s => ({ orderId, delivery: s?.delivery ?? null, tracking: s?.tracking ?? null, notes: [], failed: true }));
       }
       timer = setTimeout(tick, wait * 1000);
     };
@@ -82,7 +85,7 @@ export function useLiveStatus(order: OrderSummary | null) {
   }, [orderId, addressId, live]);
 
   const current = snap?.orderId === orderId ? snap : null;
-  return { delivery: current?.delivery ?? null, notes: current?.notes ?? [], failed: current?.failed ?? false, polling: live && current === null };
+  return { delivery: current?.delivery ?? null, tracking: current?.tracking ?? null, notes: current?.notes ?? [], failed: current?.failed ?? false, polling: live && current === null };
 }
 
 /** Itemized details for one order (fetched once). `available: false` when Swiggy hasn't rolled the tool out. */
