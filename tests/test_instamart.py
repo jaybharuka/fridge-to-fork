@@ -19,6 +19,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
+from mcp.shared.exceptions import McpError
+from mcp.types import ErrorData
 
 import app as a
 from fridge_to_fork import instamart
@@ -117,11 +119,50 @@ def cart(*, total="₹136", item_total="₹120", address_id="addr-home", **overr
     return {**data, **overrides}
 
 
+GPAY = {"id": "gpay://upi/", "displayName": "Google Pay", "kind": "intent", "enabled": True}
+PHONEPE = {"id": "phonepe://upi/", "displayName": "PhonePe", "kind": "intent", "enabled": False}
+QR = {"id": "upi-qr", "displayName": "Scan QR", "kind": "qr", "enabled": True}
+
+# get_payment_options `data` (PaymentOptionsView): cod {available,id,displayName}, allMethods[], platforms.*.methods[]
+PAYMENT_VIEW = {
+    "platforms": {
+        "mobile": {"groupName": "UPI apps", "methods": [GPAY, PHONEPE]},
+        "desktop": {"groupName": "Scan QR", "methods": [QR]},
+    },
+    "cod": {"available": True, "id": "Cash", "displayName": "Cash on delivery"},
+    "allMethods": [GPAY, PHONEPE, QR],
+    "paymentAmount": "₹136",
+    "addressId": "addr-home",
+    "placeOrderToolName": "checkout",
+}
+
+# list_coupons `data`
+COUPONS = {
+    "availableCoupons": [
+        {"couponCode": "SAVE20", "title": "₹20 off", "description": "On orders above ₹99", "isApplicable": True,
+         "applicabilityStatus": "APPLICABLE", "tnc": {"title": "T&C", "bulletTexts": ["Valid once per user"]}, "offerId": "o-1"},
+        {"couponCode": "BIG100", "title": "₹100 off", "isApplicable": False,
+         "applicabilityStatus": "MIN_CART_NOT_MET", "applicabilityMessage": "Add ₹200 more to use this"},
+    ]
+}
+
+
+def discounted_cart(**overrides) -> dict:
+    """The cart after SAVE20: same items, toPay ₹116, a coupon line in the bill."""
+    c = cart(total="₹116", **overrides)
+    c["billBreakdown"]["lineItems"] = [*c["billBreakdown"]["lineItems"], {"label": "Coupon SAVE20", "value": "-₹20"}]
+    return c
+
+
+DEFAULT_RESPONSES = {"get_payment_options": envelope(PAYMENT_VIEW), "list_coupons": envelope(COUPONS)}
+
+
 class FakeSession:
     """Replays Swiggy-shaped results by tool name and records (name, arguments)."""
 
     def __init__(self, responses: dict):
-        self.responses = {k: (list(v) if isinstance(v, list) else v) for k, v in responses.items()}
+        merged = {**DEFAULT_RESPONSES, **responses}
+        self.responses = {k: (list(v) if isinstance(v, list) else v) for k, v in merged.items()}
         self.calls: list[tuple[str, dict]] = []
 
     async def call_tool(self, name, arguments):
@@ -257,7 +298,7 @@ class CartTests(InstamartCase):
         s = FakeSession({"clear_cart": envelope({"verified": True}), "update_cart": envelope(cart()), "get_cart": envelope(cart())})
         with using(s):
             out = await instamart.build_cart("tok", "addr-home", SELECTION)
-        self.assertEqual(s.names(), ["clear_cart", "update_cart", "get_cart"])
+        self.assertEqual(s.names(), ["clear_cart", "update_cart", "get_cart", "get_payment_options", "list_coupons"])
         self.assertEqual(
             s.args("update_cart"),
             {"selectedAddressId": "addr-home", "items": [{"spinId": "spin-t500", "skuId": "sku-t500", "quantity": 2}]},
@@ -279,19 +320,18 @@ class CartTests(InstamartCase):
         self.assertEqual(len(out["adjustments"]), 2)
         self.assertIn("quantity reduced from 9 to 5", out["adjustments"][1])
 
-    async def test_blockers_minimum_unserviceable_out_of_stock_and_cod(self):
-        bad = cart(
-            item_total="₹60",
-            unserviceableItems=[{"itemName": "Tomato Hybrid"}],
-            availablePaymentMethods=["UPI"],
-        )
+    async def test_blockers_minimum_unserviceable_out_of_stock_and_no_payment_method(self):
+        bad = cart(item_total="₹60", unserviceableItems=[{"itemName": "Tomato Hybrid"}])
         bad["items"][0]["isInStockAndAvailable"] = False
-        s = FakeSession({"clear_cart": envelope({"verified": True}), "update_cart": envelope(cart()), "get_cart": envelope(bad)})
+        s = FakeSession({
+            "clear_cart": envelope({"verified": True}), "update_cart": envelope(cart()), "get_cart": envelope(bad),
+            "get_payment_options": envelope({"allMethods": []}),
+        })
         with using(s):
             review = (await instamart.build_cart("tok", "addr-home", SELECTION))["review"]
         self.assertFalse(review["canCheckout"])
         joined = " ".join(review["blockers"])
-        for expected in ("minimum order is ₹99", "Not deliverable", "out of stock", "Cash on delivery"):
+        for expected in ("minimum order is ₹99", "Not deliverable", "out of stock", "No payment method"):
             self.assertIn(expected, joined)
 
     async def test_empty_cart_and_cart_warning(self):
@@ -331,16 +371,16 @@ def checkout_session(**overrides) -> FakeSession:
     return FakeSession({**responses, **overrides})
 
 
-async def place(key="key-00000001", total="₹136", address="addr-home"):
-    return await instamart.checkout("tok", address, total, key)
+async def place(key="key-00000001", total="₹136", address="addr-home", payment="cod"):
+    return await instamart.checkout("tok", address, total, key, payment)
 
 
 class CheckoutTests(InstamartCase):
-    async def test_happy_path_sends_cod_and_address_and_verifies_against_get_orders(self):
+    async def test_happy_path_sends_the_listed_cod_id_and_address_and_verifies_against_get_orders(self):
         s = checkout_session()
         with using(s):
             out = await place()
-        self.assertEqual(s.args("checkout"), {"addressId": "addr-home", "paymentMethod": "COD"})
+        self.assertEqual(s.args("checkout"), {"addressId": "addr-home", "paymentMethod": "Cash"})  # cod.id echoed from get_payment_options
         self.assertEqual(s.args("get_orders"), {"orderType": "INSTAMART", "activeOnly": True, "count": 10})
         self.assertEqual((out["status"], out["orderIds"], out["verified"]), ("placed", ["IM-1001"], True))
         self.assertEqual(s.names().count("checkout"), 1)
@@ -438,45 +478,277 @@ class CheckoutTests(InstamartCase):
         self.assertEqual((out["status"], out["orderIds"]), ("partial", ["IM-1"]))
 
 
-class UpiPollingTests(InstamartCase):
-    PENDING = {"orderId": "IM-2002", "paasId": "paas-9", "status": "PENDING_PAYMENT", "pollingIntervalInMs": 1000, "maxTimeToPollForInMs": 30000}
+# --------------------------------------------------------------------------- phase 1: payment options
 
-    async def run_upi(self, session: FakeSession) -> dict:
-        with using(session), patch.object(instamart.asyncio, "sleep", AsyncMock()):
-            return await place()
 
-    async def test_polls_with_paas_id_then_confirms_with_order_and_paas_id(self):
-        s = checkout_session(
-            checkout=envelope(self.PENDING),
-            check_payment_status=[envelope({"paasId": "paas-9", "status": "PENDING", "terminal": False}),
-                                  envelope({"paasId": "paas-9", "status": "SUCCESS", "terminal": True, "isTerminalSuccess": True, "confirmed": False})],
-            confirm_order=envelope({"orderId": "IM-2002", "result": "success"}),
-            get_orders=[envelope({"orders": []}), envelope({"orders": [{"orderId": "IM-2002"}]})],
-        )
-        out = await self.run_upi(s)
-        self.assertEqual(s.args("check_payment_status")["paasId"], "paas-9")
+def cart_session(**overrides) -> FakeSession:
+    return FakeSession({"clear_cart": envelope({"verified": True}), "update_cart": envelope(cart()), "get_cart": envelope(cart()), **overrides})
+
+
+class PaymentOptionTests(InstamartCase):
+    async def build(self, s: FakeSession) -> dict:
+        with using(s):
+            return (await instamart.build_cart("tok", "addr-home", SELECTION))["review"]
+
+    async def test_options_come_from_get_payment_options_and_skip_disabled_methods(self):
+        s = cart_session()
+        review = await self.build(s)
+        options = review["payment"]["options"]
+        self.assertEqual([o["key"] for o in options], ["cod", "upi_intent:gpay://upi/", "upi_qr"])  # PhonePe is enabled:false
+        self.assertEqual((options[0]["methodId"], options[0]["label"]), ("Cash", "Cash on delivery"))
+        self.assertEqual(options[1]["methodId"], "gpay://upi/")
+        self.assertEqual(review["payment"]["amount"], "₹136")
+        self.assertIn("get_payment_options", s.names())
+
+    async def test_cod_is_not_offered_when_swiggy_says_it_is_unavailable(self):
+        view = {**PAYMENT_VIEW, "cod": {"available": False, "id": "Cash", "displayName": "Cash"}}
+        review = await self.build(cart_session(get_payment_options=envelope(view)))
+        self.assertNotIn("cod", [o["key"] for o in review["payment"]["options"]])
+        self.assertTrue(review["canCheckout"])  # UPI is still a way to pay
+
+    async def test_falls_back_to_the_view_embedded_in_get_cart_when_the_tool_fails(self):
+        s = cart_session(get_payment_options=envelope(success=False, error="not available"), get_cart=envelope(cart(paymentOptions=PAYMENT_VIEW)))
+        review = await self.build(s)
+        self.assertEqual(review["payment"]["options"][0]["key"], "cod")
+
+    async def test_no_payment_options_at_all_blocks_checkout(self):
+        review = await self.build(cart_session(get_payment_options=envelope({"allMethods": []})))
+        self.assertEqual(review["payment"]["options"], [])
+        self.assertFalse(review["canCheckout"])
+        self.assertIn("No payment method", review["blockers"][0])
+
+
+# --------------------------------------------------------------------------- phase 1: coupons
+
+
+class CouponTests(InstamartCase):
+    def apply_session(self, **overrides) -> FakeSession:
+        return FakeSession({
+            "get_cart": [envelope(cart()), envelope(discounted_cart())],
+            "apply_coupon": envelope(discounted_cart()),
+            **overrides,
+        })
+
+    async def test_real_coupons_are_listed_with_the_cart(self):
+        s = cart_session()
+        with using(s):
+            out = await instamart.build_cart("tok", "addr-home", SELECTION)
+        self.assertEqual(s.args("list_coupons"), {"addressId": "addr-home"})
+        self.assertTrue(out["coupons"]["available"])
+        save, big = out["coupons"]["items"]
+        self.assertEqual((save["code"], save["title"], save["applicable"], save["terms"]), ("SAVE20", "₹20 off", True, ["Valid once per user"]))
+        self.assertEqual((big["applicable"], big["message"]), (False, "Add ₹200 more to use this"))
+
+    async def test_coupons_unavailable_never_break_the_cart(self):
+        for failing in (envelope(success=False, error="unknown tool list_coupons"), McpError(ErrorData(code=-32601, message="Method not found"))):
+            with self.subTest(str(type(failing).__name__)), using(cart_session(list_coupons=failing)):
+                out = await instamart.build_cart("tok", "addr-home", SELECTION)
+            self.assertEqual(out["coupons"], {"available": False, "items": []})
+            self.assertTrue(out["review"]["canCheckout"])
+
+    async def test_apply_relists_applies_the_listed_code_and_reflects_the_discount(self):
+        s = self.apply_session()
+        with using(s):
+            out = await instamart.apply_coupon("tok", "addr-home", "save20")  # user-typed casing
+        self.assertEqual(s.names()[:6], ["get_cart", "get_payment_options", "list_coupons", "apply_coupon", "get_cart", "get_payment_options"])
+        self.assertEqual(s.args("apply_coupon"), {"couponCode": "SAVE20"})  # Swiggy's own code, exactly as listed
+        self.assertEqual(out["review"]["total"], "₹116")
+        self.assertEqual(out["coupon"], {"code": "SAVE20", "title": "₹20 off", "savings": 20.0})
+        self.assertTrue(out["review"]["canCheckout"])
+
+    async def test_a_coupon_that_stopped_being_applicable_is_not_applied(self):
+        gone = {"availableCoupons": [{**COUPONS["availableCoupons"][0], "isApplicable": False, "applicabilityMessage": "Cart changed — coupon no longer valid"}]}
+        s = self.apply_session(list_coupons=envelope(gone))
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "SAVE20")
+        self.assertEqual((ctx.exception.code, ctx.exception.message), ("coupon_not_applicable", "Cart changed — coupon no longer valid"))
+        self.assertNotIn("apply_coupon", s.names())
+
+    async def test_a_code_swiggy_no_longer_lists_is_refused(self):
+        s = self.apply_session(list_coupons=envelope({"availableCoupons": []}))
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "EXPIRED10")
+        self.assertEqual(ctx.exception.code, "coupon_not_found")
+        self.assertNotIn("apply_coupon", s.names())
+
+    async def test_swiggy_rejecting_the_apply_surfaces_its_message(self):
+        s = self.apply_session(apply_coupon=envelope(success=False, error="Coupon has expired"))
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "SAVE20")
+        self.assertEqual(ctx.exception.message, "Coupon has expired")
+
+    async def test_accepted_but_total_unchanged_is_not_counted_as_applied(self):
+        s = self.apply_session(get_cart=[envelope(cart()), envelope(cart())])
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "SAVE20")
+        self.assertEqual(ctx.exception.code, "coupon_not_reflected")
+
+    async def test_a_cart_for_another_address_is_refused_before_anything_is_listed(self):
+        s = self.apply_session(get_cart=[envelope(cart(address_id="addr-work"))])
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "SAVE20")
+        self.assertEqual(ctx.exception.code, "address_mismatch")
+        self.assertNotIn("list_coupons", s.names())
+
+    async def test_a_blocked_cart_does_not_get_a_coupon(self):
+        s = self.apply_session(get_cart=[envelope(cart(item_total="₹40"))])
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "SAVE20")
+        self.assertEqual(ctx.exception.code, "cart_blocked")
+
+    async def test_the_coupon_tool_missing_at_apply_time_is_an_error_not_a_silent_success(self):
+        s = self.apply_session(list_coupons=McpError(ErrorData(code=-32601, message="Method not found")))
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await instamart.apply_coupon("tok", "addr-home", "SAVE20")
+        self.assertEqual(ctx.exception.code, "tool_error")
+        self.assertNotIn("apply_coupon", s.names())
+
+
+# --------------------------------------------------------------------------- phase 1: checkout x payment x coupon
+
+
+class CheckoutPaymentTests(InstamartCase):
+    async def test_upi_qr_uses_generate_qr_and_returns_the_payment_page_without_calling_it_placed(self):
+        pending = {"orderId": "IM-2002", "paasId": "paas-9", "status": "PENDING_PAYMENT", "bridgeUrl": "https://pay.swiggy.com/bridge/abc",
+                   "upiIntentUrl": "upi://pay?x=1", "isQrFlow": True, "pollingIntervalInMs": 2000, "maxTimeToPollForInMs": 90000}
+        s = checkout_session(checkout=envelope(pending))
+        with using(s):
+            out = await place(payment="upi_qr")
+        self.assertEqual(s.args("checkout"), {"addressId": "addr-home", "paymentMethod": "UPI", "generateUPIQR": True})
+        self.assertEqual(out["status"], "pending_payment")
+        self.assertEqual(out["payment"], {"orderId": "IM-2002", "paasId": "paas-9", "bridgeUrl": "https://pay.swiggy.com/bridge/abc", "pollIntervalMs": 2000, "maxPollMs": 90000})
+        self.assertEqual(s.names().count("get_orders"), 1)  # only the pre-checkout duplicate check; no premature "verified"
+
+    async def test_upi_app_choice_echoes_the_intent_id_exactly(self):
+        s = checkout_session(checkout=envelope({"orderId": "IM-3", "paasId": "p", "status": "PENDING_PAYMENT", "bridgeUrl": "https://pay.swiggy.com/b"}))
+        with using(s):
+            await place(payment="upi_intent:gpay://upi/")
+        self.assertEqual(s.args("checkout"), {"addressId": "addr-home", "paymentMethod": "UPI", "intentApp": "gpay://upi/"})
+
+    async def test_unknown_or_disabled_payment_choice_never_reaches_checkout(self):
+        for key in ("bitcoin", "upi_intent:phonepe://upi/", ""):
+            s = checkout_session()
+            with self.subTest(key), using(s), self.assertRaises(InstamartError) as ctx:
+                await place(key=f"key-{abs(hash(key)) % 10**8:08d}", payment=key)
+            self.assertEqual(ctx.exception.code, "payment_unavailable")
+            self.assertNotIn("checkout", s.names())
+
+    async def test_a_method_that_disappeared_since_review_is_refused(self):
+        view = {**PAYMENT_VIEW, "cod": {"available": False, "id": "Cash", "displayName": "Cash"}}
+        s = checkout_session(get_payment_options=envelope(view))
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await place(payment="cod")
+        self.assertEqual(ctx.exception.code, "payment_unavailable")
+        self.assertNotIn("checkout", s.names())
+
+    async def test_checkout_with_a_coupon_verifies_the_discounted_total(self):
+        s = checkout_session(get_cart=envelope(discounted_cart()), checkout=envelope({**ORDER_PLACED, "cartTotal": 116}))
+        with using(s):
+            out = await place(total="₹116")
+        self.assertEqual(out["status"], "placed")
+        self.assertEqual(s.names().count("checkout"), 1)
+
+    async def test_the_pre_coupon_total_is_refused_once_a_coupon_is_applied(self):
+        s = checkout_session(get_cart=envelope(discounted_cart()))
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await place(total="₹136")  # stale: user never saw the discount
+        self.assertEqual(ctx.exception.code, "cart_changed")
+        self.assertNotIn("checkout", s.names())
+
+    async def test_a_coupon_that_lapsed_between_review_and_checkout_is_refused(self):
+        s = checkout_session(get_cart=envelope(cart()))  # Swiggy now bills ₹136 again
+        with using(s), self.assertRaises(InstamartError) as ctx:
+            await place(total="₹116")  # what the user confirmed, with the coupon
+        self.assertEqual(ctx.exception.code, "cart_changed")
+        self.assertNotIn("checkout", s.names())
+
+    async def test_pending_payment_without_a_safe_payment_page_is_unknown_not_placed(self):
+        for label, data in (
+            ("http bridge", {"orderId": "IM-4", "paasId": "p", "status": "PENDING_PAYMENT", "bridgeUrl": "http://evil.example/x"}),
+            ("javascript bridge", {"orderId": "IM-4", "paasId": "p", "status": "PENDING_PAYMENT", "bridgeUrl": "javascript:alert(1)"}),
+            ("no paasId", {"orderId": "IM-4", "status": "PENDING_PAYMENT", "bridgeUrl": "https://pay.swiggy.com/b"}),
+        ):
+            s = checkout_session(checkout=envelope(data))
+            with self.subTest(label), using(s):
+                out = await place(key=f"key-{label[:4]}-0001", payment="upi_qr")
+            self.assertEqual((out["status"], out["payment"]), ("unknown", None))
+            self.assertIn("Check the Swiggy app", out["message"])
+
+    async def test_a_replayed_pending_checkout_does_not_start_a_second_payment(self):
+        pending = {"orderId": "IM-5", "paasId": "p", "status": "PENDING_PAYMENT", "bridgeUrl": "https://pay.swiggy.com/b"}
+        s = checkout_session(checkout=envelope(pending))
+        with using(s):
+            first = await place(payment="upi_qr")
+            second = await place(payment="upi_qr")
+        self.assertEqual(first, second)
+        self.assertEqual(s.names().count("checkout"), 1)
+
+
+# --------------------------------------------------------------------------- phase 1: UPI payment polling
+
+
+class PaymentStatusTests(InstamartCase):
+    def session(self, status: dict, **overrides) -> FakeSession:
+        return FakeSession({
+            "check_payment_status": envelope({"paasId": "paas-9", **status}),
+            "get_orders": envelope({"orders": [{"orderId": "IM-2002"}]}),
+            **overrides,
+        })
+
+    async def poll(self, s: FakeSession, final=False) -> dict:
+        with using(s):
+            return await instamart.payment_status("tok", "IM-2002", "paas-9", final)
+
+    async def test_pending_keeps_waiting_and_confirms_nothing(self):
+        s = self.session({"status": "pending", "terminal": False})
+        out = await self.poll(s)
+        self.assertEqual(out["status"], "pending_payment")
+        self.assertEqual(s.args("check_payment_status"), {"paasId": "paas-9", "orderId": "IM-2002"})
+        self.assertNotIn("confirm_order", s.names())
+
+    async def test_terminal_success_not_yet_confirmed_calls_confirm_order_with_order_and_paas_id(self):
+        s = self.session({"status": "success", "terminal": True, "isTerminalSuccess": True, "confirmed": False},
+                         confirm_order=envelope({"orderId": "IM-2002", "result": "success"}))
+        out = await self.poll(s)
         self.assertEqual(s.args("confirm_order"), {"orderId": "IM-2002", "paasId": "paas-9"})
-        self.assertEqual((out["status"], out["orderIds"]), ("placed", ["IM-2002"]))
+        self.assertEqual((out["status"], out["orderIds"], out["verified"]), ("placed", ["IM-2002"], True))
 
     async def test_already_confirmed_skips_confirm_order(self):
-        s = checkout_session(
-            checkout=envelope(self.PENDING),
-            check_payment_status=envelope({"paasId": "paas-9", "status": "SUCCESS", "isTerminalSuccess": True, "confirmed": True}),
-            get_orders=[envelope({"orders": []}), envelope({"orders": [{"orderId": "IM-2002"}]})],
-        )
-        out = await self.run_upi(s)
+        s = self.session({"status": "success", "terminal": True, "isTerminalSuccess": True, "confirmed": True})
+        out = await self.poll(s)
         self.assertNotIn("confirm_order", s.names())
         self.assertEqual(out["status"], "placed")
 
-    async def test_terminal_failure_does_not_confirm(self):
-        s = checkout_session(
-            checkout=envelope(self.PENDING),
-            check_payment_status=envelope({"paasId": "paas-9", "status": "FAILED", "terminal": True, "isTerminalFailure": True}),
-            get_orders=[envelope({"orders": []}), envelope({"orders": []})],
-        )
-        out = await self.run_upi(s)
-        self.assertNotIn("confirm_order", s.names())
-        self.assertEqual(out["status"], "failed")
+    async def test_failures_and_refunds_never_confirm(self):
+        cases = {
+            "failed": "didn't go through",
+            "cancelled": "cancelled",
+            "refund-initiated": "refund has started",
+            "cart_changed": "Prices or stock changed",
+        }
+        for state, fragment in cases.items():
+            s = self.session({"status": state, "terminal": True, "isTerminalFailure": state != "cart_changed"})
+            with self.subTest(state):
+                out = await self.poll(s)
+                self.assertEqual(out["status"], "failed")
+                self.assertIn(fragment, out["message"])
+                self.assertNotIn("confirm_order", s.names())
+
+    async def test_at_the_deadline_it_confirms_once_and_lets_swiggy_reconcile_a_late_payment(self):
+        s = self.session({"status": "pending", "terminal": False}, confirm_order=envelope({"orderId": "IM-2002", "result": "success"}))
+        out = await self.poll(s, final=True)
+        self.assertEqual(s.names().count("confirm_order"), 1)
+        self.assertEqual(out["status"], "placed")
+
+    async def test_deadline_with_swiggy_still_pending_is_unknown_never_failed(self):
+        s = self.session({"status": "pending", "terminal": False}, confirm_order=envelope({"orderId": "IM-2002", "result": "pending"}))
+        out = await self.poll(s, final=True)
+        self.assertEqual(out["status"], "unknown")
+        self.assertIn("Check the Swiggy app", out["message"])
+
+    async def test_confirm_reporting_failure_is_failed(self):
+        s = self.session({"status": "success", "isTerminalSuccess": True, "confirmed": False}, confirm_order=envelope({"result": "failed"}))
+        self.assertEqual((await self.poll(s))["status"], "failed")
 
 
 # --------------------------------------------------------------------------- routes
@@ -497,7 +769,9 @@ class RouteTests(unittest.TestCase):
         bodies = {
             "search": {"items": ["tomato"]},
             "cart": {"address_id": "a", "selections": [{"spin_id": "s", "sku_id": "k", "quantity": 1}]},
-            "checkout": {"address_id": "a", "expected_total": "₹1", "idempotency_key": "key-00000001"},
+            "coupon": {"address_id": "a", "coupon_code": "SAVE20"},
+            "checkout": {"address_id": "a", "expected_total": "₹1", "idempotency_key": "key-00000001", "payment_key": "cod"},
+            "payment-status": {"order_id": "o", "paas_id": "p"},
         }
         for stage, body in bodies.items():
             r = self.client.post(f"/api/instamart/{stage}", json=body)
@@ -523,7 +797,7 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/instamart/search", json={"items": ["x"] * 26}, headers=h).status_code, 422)
         bad_qty = {"address_id": "a", "selections": [{"spin_id": "s", "sku_id": "k", "quantity": 0}]}
         self.assertEqual(self.client.post("/api/instamart/cart", json=bad_qty, headers=h).status_code, 422)
-        weak_key = {"address_id": "a", "expected_total": "₹1", "idempotency_key": "short"}
+        weak_key = {"address_id": "a", "expected_total": "₹1", "idempotency_key": "short", "payment_key": "cod"}
         self.assertEqual(self.client.post("/api/instamart/checkout", json=weak_key, headers=h).status_code, 422)
 
     def test_checkout_route_passes_the_reviewed_total_and_key(self):
@@ -531,11 +805,27 @@ class RouteTests(unittest.TestCase):
         with patch.object(instamart, "checkout", AsyncMock(return_value=order)) as fn:
             r = self.client.post(
                 "/api/instamart/checkout",
-                json={"address_id": "addr-home", "expected_total": "₹136", "idempotency_key": "key-abcdef12"},
+                json={"address_id": "addr-home", "expected_total": "₹136", "idempotency_key": "key-abcdef12", "payment_key": "upi_qr"},
                 headers=signed_bearer(),
             )
         self.assertEqual(r.json(), {"ok": True, "order": order})
-        self.assertEqual(fn.await_args.args, ("swiggy-tok", "addr-home", "₹136", "key-abcdef12"))
+        self.assertEqual(fn.await_args.args, ("swiggy-tok", "addr-home", "₹136", "key-abcdef12", "upi_qr"))
+
+    def test_checkout_requires_a_payment_choice(self):
+        body = {"address_id": "a", "expected_total": "₹1", "idempotency_key": "key-abcdef12"}
+        self.assertEqual(self.client.post("/api/instamart/checkout", json=body, headers=signed_bearer()).status_code, 422)
+
+    def test_coupon_and_payment_status_routes_pass_through(self):
+        h = signed_bearer()
+        with patch.object(instamart, "apply_coupon", AsyncMock(return_value={"review": {}, "coupon": {"code": "SAVE20"}, "coupons": {}})) as fn:
+            r = self.client.post("/api/instamart/coupon", json={"address_id": "addr-home", "coupon_code": "SAVE20"}, headers=h)
+        self.assertEqual((r.json()["ok"], fn.await_args.args), (True, ("swiggy-tok", "addr-home", "SAVE20")))
+        order = {"status": "pending_payment", "orderIds": ["o"], "message": "", "verified": False, "total": None, "payment": None}
+        with patch.object(instamart, "payment_status", AsyncMock(return_value=order)) as fn:
+            r = self.client.post("/api/instamart/payment-status", json={"order_id": "o", "paas_id": "p", "final": True}, headers=h)
+        self.assertEqual((r.json(), fn.await_args.args), ({"ok": True, "order": order}, ("swiggy-tok", "o", "p", True)))
+        bad = self.client.post("/api/instamart/coupon", json={"address_id": "a", "coupon_code": ""}, headers=h)
+        self.assertEqual(bad.status_code, 422)
 
 
 # --------------------------------------------------------------------------- the old agent path is closed for groceries
