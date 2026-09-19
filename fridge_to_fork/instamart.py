@@ -401,6 +401,57 @@ def _coupon_block(coupons: list[dict] | None) -> dict:
     return {"available": coupons is not None, "items": coupons or []}
 
 
+def _same_place(cart_text: str, saved_line: str) -> bool:
+    """Loose text comparison (cart and get_addresses word the same address differently); diagnostics only."""
+    a, b = (re.sub(r"[^a-z0-9]+", " ", t.lower()).strip() for t in (cart_text or "", saved_line or ""))
+    return bool(a and b and (a in b or b in a))
+
+
+def _same_id(a, b) -> bool:
+    """Ids compare as strings: Swiggy documents them as strings, but nothing guarantees one tool doesn't
+    hand back 123 where another hands back "123", and a type difference is not an address change."""
+    return a is not None and b is not None and str(a).strip() == str(b).strip()
+
+
+async def _verify_cart_address(
+    session: ClientSession,
+    review: dict,
+    address_id: str,
+    *,
+    stage: str,
+    message: str = "The delivery address changed. Please review your cart again.",
+    allow_missing: bool = False,
+) -> None:
+    """Refuse to go on if Swiggy's cart is not for the address the user chose.
+
+    On a mismatch it logs both ids (opaque identifiers) and yes/no facts only: whether each id is one of the
+    account's saved addresses, and whether the cart's address *text* matches the address that was asked for.
+    Together they tell an id-format difference for the same address (cart id not saved, text matches) from
+    Swiggy's cart really sitting on another address (cart id saved, or text differs). No address text, name
+    or phone is ever logged.
+    """
+    cart_id = review["address"]["id"]
+    if _same_id(cart_id, address_id) or (allow_missing and cart_id in (None, "")):
+        return
+    saved: list[dict] | None
+    try:
+        saved = await _saved_addresses(session)
+    except Exception:  # diagnostics must never mask the real refusal
+        saved = None
+    saved_ids = None if saved is None else [str(a["id"]) for a in saved]
+    requested_line = next((a.get("addressLine", "") for a in saved or [] if _same_id(a["id"], address_id)), None)
+    text_matches = None if requested_line is None else _same_place(review["address"]["text"], requested_line)
+    log.warning(
+        "[INSTAMART] address mismatch at %s: requested=%r (%s) cart=%r (%s) | requested_is_saved=%s cart_id_is_saved=%s "
+        "cart_text_matches_requested=%s saved_ids=%s",
+        stage, address_id, type(address_id).__name__, cart_id, type(cart_id).__name__,
+        None if saved_ids is None else str(address_id).strip() in saved_ids,
+        None if saved_ids is None else str(cart_id).strip() in saved_ids,
+        text_matches, saved_ids,
+    )
+    raise InstamartError("address_mismatch", message)
+
+
 async def build_cart(token: str, address_id: str, selections: list[dict]) -> dict:
     """Make Swiggy's cart exactly `selections`, then return the real cart for review.
 
@@ -415,9 +466,11 @@ async def build_cart(token: str, address_id: str, selections: list[dict]) -> dic
         cart = await _call(session, "get_cart")
         payment = await _fetch_payment(session, cart)
         coupons = await _coupons_or_none(session, address_id)
-    review = _review(cart, payment)
-    if review["address"]["id"] and review["address"]["id"] != address_id:
-        raise InstamartError("address_mismatch", "The cart's delivery address changed. Please start again.")
+        review = _review(cart, payment)
+        await _verify_cart_address(
+            session, review, address_id, stage="cart", allow_missing=True,
+            message="The cart's delivery address changed. Please start again.",
+        )
     adjustments = [f"{i.get('itemName', 'An item')} was removed (out of stock)." for i in updated.get("removedOutOfStockItems") or []]
     adjustments += [
         f"{r.get('itemName', 'An item')}: quantity reduced from {r.get('requestedQuantity')} to {r.get('cappedQuantity')}."
@@ -448,8 +501,7 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
     async with _session(token) as session:
         before_cart = await _call(session, "get_cart")
         before = _review(before_cart, await _fetch_payment(session, before_cart))
-        if before["address"]["id"] != address_id:
-            raise InstamartError("address_mismatch", "The delivery address changed. Please review your cart again.")
+        await _verify_cart_address(session, before, address_id, stage="coupon-before")
         if before["blockers"]:
             raise InstamartError("cart_blocked", before["blockers"][0])
 
@@ -464,9 +516,8 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
         after_cart = await _call(session, "get_cart")
         payment = await _fetch_payment(session, after_cart)
         relisted = await _coupons_or_none(session, address_id)
-    after = _review(after_cart, payment)
-    if after["address"]["id"] != address_id:
-        raise InstamartError("address_mismatch", "The delivery address changed. Please review your cart again.")
+        after = _review(after_cart, payment)
+        await _verify_cart_address(session, after, address_id, stage="coupon-after")
     reflected, savings = _discount_reflected(before, after)
     if not reflected:
         raise InstamartError(
@@ -635,8 +686,7 @@ async def _checkout_locked(token: str, address_id: str, expected_total: str, pay
     async with _session(token) as session:
         cart = await _call(session, "get_cart")
         review = _review(cart, await _fetch_payment(session, cart))
-        if review["address"]["id"] != address_id:
-            raise InstamartError("address_mismatch", "The delivery address changed. Please review your cart again.")
+        await _verify_cart_address(session, review, address_id, stage="checkout")
         if review["blockers"]:
             raise InstamartError("cart_blocked", review["blockers"][0])
         # The total the user confirmed already includes any coupon (get_cart bills the discounted
