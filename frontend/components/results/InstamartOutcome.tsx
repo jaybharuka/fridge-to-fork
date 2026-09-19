@@ -1,7 +1,8 @@
 'use client';
 
 import { CircleAlert, CircleCheck, ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react';
-import type { InstamartOutcome as Outcome } from '@/lib/instamart';
+import type { InstamartOutcome as Outcome, ReportContext } from '@/lib/instamart';
+import { ReportProblem } from './ReportProblem';
 import styles from './instamart.module.css';
 
 interface OutcomeProps {
@@ -12,10 +13,22 @@ interface OutcomeProps {
   onBackToCart: () => void;
   /** Open live tracking for a placed order. */
   onTrack: (orderId: string) => void;
+  /** Identifiers for a problem report: address, payment method, coupon. */
+  reportContext: ReportContext;
 }
 
-export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack }: OutcomeProps) {
+export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack, reportContext }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
+  const report = (
+    <ReportProblem
+      input={{
+        tool: 'checkout',
+        errorMessage: outcome.message,
+        flow: 'Reviewed the Instamart cart, chose a payment method and placed the order',
+        context: { ...reportContext, ...(outcome.orderIds[0] ? { orderId: outcome.orderIds[0] } : {}) },
+      }}
+    />
+  );
 
   if (outcome.status === 'pending_payment' && outcome.payment) {
     // The parent hook is polling payment-status; this screen just gives the user the payment page.
@@ -59,6 +72,7 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
         <p className={styles.outcomeBody}>{outcome.message}</p>
         <button type="button" className={styles.primary} onClick={onBackToCart}>Back to your cart</button>
         <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
+        {report}
       </div>
     );
   }
@@ -71,6 +85,7 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
       {ids && <p className={styles.outcomeBody}>Order {ids}.</p>}
       <p className={styles.hint}>Don&apos;t order again until you&apos;ve checked, so you aren&apos;t charged twice.</p>
       <button type="button" className={styles.primary} onClick={onClose}>Close</button>
+      {report}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { closeOrders, useOrdersUi } from '@/lib/ordersUi';
 import { formatInr, isPastOrder, type OrderDetails, type OrderSummary } from '@/lib/instamart';
 import { useLiveStatus, useOrderDetails, useOrderList } from '@/hooks/useInstamartOrders';
+import { ReportProblem } from './ReportProblem';
 import resultsStyles from './results.module.css';
 import styles from './instamart.module.css';
 
@@ -180,6 +181,15 @@ function Panel({ initialOrderId, onClose }: { initialOrderId: string | null; onC
             </div>
           )}
           <Details orderId={viewId} order={order} />
+          <ReportProblem
+            label="Report a problem with this order"
+            input={{
+              tool: order && isPastOrder(order.status) ? 'get_order_details' : 'get_delivery_status',
+              errorMessage: `Problem with order ${viewId}${order?.status ? ` (status: ${order.status})` : ''}`,
+              flow: 'Viewing the order in the app',
+              context: { orderId: viewId, ...(order?.addressId ? { addressId: order.addressId } : {}) },
+            }}
+          />
         </>
       ) : list.loading ? (
         <div className={styles.list} aria-busy="true">{[0, 1, 2].map(i => <div key={i} className={styles.skeleton} />)}</div>

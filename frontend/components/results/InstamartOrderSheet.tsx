@@ -10,6 +10,7 @@ import { useSelectedAddressId } from '@/lib/addressStore';
 import { formatInr } from '@/lib/instamart';
 import { openOrders } from '@/lib/ordersUi';
 import { AddressPicker } from './AddressPicker';
+import { ReportProblem } from './ReportProblem';
 import { InstamartOutcome } from './InstamartOutcome';
 import { estimateSubtotal, InstamartPicker } from './InstamartPicker';
 import { InstamartReview } from './InstamartReview';
@@ -99,6 +100,12 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
   const usualFresh = usual.items.filter(r => !state.results.some(x => x.ingredient === r.ingredient));
   const showTopUps = !usual.loading && usual.items.length === 0 && topUpSuggestions.length > 0;
   const selectedPayment = state.review?.payment.options.find(o => o.key === state.paymentKey) ?? null;
+  // Identifiers a problem report should carry (no names or phone numbers).
+  const reportContext = {
+    ...(state.review?.address.id ? { addressId: state.review.address.id } : {}),
+    ...(selectedPayment ? { paymentMethod: selectedPayment.type === 'cod' ? 'Cash' : 'UPI' } : {}),
+    ...(state.appliedCoupon ? { couponCode: state.appliedCoupon.code } : {}),
+  };
   const close = () => { if (!placing) onClose(); }; // a request is in flight: the user must see its outcome
 
   const selectedTopUps = new Set(state.extras);
@@ -147,9 +154,10 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             <p className={styles.outcomeBody}>{state.error}</p>
             <button type="button" className={styles.primary} onClick={() => order.search([...itemsToOrder.map(i => i.name), ...state.extras], state.extras, selectedAddressId)}>Try again</button>
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
+            <ReportProblem input={{ tool: 'search_products', errorMessage: state.error ?? 'Search failed', flow: 'Searched Instamart for the missing ingredients', context: state.address?.id ? { addressId: state.address.id } : {} }} />
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id); }} />
+          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id); }} reportContext={reportContext} />
         ) : state.stage === 'picking' && addressOpen ? (
           <AddressPicker
             currentId={state.address?.id ?? null}
