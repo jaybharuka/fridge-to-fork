@@ -85,7 +85,7 @@ export interface InstamartOutcome {
 export interface CartSelection { spin_id: string; sku_id: string; quantity: number }
 
 export class InstamartApiError extends Error {
-  constructor(public code: string, message: string, public status: number) {
+  constructor(public code: string, message: string, public status: number, public tool: string | null = null) {
     super(message);
   }
 }
@@ -97,7 +97,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
     credentials: 'include',
   });
-  let data: { ok?: boolean; error?: { code?: string; message?: string } } | null = null;
+  let data: { ok?: boolean; error?: { code?: string; message?: string; tool?: string } } | null = null;
   try {
     data = await res.json();
   } catch {
@@ -106,7 +106,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (!data?.ok) {
     const code = data?.error?.code ?? 'unexpected_response';
     if (code === 'auth_required') markDisconnected();
-    throw new InstamartApiError(code, data?.error?.message ?? 'Something went wrong. Please try again.', res.status);
+    throw new InstamartApiError(code, data?.error?.message ?? 'Something went wrong. Please try again.', res.status, data?.error?.tool ?? null);
   }
   return data as T;
 }
@@ -252,3 +252,39 @@ export const instamartDeleteAddress = (addressId: string) => post<AddressList>('
 
 export const instamartGoToItems = (addressId: string) =>
   post<{ results: InstamartSearchResult[] }>('go-to-items', { address_id: addressId });
+
+// ---- Report a problem (backend: fridge_to_fork/instamart_support.py -> Swiggy's report_error) ----
+
+/** Identifiers report_error accepts as toolContext. Names and phone numbers are deliberately not among them. */
+export type ReportContext = Partial<Record<'orderId' | 'addressId' | 'spinId' | 'couponCode' | 'query' | 'cartId' | 'paymentMethod', string>>;
+
+export interface ReportInput {
+  /** The Instamart tool that failed (e.g. "checkout"). */
+  tool: string;
+  errorMessage: string;
+  flow?: string;
+  context?: ReportContext;
+  notes?: string;
+}
+
+/** `mailto` is Swiggy's pre-filled email to their MCP team; the user sends it themselves. */
+export interface ProblemReport { mailto: string | null; subject: string | null; body: string | null }
+
+export const instamartReport = (r: ReportInput) =>
+  post<{ report: ProblemReport }>('report', {
+    tool: r.tool,
+    error_message: r.errorMessage,
+    ...(r.flow ? { flow: r.flow } : {}),
+    ...(r.context && Object.keys(r.context).length ? { context: r.context } : {}),
+    ...(r.notes ? { notes: r.notes } : {}),
+  });
+
+/** Plain-text version of a report, for when Swiggy can't prepare one: nothing personal, just what failed. */
+export function localReportText(r: ReportInput): string {
+  const lines = ['Problem with Instamart in Fridge to Fork', `Tool: ${r.tool}`, `Error: ${r.errorMessage}`];
+  if (r.flow) lines.push(`What I was doing: ${r.flow}`);
+  for (const [key, value] of Object.entries(r.context ?? {})) lines.push(`${key}: ${value}`);
+  if (r.notes) lines.push(`Notes: ${r.notes}`);
+  lines.push(`Time: ${new Date().toISOString()}`);
+  return lines.join('\n');
+}
