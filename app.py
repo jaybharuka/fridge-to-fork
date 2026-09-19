@@ -261,12 +261,17 @@ def _local_fallback_plan(fridge, target_dish: str | None = None) -> MealPlan:
 
 
 # ---------------------------------------------------------------------------
-# Main page
+# Root — the UI lives on the Next.js frontend; the old vanilla page
+# (templates/index.html) is retired and no longer served.
 # ---------------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    return (Path(__file__).parent / "templates" / "index.html").read_text(encoding="utf-8")
+@app.get("/", include_in_schema=False)
+async def index(request: Request):
+    target = (_frontend_origin or _app_base_url()).rstrip("/") + "/"
+    if urllib.parse.urlsplit(target).netloc == request.url.netloc:
+        # Unconfigured (local dev defaults APP_BASE_URL to this server): don't redirect to ourselves.
+        return JSONResponse({"detail": "Frontend origin not configured. Set FRONTEND_ORIGIN."}, status_code=404)
+    return RedirectResponse(target, status_code=307)
 
 
 @app.get("/health")
