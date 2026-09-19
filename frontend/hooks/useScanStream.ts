@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useReducer, useRef } from 'react';
+import { authHeaders, markDisconnected } from '../lib/auth';
 import { readSSEStream } from '../lib/sse';
 import type { ChecklistItem, DetectedIngredient, MealSuggestion, ScanEvent, TopUpSuggestion } from '../lib/types';
 
@@ -228,8 +229,9 @@ function reducer(state: ScanState, action: Action): ScanState {
 // Vercel's next.config.js rewrite proxy risks hitting the Hobby plan's
 // serverless function execution limit (as short as 10s), well before the
 // real response finishes. Fetching the Render backend directly sidesteps
-// that; CORS + SameSite=None cookies in app.py already support this
-// cross-origin call. Falls back to the same-origin proxy path when unset
+// that; CORS in app.py supports this cross-origin call, and auth rides an
+// Authorization bearer (lib/auth.ts) because the session cookie is host-only
+// on the Vercel origin and never reaches this one. Falls back to the same-origin proxy path when unset
 // (local dev, where next.config.js's own BACKEND_URL default handles it).
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
@@ -250,7 +252,7 @@ export function useScanStream() {
       if (targetDish) form.append('target_dish', targetDish);
       form.append('servings', String(servings));
       try {
-        const res = await fetch(`${BACKEND_URL}/api/scan`, { method: 'POST', body: form, credentials: 'include' });
+        const res = await fetch(`${BACKEND_URL}/api/scan`, { method: 'POST', body: form, credentials: 'include', headers: await authHeaders() });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         await readSSEStream(res, ev => dispatch(ev));
       } catch {
@@ -270,9 +272,12 @@ export function useScanStream() {
       form.append('meal_name', mealName || '');
       form.append('missing_ingredients', missingIngredientNames.join(','));
       try {
-        const res = await fetch(`${BACKEND_URL}/api/order`, { method: 'POST', body: form, credentials: 'include' });
+        const res = await fetch(`${BACKEND_URL}/api/order`, { method: 'POST', body: form, credentials: 'include', headers: await authHeaders() });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        await readSSEStream(res, ev => dispatch(ev));
+        await readSSEStream(res, ev => {
+          if (ev.type === 'auth_required') markDisconnected();
+          dispatch(ev);
+        });
       } catch {
         dispatch({ type: 'error', message: 'Something went wrong. Try again.' });
       } finally {

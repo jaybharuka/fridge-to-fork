@@ -26,7 +26,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from google import genai
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
@@ -61,10 +62,12 @@ DEFAULT_DELIVERY_ADDRESS = "Mumbai, India"
 # SameSite=None cookies must be Secure or browsers drop them. It's a
 # harmless superset locally too (dev runs over http, so https_only is
 # effectively bypassed by browsers for localhost).
+_SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-fallback-change-in-prod")
+_SESSION_MAX_AGE = 5 * 24 * 60 * 60  # 5 days, matching Swiggy token lifetime
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SECRET_KEY", "dev-secret-fallback-change-in-prod"),
-    max_age=5 * 24 * 60 * 60,  # 5 days, matching Swiggy token lifetime
+    secret_key=_SECRET_KEY,
+    max_age=_SESSION_MAX_AGE,
     same_site="none",
     https_only=True,
 )
@@ -143,15 +146,47 @@ def _safe_next_path(next_param: str | None) -> str:
     return next_param
 
 
-def _token_valid(request: Request) -> bool:
-    token = request.session.get("access_token")
-    expires_at = request.session.get("expires_at")
+_bearer_signer = URLSafeTimedSerializer(_SECRET_KEY, salt="f2f-bearer")
+
+
+def _issue_bearer(access_token: str, expires_at: str) -> str:
+    return _bearer_signer.dumps({"t": access_token, "exp": expires_at})
+
+
+def _valid_pair(token: str | None, expires_at: str | None) -> tuple[str, str] | None:
     if not token or not expires_at:
-        return False
+        return None
     try:
-        return datetime.fromisoformat(expires_at) > datetime.now(timezone.utc)
+        if datetime.fromisoformat(expires_at) > datetime.now(timezone.utc):
+            return token, expires_at
     except ValueError:
-        return False
+        pass
+    return None
+
+
+def _session_auth(request: Request) -> tuple[str, str] | None:
+    return _valid_pair(request.session.get("access_token"), request.session.get("expires_at"))
+
+
+def _auth(request: Request) -> tuple[str, str] | None:
+    """(swiggy_access_token, expires_at) from `Authorization: Bearer <signed>`
+    (direct cross-origin calls, where the host-only session cookie isn't
+    sent), else from the session cookie. None if neither is valid/unexpired."""
+    header = request.headers.get("authorization", "")
+    if header[:7].lower() == "bearer ":
+        try:
+            data = _bearer_signer.loads(header[7:].strip(), max_age=_SESSION_MAX_AGE)
+            pair = _valid_pair(data.get("t"), data.get("exp"))
+        except (BadSignature, AttributeError):
+            pair = None
+        if pair:
+            return pair
+    return _session_auth(request)
+
+
+def _access_token(request: Request) -> str | None:
+    auth = _auth(request)
+    return auth[0] if auth else None
 
 
 # ---------------------------------------------------------------------------
@@ -437,10 +472,10 @@ async def cart_fill(request: Request):
     items = body.get("items", [])
     # items = [{"id": "d1", "name": "Basmati Rice", "qty_needed": 5, "unit": "kg"}]
 
-    access_token = request.session.get("access_token")
+    access_token = _access_token(request)
 
     async def stream():
-        if not _token_valid(request):
+        if not access_token:
             yield _sse({"type": "auth_required"})
             return
 
@@ -594,11 +629,22 @@ async def auth_callback(request: Request, code: str = "", state: str = ""):
 
 @app.get("/auth/status")
 async def auth_status(request: Request):
-    authenticated = _token_valid(request)
-    return {
-        "authenticated": authenticated,
-        "expires_at": request.session.get("expires_at") if authenticated else None,
-    }
+    auth = _auth(request)
+    return {"authenticated": bool(auth), "expires_at": auth[1] if auth else None}
+
+
+@app.get("/auth/session-token")
+async def auth_session_token(request: Request):
+    """Cookie-only, same-origin (proxied) — hands the frontend a signed bearer
+    for its direct cross-origin /api calls. Swiggy issues no refresh token, so
+    expiry means re-authorization, never a silent refresh."""
+    auth = _session_auth(request)
+    body = (
+        {"authenticated": True, "token": _issue_bearer(*auth), "expires_at": auth[1]}
+        if auth
+        else {"authenticated": False}
+    )
+    return JSONResponse(body, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/auth/logout")
@@ -967,7 +1013,7 @@ async def place_order(
     missing_ingredients: str = Form(""),  # comma-separated
 ):
     delivery_address = os.environ.get("DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS)
-    access_token: str | None = request.session.get("access_token")
+    access_token = _access_token(request)
 
     async def stream():
         try:
@@ -984,7 +1030,7 @@ async def place_order(
                 yield _sse({"type": "complete"})
                 return
 
-            if not _token_valid(request):
+            if not access_token:
                 yield _sse({
                     "type": "auth_required",
                     "message": "Connect your Swiggy account to place this order",
