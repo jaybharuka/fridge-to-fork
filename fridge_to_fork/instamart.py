@@ -154,25 +154,49 @@ def _num(value) -> float | None:
     return None
 
 
-def _pick_address(addresses: list[dict]) -> dict:
-    """Recipe: pick "Home" if present, else the first saved address. No phone number leaves the server."""
-    def is_home(a: dict) -> bool:
-        return "home" in f"{a.get('addressTag', '')} {a.get('addressCategory', '')}".lower()
-
-    chosen = next((a for a in addresses if is_home(a)), addresses[0])
+def _public_address(a: dict) -> dict:
+    """The address as the frontend sees it. The phone number never leaves the server."""
     return {
-        "id": chosen["id"],
-        "label": chosen.get("addressTag") or chosen.get("addressCategory") or "Saved address",
-        "addressLine": chosen.get("addressLine", ""),
+        "id": a["id"],
+        "label": a.get("addressTag") or (a.get("addressCategory") or "").replace("_", " ").title() or "Saved address",
+        "addressLine": a.get("addressLine", ""),
+        "category": a.get("addressCategory"),
     }
 
 
-async def _default_address(session: ClientSession) -> dict:
-    data = await _call(session, "get_addresses")
-    addresses = [a for a in (data.get("addresses") or []) if a.get("id")]
+def _pick_address(addresses: list[dict]) -> dict:
+    """Recipe: pick "Home" if present, else the first saved address."""
+    def is_home(a: dict) -> bool:
+        return "home" in f"{a.get('addressTag', '')} {a.get('addressCategory', '')}".lower()
+
+    return _public_address(next((a for a in addresses if is_home(a)), addresses[0]))
+
+
+MAX_ADDRESS_PAGES = 3  # get_addresses pages by 10; more than 30 saved addresses is not a real case
+
+
+async def _saved_addresses(session: ClientSession) -> list[dict]:
+    """Raw saved addresses (with phone numbers, server-side only), following get_addresses pagination."""
+    found: list[dict] = []
+    for page in range(1, MAX_ADDRESS_PAGES + 1):
+        data = await _call(session, "get_addresses", page=page, pageSize=10)
+        found += [a for a in data.get("addresses") or [] if a.get("id")]
+        if not (data.get("pagination") or {}).get("hasMore"):
+            break
+    return found
+
+
+async def _resolve_address(session: ClientSession, address_id: str | None) -> dict:
+    """The user's chosen address, verified against their saved list, else the Home/first default."""
+    addresses = await _saved_addresses(session)
     if not addresses:
-        raise InstamartError("no_address", "Add a delivery address in the Swiggy app first, then try again.")
-    return _pick_address(addresses)
+        raise InstamartError("no_address", "Add a delivery address first, then try again.")
+    if address_id is None:
+        return _pick_address(addresses)
+    match = next((a for a in addresses if a["id"] == address_id), None)
+    if match is None:
+        raise InstamartError("address_not_found", "That address isn't saved on your Swiggy account anymore. Choose another.")
+    return _public_address(match)
 
 
 def _options(product: dict) -> list[dict]:
@@ -318,9 +342,9 @@ def _review(cart: dict, payment: dict) -> dict:
 # Stage 1 — search (read-only)
 # ---------------------------------------------------------------------------
 
-async def search_ingredients(token: str, ingredients: list[str]) -> dict:
+async def search_ingredients(token: str, ingredients: list[str], address_id: str | None = None) -> dict:
     async with _session(token) as session:
-        address = await _default_address(session)
+        address = await _resolve_address(session, address_id)
         gate = asyncio.Semaphore(SEARCH_CONCURRENCY)
 
         async def one(name: str) -> dict:

@@ -1,7 +1,11 @@
 """
 HTTP surface for the staged Instamart flow (see instamart.py).
 
-  POST /api/instamart/search    {items}                                   -> {address, results[]}
+  POST /api/instamart/search    {items, address_id?}                      -> {address, results[]}
+  POST /api/instamart/addresses {}                                        -> {addresses[], defaultId}
+  POST /api/instamart/address   {...new address}                          -> {addressId, addresses[], defaultId}
+  POST /api/instamart/address-delete {address_id}                         -> {addresses[], defaultId}
+  POST /api/instamart/go-to-items {address_id}                            -> {results[]}
   POST /api/instamart/cart      {address_id, selections[]}                -> {review, adjustments[], coupons}
   POST /api/instamart/coupon    {address_id, coupon_code}                 -> {review, coupon, coupons}
   POST /api/instamart/checkout  {address_id, expected_total, idempotency_key, payment_key} -> {order}
@@ -16,13 +20,13 @@ domain failures (cart changed, minimum not met, ...) are 200 + ok:false, the
 same way Swiggy itself reports them.
 """
 
-from typing import Annotated, Awaitable, Callable
+from typing import Annotated, Awaitable, Callable, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from . import instamart, instamart_orders
+from . import instamart, instamart_addresses, instamart_orders
 from .instamart import InstamartError
 
 Ingredient = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -31,6 +35,8 @@ Id = Annotated[str, StringConstraints(min_length=1, max_length=120)]
 
 class SearchRequest(BaseModel):
     items: list[Ingredient] = Field(min_length=1, max_length=25)
+    # A saved address the user picked; verified server-side. Omitted = Home/first.
+    address_id: Id | None = None
 
 
 class Selection(BaseModel):
@@ -42,6 +48,43 @@ class Selection(BaseModel):
 class CartRequest(BaseModel):
     address_id: Id
     selections: list[Selection] = Field(min_length=1, max_length=40)
+
+
+Phone = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^\+?\d{10,15}$")]
+Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+OptText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None
+
+
+class AddressRequest(BaseModel):
+    """Fields of create_address. The account holder's name/phone are required by Swiggy."""
+    full_address: Text
+    address_line: Text
+    address_line2: Text
+    city: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+    postal_code: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^\d{6}$")]
+    address_category: Literal["HOME", "WORK", "OFFICE", "FRIENDS_AND_FAMILY", "OTHER"]
+    user_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+    user_phone: Phone
+    locality: OptText = None
+    address_tag: OptText = None
+    # Real coordinates only (e.g. from the device's location, with the user's consent); Swiggy
+    # auto-resolves them if omitted but never returns what it resolved. Both or neither.
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def _both_coordinates_or_none(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        return self
+
+
+class AddressDeleteRequest(BaseModel):
+    address_id: Id
+
+
+class GoToRequest(BaseModel):
+    address_id: Id
 
 
 class OrdersRequest(BaseModel):
@@ -113,7 +156,7 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
 
     @router.post("/search")
     async def search(body: SearchRequest, request: Request):
-        return await run(request, lambda t: instamart.search_ingredients(t, _dedupe(body.items)))
+        return await run(request, lambda t: instamart.search_ingredients(t, _dedupe(body.items), body.address_id))
 
     @router.post("/cart")
     async def cart(body: CartRequest, request: Request):
@@ -138,6 +181,22 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
             return {"order": await instamart.payment_status(token, body.order_id, body.paas_id, body.final)}
 
         return await run(request, act)
+
+    @router.post("/addresses")
+    async def addresses(request: Request):
+        return await run(request, instamart_addresses.list_addresses)
+
+    @router.post("/address")
+    async def create_address(body: AddressRequest, request: Request):
+        return await run(request, lambda t: instamart_addresses.create_address(t, body.model_dump(exclude_none=True)))
+
+    @router.post("/address-delete")
+    async def delete_address(body: AddressDeleteRequest, request: Request):
+        return await run(request, lambda t: instamart_addresses.delete_address(t, body.address_id))
+
+    @router.post("/go-to-items")
+    async def go_to_items(body: GoToRequest, request: Request):
+        return await run(request, lambda t: instamart_addresses.go_to_items(t, body.address_id))
 
     @router.post("/orders")
     async def orders(body: OrdersRequest, request: Request):
