@@ -240,7 +240,8 @@ class SearchTests(InstamartCase):
         with using(s):
             out = await instamart.search_ingredients("tok", ["tomato"])
         self.assertEqual(s.args("search_products"), {"addressId": "addr-home", "query": "tomato"})
-        self.assertEqual(out["address"], {"id": "addr-home", "label": "Home", "addressLine": "12 MG Road, Bengaluru"})
+        self.assertEqual(s.args("get_addresses"), {"page": 1, "pageSize": 10})
+        self.assertEqual(out["address"], {"id": "addr-home", "label": "Home", "addressLine": "12 MG Road, Bengaluru", "category": None})
         self.assertNotIn("phone", json.dumps(out).lower())
 
     async def test_options_are_sku_level_variations_in_stock_first(self):
@@ -782,7 +783,7 @@ class RouteTests(unittest.TestCase):
         with patch.object(instamart, "search_ingredients", AsyncMock(return_value={"address": {}, "results": []})) as fn:
             r = self.client.post("/api/instamart/search", json={"items": ["Tomato", "tomato ", "Onion"]}, headers=signed_bearer())
         self.assertEqual(r.json(), {"ok": True, "address": {}, "results": []})
-        self.assertEqual(fn.await_args.args, ("swiggy-tok", ["Tomato", "Onion"]))
+        self.assertEqual(fn.await_args.args, ("swiggy-tok", ["Tomato", "Onion"], None))
 
     def test_instamart_errors_map_to_status_and_envelope(self):
         cases = ((InstamartError("upstream_unavailable", "down", 502), 502), (InstamartError("cart_changed", "changed"), 200))
