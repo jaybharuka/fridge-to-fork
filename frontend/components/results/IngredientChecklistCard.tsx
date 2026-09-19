@@ -5,6 +5,7 @@ import { Camera, CircleCheck } from 'lucide-react';
 import type { ChecklistItem } from '@/lib/types';
 import { buildRecipeHookText } from '@/hooks/useRecipeChecklist';
 import { useProductMatches } from '@/hooks/useInstamartProducts';
+import { useSelectedAddressId } from '@/lib/addressStore';
 import { formatInr, topAvailable } from '@/lib/instamart';
 import { keyOf, type CacheEntry } from '@/lib/searchCache';
 import { ProductThumb } from './ProductThumb';
@@ -83,7 +84,7 @@ function StatNumber({ target, className }: { target: number; className?: string 
 // them. A short checklist that fits within max-height never overflows, so
 // no scrollbar/fade appears for it.
 export function IngredientChecklistCard({ checklist, toggleChecklistItem, onOpenProduct }: IngredientChecklistCardProps) {
-  const { entries } = useProductMatches();
+  const { entries } = useProductMatches(useSelectedAddressId());
   const rowsRef = useRef<HTMLDivElement>(null);
   const [hasMoreBelow, setHasMoreBelow] = useState(false);
 

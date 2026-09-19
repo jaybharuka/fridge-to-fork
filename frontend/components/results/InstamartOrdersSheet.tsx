@@ -74,12 +74,23 @@ function LiveStatus({ order }: { order: OrderSummary | null }) {
     sub = null;
   }
 
+  const t = live.tracking;
+  if (t && !d?.terminal) {
+    title = t.statusMessage || title;
+    sub = t.subStatusMessage || t.etaText || sub;
+  }
+
   return (
     <div className={styles.statusCard} aria-live="polite">
       <Icon className={`${styles.statusIcon} ${tone}`} aria-hidden />
       <div>
         <p className={styles.statusBig}>{title}</p>
         {sub && <p className={styles.meta}>{sub}</p>}
+        {t?.store && <p className={styles.meta}>From {t.store}</p>}
+        {t?.paymentMessage && <p className={styles.meta}>{t.paymentMessage}</p>}
+        {t?.riderLocation && !d?.terminal && (
+          <a className={styles.linkBtn} href={`https://www.google.com/maps?q=${t.riderLocation.lat},${t.riderLocation.lng}`} target="_blank" rel="noopener noreferrer">See rider on map</a>
+        )}
         {live.notes.map(n => <p key={n} className={styles.meta}>{n}</p>)}
         {live.failed && <p className={styles.couponWhy}>Live updates paused — reopen this screen to refresh.</p>}
       </div>

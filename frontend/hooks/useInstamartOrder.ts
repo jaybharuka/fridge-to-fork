@@ -2,6 +2,7 @@
 import { useCallback, useReducer, useRef } from 'react';
 import {
   InstamartApiError,
+  instamartAddresses,
   instamartApplyCoupon,
   instamartCart,
   instamartCheckout,
@@ -17,7 +18,8 @@ import {
   type InstamartSearchResult,
   type PendingPayment,
 } from '../lib/instamart';
-import { productCache } from '../lib/instamartSearch';
+import { setSelectedAddressId } from '../lib/addressStore';
+import { productCacheFor } from '../lib/instamartSearch';
 import { keyOf } from '../lib/searchCache';
 
 export type Stage = 'searching' | 'picking' | 'building' | 'reviewing' | 'placing' | 'done' | 'error';
@@ -55,6 +57,7 @@ type Action =
   | { type: 'EXTRA_ADD'; ingredient: string }
   | { type: 'SEARCH_OK'; address: InstamartAddress | null; results: InstamartSearchResult[] }
   | { type: 'EXTRA_OK'; address: InstamartAddress; result: InstamartSearchResult }
+  | { type: 'EXTRA_PRODUCT'; result: InstamartSearchResult }
   | { type: 'EXTRA_REMOVE'; ingredient: string }
   | { type: 'PICK'; ingredient: string; spinId: string | null }
   | { type: 'QTY'; ingredient: string; quantity: number }
@@ -113,6 +116,16 @@ function reducer(state: InstamartState, action: Action): InstamartState {
         results: [...state.results, action.result],
         choices: { ...state.choices, [action.result.ingredient]: defaultChoice(action.result) },
       };
+    case 'EXTRA_PRODUCT': {
+      // One of "your usual items": already a real product, so it is added with that exact SKU picked.
+      if (state.results.some(r => r.ingredient === action.result.ingredient)) return state;
+      return {
+        ...state,
+        extras: [...state.extras, action.result.ingredient],
+        results: [...state.results, action.result],
+        choices: { ...state.choices, [action.result.ingredient]: defaultChoice(action.result) },
+      };
+    }
     case 'EXTRA_REMOVE':
       return {
         ...state,
@@ -213,34 +226,55 @@ export function useInstamartOrder() {
   // Bumped on every (re)start so a slow response from a closed/restarted sheet is dropped.
   const run = useRef(0);
 
-  const search = useCallback(async (ingredients: string[], extras: string[] = []) => {
+  // The address the current flow was searched for (null = default), so add-ons hit the same cache.
+  const searchedFor = useRef<string | null>(null);
+
+  const search = useCallback(async (ingredients: string[], extras: string[] = [], addressId: string | null = null) => {
     const id = ++run.current;
+    searchedFor.current = addressId;
     dispatch({ type: 'SEARCH_START', extras });
     if (ingredients.length === 0) {
-      dispatch({ type: 'SEARCH_OK', address: null, results: [] });
+      // Nothing to search, but the address is still needed for "Change" and the usual items.
+      const address = await instamartAddresses()
+        .then(({ addresses, defaultId }) => addresses.find(a => a.id === (addressId ?? defaultId)) ?? null)
+        .catch(() => null);
+      if (run.current === id) dispatch({ type: 'SEARCH_OK', address, results: [] });
       return;
     }
-    try {
-      // Served from the shared cache when the checklist already searched these.
-      const { address, entries, error } = await productCache.ensure(ingredients);
-      if (run.current !== id) return;
-      if (!address) throw error ?? new Error('search failed');
-      const results = [...new Map(ingredients.map(n => [keyOf(n), n])).values()].map(name => {
-        const hit = entries.get(keyOf(name))?.result;
-        return hit ? { ...hit, ingredient: name } : { ingredient: name, options: [], note: "Couldn't search this item" };
-      });
-      dispatch({ type: 'SEARCH_OK', address, results });
-    } catch (e) {
-      const d = describe(e);
-      if (run.current === id) dispatch({ type: 'FAIL', message: d.message, authNeeded: d.authNeeded, stage: 'error' });
+    // Two passes at most: if the remembered address was deleted elsewhere, forget it and use the default.
+    let target = addressId;
+    for (let pass = 0; pass < 2; pass++) {
+      try {
+        searchedFor.current = target;
+        // Served from the shared per-address cache when the checklist already searched these.
+        const { address, entries, error } = await productCacheFor(target).ensure(ingredients);
+        if (run.current !== id) return;
+        if (!address) throw error ?? new Error('search failed');
+        const results = [...new Map(ingredients.map(n => [keyOf(n), n])).values()].map(name => {
+          const hit = entries.get(keyOf(name))?.result;
+          return hit ? { ...hit, ingredient: name } : { ingredient: name, options: [], note: "Couldn't search this item" };
+        });
+        return dispatch({ type: 'SEARCH_OK', address, results });
+      } catch (e) {
+        const d = describe(e);
+        if (run.current !== id) return;
+        if (d.code === 'address_not_found' && target && pass === 0) {
+          setSelectedAddressId(null);
+          target = null;
+          continue;
+        }
+        return dispatch({ type: 'FAIL', message: d.message, authNeeded: d.authNeeded, stage: 'error' });
+      }
     }
   }, []);
+
+  const addProduct = useCallback((result: InstamartSearchResult) => dispatch({ type: 'EXTRA_PRODUCT', result }), []);
 
   const addExtra = useCallback(async (ingredient: string) => {
     const id = run.current;
     dispatch({ type: 'EXTRA_ADD', ingredient });
     try {
-      const { address, entries, error } = await productCache.ensure([ingredient]);
+      const { address, entries, error } = await productCacheFor(searchedFor.current).ensure([ingredient]);
       if (run.current !== id) return;
       const hit = entries.get(keyOf(ingredient))?.result;
       if (!address || !hit) throw error ?? new Error('search failed');
@@ -331,5 +365,5 @@ export function useInstamartOrder() {
     }
   }, [pollPayment]);
 
-  return { state, search, addExtra, removeExtra, pick, setQuantity, selectPayment, backToPicking, buildCart, applyCoupon, placeOrder, reset };
+  return { state, search, addExtra, addProduct, removeExtra, pick, setQuantity, selectPayment, backToPicking, buildCart, applyCoupon, placeOrder, reset };
 }

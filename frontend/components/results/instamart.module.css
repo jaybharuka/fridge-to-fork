@@ -126,3 +126,23 @@
 .statusIcon.bad { color: #ff6b6b; }
 .statusBig { font-size: 17px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0 0 4px 0; }
 .removed { text-decoration: line-through; color: rgba(255,255,255,0.35); }
+
+/* Address picker / form, usual items */
+.form { display: flex; flex-direction: column; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.fieldLabel { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
+.fieldRow { display: flex; gap: 12px; }
+.input { width: 100%; padding: 11px 12px; font: inherit; font-size: 14px; color: rgba(255,255,255,0.95); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; }
+.input:focus { outline: none; border-color: #FC8019; }
+select.input { appearance: auto; }
+.geo { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.confirmDelete { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; max-width: 160px; }
+.dangerBtn { padding: 7px 12px; font-size: 13px; font-weight: 700; color: #fff; background: #d64545; border: none; border-radius: 10px; cursor: pointer; }
+.dangerBtn:disabled { opacity: .5; cursor: not-allowed; }
+.usualRow { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
+.usualRow::-webkit-scrollbar { display: none; }
+.usualCard { width: 132px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
+.usualThumb, .usualThumbFallback { width: 100%; height: 84px; border-radius: 10px; }
+.usualThumb { object-fit: contain; background: #fff; }
+.usualThumbFallback { display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); font-size: 24px; }
+.usualName { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.92); margin: 4px 0 0 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 34px; }
