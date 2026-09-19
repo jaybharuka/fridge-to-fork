@@ -107,3 +107,22 @@
 .terms { margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.5); }
 .terms summary { cursor: pointer; }
 .terms ul { margin: 6px 0 0 16px; padding: 0; }
+
+/* Orders sheet: list, live status, details */
+.orderRow { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; padding: 12px; color: inherit; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; }
+.orderRow:hover { border-color: rgba(252,128,25,0.5); }
+.orderTitle { display: block; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.92); }
+.orderSide { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.chip { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.chipLive { color: #FC8019; background: rgba(252,128,25,0.12); }
+.chipDone { color: #2ECC71; background: rgba(46,204,113,0.12); }
+.chipBad { color: #ff8f8f; background: rgba(255,107,107,0.12); }
+.backBtn { display: inline-flex; align-items: center; gap: 2px; margin: 0 0 8px -4px; padding: 4px 4px; background: none; border: none; color: #FC8019; font-size: 13px; font-weight: 600; cursor: pointer; }
+.backBtn svg { width: 16px; height: 16px; }
+.statusCard { display: flex; align-items: flex-start; gap: 14px; padding: 16px; margin-bottom: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
+.statusIcon { width: 28px; height: 28px; flex-shrink: 0; }
+.statusIcon.ok { color: #2ECC71; }
+.statusIcon.bad { color: #ff6b6b; }
+.statusBig { font-size: 17px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0 0 4px 0; }
+.removed { text-decoration: line-through; color: rgba(255,255,255,0.35); }

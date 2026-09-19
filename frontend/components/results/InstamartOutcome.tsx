@@ -10,9 +10,11 @@ interface OutcomeProps {
   payOnDelivery: boolean;
   onClose: () => void;
   onBackToCart: () => void;
+  /** Open live tracking for a placed order. */
+  onTrack: (orderId: string) => void;
 }
 
-export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart }: OutcomeProps) {
+export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
 
   if (outcome.status === 'pending_payment' && outcome.payment) {
@@ -39,10 +41,13 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
         <p className={styles.outcomeBody}>
           {ids && <>Order {ids}. </>}
           {payOnDelivery && outcome.total ? <>Pay {outcome.total} on delivery. </> : !payOnDelivery ? <>Payment received. </> : null}
-          Track it in the Swiggy app.
+          Track it here or in the Swiggy app.
         </p>
         {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy — it&apos;s worth a glance in the app.</p>}
-        <button type="button" className={styles.primary} onClick={onClose}>Done</button>
+        {outcome.orderIds[0] && (
+          <button type="button" className={styles.primary} onClick={() => onTrack(outcome.orderIds[0])}>Track order</button>
+        )}
+        <button type="button" className={styles.secondary} onClick={onClose}>Done</button>
       </div>
     );
   }
