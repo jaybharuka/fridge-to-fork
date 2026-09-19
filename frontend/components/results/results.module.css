@@ -16,6 +16,12 @@
 .brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; font-size: 16px; white-space: nowrap; }
 .brandLogo { width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; }
 .headerActions { display: flex; align-items: center; gap: 8px; }
+.connectedChip {
+  display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; flex-shrink: 0;
+  font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--green); background: var(--green-dim);
+  border: 1px solid var(--green-border); border-radius: 999px;
+}
+.connectedChip svg { width: 14px; height: 14px; }
 .themeToggle {
   width: 44px; height: 44px; background: var(--bg-secondary); border: 1px solid var(--border); cursor: pointer; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0;

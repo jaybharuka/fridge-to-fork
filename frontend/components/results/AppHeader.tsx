@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Check, Moon, Sun } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import styles from './results.module.css';
 
@@ -12,6 +13,7 @@ const SPIN_MS = 300;
 // lucide.createIcons() call — React just re-renders it.
 export function AppHeader() {
   const { theme, toggle } = useTheme();
+  const { status } = useAuth();
   const [spinning, setSpinning] = useState(false);
 
   function handleClick() {
@@ -28,6 +30,11 @@ export function AppHeader() {
           <span>Fridge to Fork</span>
         </div>
         <div className={styles.headerActions}>
+          {status === 'connected' && (
+            <span className={styles.connectedChip} role="status" aria-label="Swiggy account connected" title="Swiggy account connected">
+              <Check aria-hidden /> Connected
+            </span>
+          )}
           <button
             type="button"
             className={`${styles.themeToggle} ${spinning ? styles.spinning : ''}`}
