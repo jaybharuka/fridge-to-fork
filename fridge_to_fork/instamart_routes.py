@@ -10,6 +10,7 @@ HTTP surface for the staged Instamart flow (see instamart.py).
   POST /api/instamart/coupon    {address_id, coupon_code}                 -> {review, coupon, coupons}
   POST /api/instamart/checkout  {address_id, expected_total, idempotency_key, payment_key} -> {order}
   POST /api/instamart/payment-status {order_id, paas_id, final}           -> {order}
+  POST /api/instamart/report    {tool, error_message, flow?, context?, notes?} -> {report{mailto, subject, body}}
   POST /api/instamart/orders    {active_only}                             -> {orders[], hasMore}
   POST /api/instamart/order-status  {order_id, address_id?, lat?, lng?}   -> {delivery, tracking, notes[]}
   POST /api/instamart/order-details {order_id}                            -> {details}
@@ -26,7 +27,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from . import instamart, instamart_addresses, instamart_orders
+from . import instamart, instamart_addresses, instamart_orders, instamart_support
 from .instamart import InstamartError
 
 Ingredient = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -87,6 +88,30 @@ class GoToRequest(BaseModel):
     address_id: Id
 
 
+# The Instamart tools a report may name (report_error itself excluded).
+ReportTool = Literal[
+    "create_address", "delete_address", "get_addresses", "search_products", "your_go_to_items", "apply_coupon", "clear_cart",
+    "get_cart", "list_coupons", "update_cart", "check_payment_status", "confirm_order", "get_payment_options", "checkout",
+    "get_delivery_status", "get_order_details", "get_orders", "track_order",
+]
+
+
+class ReportRequest(BaseModel):
+    tool: ReportTool
+    error_message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+    flow: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    # Identifiers only (order/address/coupon/payment method...), per report_error's toolContext.
+    context: dict[str, Annotated[str, StringConstraints(max_length=100)]] = Field(default_factory=dict, max_length=len(instamart_support.CONTEXT_KEYS))
+    notes: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
+
+    @model_validator(mode="after")
+    def _only_known_context_keys(self):
+        unknown = set(self.context) - set(instamart_support.CONTEXT_KEYS)
+        if unknown:
+            raise ValueError(f"unsupported context keys: {sorted(unknown)}")
+        return self
+
+
 class OrdersRequest(BaseModel):
     active_only: bool = False
 
@@ -131,7 +156,8 @@ class CheckoutRequest(BaseModel):
 
 
 def _error(exc: InstamartError) -> JSONResponse:
-    return JSONResponse({"ok": False, "error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
+    error = {"code": exc.code, "message": exc.message, **({"tool": exc.tool} if exc.tool else {})}
+    return JSONResponse({"ok": False, "error": error}, status_code=exc.status)
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -197,6 +223,10 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     @router.post("/go-to-items")
     async def go_to_items(body: GoToRequest, request: Request):
         return await run(request, lambda t: instamart_addresses.go_to_items(t, body.address_id))
+
+    @router.post("/report")
+    async def report(body: ReportRequest, request: Request):
+        return await run(request, lambda t: instamart_support.report_problem(t, body.tool, body.error_message, body.flow, body.context, body.notes))
 
     @router.post("/orders")
     async def orders(body: OrdersRequest, request: Request):

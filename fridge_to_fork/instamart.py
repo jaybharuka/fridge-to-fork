@@ -43,11 +43,12 @@ _FAILED_STATUSES = {"FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED"}
 class InstamartError(Exception):
     """`code` is stable for the frontend; `message` is safe to show the user."""
 
-    def __init__(self, code: str, message: str, status: int = 200):
+    def __init__(self, code: str, message: str, status: int = 200, tool: str | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
         self.status = status
+        self.tool = tool  # the Swiggy tool that refused, when known (used to file a report)
 
 
 # ---------------------------------------------------------------------------
@@ -131,10 +132,12 @@ async def _call(session: ClientSession, name: str, **arguments) -> dict:
     try:
         result = await session.call_tool(name, arguments)
     except McpError as exc:  # protocol-level refusal, e.g. a tool that isn't rolled out for this account
-        raise InstamartError("tool_error", f"{name}: {exc}") from exc
+        raise InstamartError("tool_error", f"{name}: {exc}", tool=name) from exc
     payload = _payload(result)
     if getattr(result, "isError", False) or payload.get("success") is False:
-        raise _tool_error(payload)
+        error = _tool_error(payload)
+        error.tool = name
+        raise error
     data = payload.get("data")
     return data if isinstance(data, dict) else payload
 
