@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useScanStream } from '@/hooks/useScanStream';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useYoutubeVideos } from '@/hooks/useYoutubeVideos';
 import { useToast } from '@/hooks/useToast';
+import { usePrefetchProducts } from '@/hooks/useInstamartProducts';
+import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
 import { Landing } from '@/components/landing/Landing';
 import { LoadingOverlay } from '@/components/loading/LoadingOverlay';
@@ -26,6 +28,7 @@ export default function Home() {
   // outlives step1 and can outlive `complete`.
   const [photoDetectionRevealed, setPhotoDetectionRevealed] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  const [focusIngredient, setFocusIngredient] = useState<string | null>(null);
   // Recreated per scan — resetResultTabs() (templates/index.html:3565).
   const [recipeDotDismissed, setRecipeDotDismissed] = useState(false);
 
@@ -72,7 +75,20 @@ export default function Home() {
   // Groceries go through the staged Instamart sheet (real products -> real
   // cart -> explicit Place order); it also works with nothing missing, offering
   // just the add-on suggestions.
-  const handleOrderGroceries = useCallback(() => setOrderSheetOpen(true), []);
+  const handleOrderGroceries = useCallback(() => {
+    setFocusIngredient(null);
+    setOrderSheetOpen(true);
+  }, []);
+
+  // A checklist row's Instamart match opens the same sheet, scrolled to that item.
+  const handleOpenProduct = useCallback((ingredientName: string) => {
+    setFocusIngredient(ingredientName);
+    setOrderSheetOpen(true);
+  }, []);
+
+  // Start searching Instamart the moment the missing list is known, not when the sheet opens.
+  const missingNames = useMemo(() => getItemsToOrder(state.checklist).map(i => i.name), [state.checklist]);
+  usePrefetchProducts(missingNames, true);
 
   // Stashes just enough state to resume the in-progress order after the
   // full-page OAuth redirect a "Connect with Swiggy" click triggers — see
@@ -194,6 +210,8 @@ export default function Home() {
           fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
           onToggleChecklistItem={toggleChecklistItem}
           onOrderGroceries={handleOrderGroceries}
+          onOpenProduct={handleOpenProduct}
+          focusIngredient={focusIngredient}
           onOrderDish={() => placeOrder('order_dish', state.recommendedMeal ?? '')}
           orderSheetOpen={orderSheetOpen}
           onCloseOrderSheet={() => setOrderSheetOpen(false)}

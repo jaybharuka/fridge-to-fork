@@ -19,6 +19,8 @@ interface InstamartOrderSheetProps {
   topUpSuggestions: TopUpSuggestion[];
   /** Add-ons to re-select when reopening after the OAuth round trip (lib/pendingOrder.ts). */
   initialSelectedTopUpNames?: string[];
+  /** Checklist item the user tapped: its row is scrolled into view and highlighted once products load. */
+  focusIngredient?: string | null;
   onClose: () => void;
   /** Fired just before "Connect with Swiggy" navigates away, so the caller can stash state to resume. */
   onConnectClick: (selectedTopUpNames: string[]) => void;
@@ -38,7 +40,7 @@ const SUBTITLES: Record<Stage, string> = {
 // ordered until the user has seen real Instamart products (picker), then the
 // real cart Swiggy will bill (review), and taps a separate "Place order".
 // Always dark regardless of site theme — same reasoning as the dish hero.
-export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, initialSelectedTopUpNames, onClose, onConnectClick }: InstamartOrderSheetProps) {
+export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, initialSelectedTopUpNames, focusIngredient, onClose, onConnectClick }: InstamartOrderSheetProps) {
   const auth = useAuth();
   const order = useInstamartOrder();
   const { state } = order;
@@ -47,6 +49,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
   const touchStartY = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -67,6 +70,12 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
     void order.search([...missing, ...restored], restored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, connected]);
+
+  useEffect(() => {
+    if (state.stage !== 'picking' || !focusIngredient) return;
+    const rows = panelRef.current?.querySelectorAll<HTMLElement>('[data-ingredient]') ?? [];
+    Array.from(rows).find(el => el.dataset.ingredient === focusIngredient)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [state.stage, focusIngredient]);
 
   // Drop all flow state once the closing animation has finished.
   useEffect(() => {
@@ -96,6 +105,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
     <div className={resultsStyles.orderBottomSheet}>
       <div className={`${resultsStyles.orderSheetBackdrop} ${visible ? resultsStyles.visible : ''}`} onClick={close} />
       <div
+        ref={panelRef}
         className={`${resultsStyles.orderSheetPanel} ${visible ? resultsStyles.visible : ''}`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -137,6 +147,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
               results={state.results}
               choices={state.choices}
               extras={selectedTopUps}
+              focusIngredient={focusIngredient}
               onPick={order.pick}
               onQuantity={order.setQuantity}
               onRemoveExtra={order.removeExtra}

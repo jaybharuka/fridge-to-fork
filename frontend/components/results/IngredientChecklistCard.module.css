@@ -89,3 +89,28 @@
 .rowTagFridge { color: #2E7D32; background: #E8F5E9; }
 :global([data-theme="dark"]) .rowTagFridge { color: #81C784; background: rgba(46,125,50,0.2); }
 .rowTagWillOrder { font-size: 12px; font-style: italic; color: var(--text-muted); white-space: nowrap; }
+
+/* Real Instamart match under a missing ingredient (see ProductMatch). */
+.match {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 8px 10px;
+  text-align: left; font: inherit; color: inherit; cursor: pointer;
+  background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px;
+  transition: border-color .12s ease;
+}
+.match:hover { border-color: var(--orange); }
+.matchThumb, .matchThumbFallback { width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0; }
+.matchThumb { object-fit: contain; background: #fff; }
+.matchThumbFallback { display: flex; align-items: center; justify-content: center; background: var(--border); font-size: 16px; }
+.matchBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.matchName { font-size: 13px; font-weight: 600; color: var(--grey-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matchSub { font-size: 11px; color: var(--grey-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matchPrice { flex-shrink: 0; font-size: 14px; font-weight: 700; color: var(--grey-900); }
+.matchMrp { margin-left: 5px; font-size: 11px; font-weight: 400; color: var(--grey-400); text-decoration: line-through; }
+.matchLoading {
+  height: 56px; margin-top: 10px; border-radius: 12px;
+  background: linear-gradient(90deg, var(--bg-secondary), var(--border), var(--bg-secondary)); background-size: 200% 100%;
+  animation: matchShimmer 1.4s infinite;
+}
+@keyframes matchShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.row:has(.match, .matchLoading) { align-items: flex-start; }
+.row:has(.match, .matchLoading) .rowCheckbox { margin-top: 1px; }

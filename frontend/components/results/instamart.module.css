@@ -80,3 +80,5 @@
 .outcomeBody { font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.65); margin: 0 0 8px 0; }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.row.focused { border-color: #FC8019; box-shadow: 0 0 0 1px #FC8019 inset; }

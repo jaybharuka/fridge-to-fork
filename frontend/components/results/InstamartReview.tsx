@@ -1,15 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { formatInr, type InstamartReview as Review } from '@/lib/instamart';
+import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
 
-function Thumb({ url }: { url: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) return <div className={styles.thumbFallback} aria-hidden>🛒</div>;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img className={styles.thumb} src={url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
-}
+const Thumb = ({ url }: { url: string | null }) => (
+  <ProductThumb url={url} className={styles.thumb} fallbackClassName={styles.thumbFallback} />
+);
 
 interface ReviewProps {
   review: Review;
