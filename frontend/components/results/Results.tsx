@@ -15,7 +15,7 @@ import { IngredientChecklistCard } from './IngredientChecklistCard';
 import { ChoiceCard } from './ChoiceCard';
 import { ChecklistSkeleton, ChoiceSkeleton } from './ResultsSkeleton';
 import { OrderResultCard } from './OrderResultCard';
-import { OrderBottomSheet } from './OrderBottomSheet';
+import { InstamartOrderSheet } from './InstamartOrderSheet';
 import { RecipeStepsSection } from './RecipeStepsSection';
 import { YoutubeCarousel } from './YoutubeCarousel';
 import styles from './results.module.css';
@@ -44,7 +44,6 @@ interface ResultsProps {
   onOrderDish: () => void;
   orderSheetOpen: boolean;
   onCloseOrderSheet: () => void;
-  onConfirmOrderSheet: (selectedTopUpNames: string[]) => void;
   /** Fired just before the sheet's "Connect with Swiggy" CTA navigates —
    *  stashes state to resume after the OAuth round trip (lib/pendingOrder.ts). */
   onSheetConnectClick: (selectedTopUpNames: string[]) => void;
@@ -77,7 +76,6 @@ export function Results({
   onOrderDish,
   orderSheetOpen,
   onCloseOrderSheet,
-  onConfirmOrderSheet,
   onSheetConnectClick,
   initialSelectedTopUpNames,
   onResultCardConnectClick,
@@ -218,15 +216,12 @@ export function Results({
       </div>
 
       <FridgeLightbox open={lightboxOpen} imageUrl={heroPhotoUrl} onClose={() => setLightboxOpen(false)} />
-      <OrderBottomSheet
+      <InstamartOrderSheet
         open={orderSheetOpen}
         itemsToOrder={itemsToOrder}
         topUpSuggestions={state.topUpSuggestions}
-        orderPlacing={state.orderPlacing}
-        orderResult={state.orderResult}
         initialSelectedTopUpNames={initialSelectedTopUpNames}
         onClose={onCloseOrderSheet}
-        onConfirm={onConfirmOrderSheet}
         onConnectClick={onSheetConnectClick}
       />
     </div>

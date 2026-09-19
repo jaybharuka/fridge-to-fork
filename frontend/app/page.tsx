@@ -5,7 +5,6 @@ import { useScanStream } from '@/hooks/useScanStream';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useYoutubeVideos } from '@/hooks/useYoutubeVideos';
 import { useToast } from '@/hooks/useToast';
-import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
 import { Landing } from '@/components/landing/Landing';
 import { LoadingOverlay } from '@/components/loading/LoadingOverlay';
@@ -70,27 +69,10 @@ export default function Home() {
     setTab(next);
   }, []);
 
-  // confirmOrderGroceries() — the preview sheet only exists to review what's
-  // missing, so skip it outright when nothing is (lines 3900-3911).
-  const handleOrderGroceries = useCallback(() => {
-    if (getItemsToOrder(state.checklist).length === 0) {
-      placeOrder('order_groceries', state.recommendedMeal ?? '', []);
-      return;
-    }
-    setOrderSheetOpen(true);
-  }, [state.checklist, state.recommendedMeal, placeOrder]);
-
-  // Top-up items are optional add-ons the user picked in the sheet, kept
-  // separate from the missing-ingredients list (things already known to be
-  // missing) until the moment of submission, where both genuinely need to
-  // reach the backend as one combined item list.
-  const handleConfirmOrderSheet = useCallback((selectedTopUpNames: string[]) => {
-    placeOrder(
-      'order_groceries',
-      state.recommendedMeal ?? '',
-      [...getItemsToOrder(state.checklist).map(i => i.name), ...selectedTopUpNames]
-    );
-  }, [state.checklist, state.recommendedMeal, placeOrder]);
+  // Groceries go through the staged Instamart sheet (real products -> real
+  // cart -> explicit Place order); it also works with nothing missing, offering
+  // just the add-on suggestions.
+  const handleOrderGroceries = useCallback(() => setOrderSheetOpen(true), []);
 
   // Stashes just enough state to resume the in-progress order after the
   // full-page OAuth redirect a "Connect with Swiggy" click triggers — see
@@ -118,18 +100,6 @@ export default function Home() {
       reopenOrderSheet: false,
     });
   }, [state.recommendedMeal, state.reasoning, state.checklist, state.topUpSuggestions]);
-
-  // The sheet used to close the instant Confirm was tapped, before the
-  // request even resolved — if the response turned out to be auth_required
-  // or an error, it closed anyway, silently, with nothing on screen to
-  // explain why. Now it only closes once the order genuinely succeeds;
-  // OrderBottomSheet shows auth/error state inline and stays open otherwise,
-  // so the user's top-up selections survive a failed attempt.
-  useEffect(() => {
-    if (orderSheetOpen && state.orderResult?.kind === 'order_placed') {
-      setOrderSheetOpen(false);
-    }
-  }, [orderSheetOpen, state.orderResult]);
 
   // Resumes state stashed in lib/pendingOrder.ts right before a "Connect
   // with Swiggy" click sent the user through the full-page OAuth redirect
@@ -224,10 +194,9 @@ export default function Home() {
           fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
           onToggleChecklistItem={toggleChecklistItem}
           onOrderGroceries={handleOrderGroceries}
-          onOrderDish={() => placeOrder('order_dish', state.recommendedMeal ?? '', [])}
+          onOrderDish={() => placeOrder('order_dish', state.recommendedMeal ?? '')}
           orderSheetOpen={orderSheetOpen}
           onCloseOrderSheet={() => setOrderSheetOpen(false)}
-          onConfirmOrderSheet={handleConfirmOrderSheet}
           onSheetConnectClick={handleSheetConnectClick}
           initialSelectedTopUpNames={restoredOrder?.reopenOrderSheet ? restoredOrder.selectedTopUpNames : undefined}
           onResultCardConnectClick={handleResultCardConnectClick}
