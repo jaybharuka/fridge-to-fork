@@ -44,10 +44,8 @@ def _ascii_safe(value) -> str:
 
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals_stream
-from fridge_to_fork.step3_order_router import (
-    order_dish_from_swiggy,
-    order_groceries_from_instamart,
-)
+from fridge_to_fork.instamart_routes import make_router as make_instamart_router
+from fridge_to_fork.step3_order_router import order_dish_from_swiggy
 from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
@@ -453,99 +451,6 @@ async def get_ingredient_image(name: str):
         pass
     print(f"[TIMING] ingredient_image_call (not found): {time.time() - t_ingredient_image:.2f}s")
     return {"image_url": "", "found": False}
-
-
-# ---------------------------------------------------------------------------
-# Cart fill — search each item on Instamart via the Swiggy MCP agent and
-# add it to the user's cart. Used by the recipe checklist's "Add to
-# Instamart" flow (not tied to the household inventory feature).
-# ---------------------------------------------------------------------------
-
-@app.post("/api/cart-fill")
-async def cart_fill(request: Request):
-    """
-    SSE stream that uses the Google ADK agent to search each item on
-    Instamart and add it to the user's cart. Requires a valid Swiggy
-    Bearer token from session.
-    """
-    body = await request.json()
-    items = body.get("items", [])
-    # items = [{"id": "d1", "name": "Basmati Rice", "qty_needed": 5, "unit": "kg"}]
-
-    access_token = _access_token(request)
-
-    async def stream():
-        if not access_token:
-            yield _sse({"type": "auth_required"})
-            return
-
-        for item in items:
-            yield _sse({
-                "type": "item_searching",
-                "itemId": item["id"],
-                "itemName": item["name"]
-            })
-
-            try:
-                from fridge_to_fork.swiggy_agent import run_swiggy_agent
-
-                # Build a mini meal plan just for this item
-                suggestion = MealSuggestion(
-                    name=item["name"],
-                    description="",
-                    can_cook_now=False,
-                    missing_ingredients=[item["name"]],
-                    cuisine="",
-                    prep_time_minutes=0
-                )
-                plan = MealPlan(
-                    suggestions=[suggestion],
-                    decision=Decision.ORDER_GROCERIES,
-                    recommended_meal=suggestion,
-                    reasoning=""
-                )
-
-                result = await run_swiggy_agent(
-                    plan=plan,
-                    delivery_address=os.environ.get(
-                        "DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS
-                    ),
-                    access_token=access_token,
-                    dry_run=False
-                )
-
-                if result and result.success:
-                    yield _sse({
-                        "type": "item_added",
-                        "itemId": item["id"],
-                        "itemName": item["name"]
-                    })
-                else:
-                    error = result.error if result else "unknown"
-                    if error == "auth_required":
-                        yield _sse({"type": "auth_required"})
-                        return
-                    yield _sse({
-                        "type": "item_failed",
-                        "itemId": item["id"],
-                        "itemName": item["name"]
-                    })
-
-            except Exception as e:
-                print(f"[CART_FILL] Error for {item['name']}: {e}")
-                yield _sse({
-                    "type": "item_failed",
-                    "itemId": item["id"],
-                    "itemName": item["name"]
-                })
-
-        yield _sse({"type": "cart_complete"})
-
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -1002,15 +907,22 @@ async def scan_vision_only(file: UploadFile = File(...)):
 
 
 # ---------------------------------------------------------------------------
-# Order endpoint — fires only after the user picks an action
+# Instamart groceries — staged search -> cart -> checkout (fridge_to_fork/instamart.py)
+# ---------------------------------------------------------------------------
+
+app.include_router(make_instamart_router(_access_token))
+
+
+# ---------------------------------------------------------------------------
+# Order endpoint — "cook" and Swiggy Food dish orders. Groceries never go
+# through here: they use the explicit-confirmation flow above.
 # ---------------------------------------------------------------------------
 
 @app.post("/api/order")
 async def place_order(
     request: Request,
-    action: str = Form(...),  # "cook" | "order_groceries" | "order_dish"
+    action: str = Form(...),  # "cook" | "order_dish"
     meal_name: str = Form(...),
-    missing_ingredients: str = Form(""),  # comma-separated
 ):
     delivery_address = os.environ.get("DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS)
     access_token = _access_token(request)
@@ -1025,7 +937,7 @@ async def place_order(
                 yield _sse({"type": "complete"})
                 return
 
-            if action not in ("order_groceries", "order_dish"):
+            if action not in ("order_dish",):
                 yield _sse({"type": "error", "message": f"Unknown action: {action}"})
                 yield _sse({"type": "complete"})
                 return
@@ -1040,11 +952,7 @@ async def place_order(
 
             yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
 
-            if action == "order_groceries":
-                items = [i.strip() for i in missing_ingredients.split(",") if i.strip()]
-                result = await order_groceries_from_instamart(items, delivery_address, access_token)
-            else:
-                result = await order_dish_from_swiggy(meal_name, delivery_address, access_token)
+            result = await order_dish_from_swiggy(meal_name, delivery_address, access_token)
 
             if result and result.error == "auth_required":
                 yield _sse({

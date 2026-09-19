@@ -8,7 +8,6 @@ import pytest
 from fridge_to_fork.models import Decision, MealPlan, MealSuggestion
 from fridge_to_fork.step3_order_router import (
     order_dish_from_swiggy,
-    order_groceries_from_instamart,
     route_order,
 )
 
@@ -47,22 +46,6 @@ def test_order_dish_dry_run():
     assert result.order_id is not None
     assert result.estimated_minutes == 35
     assert "Butter Chicken" in result.items
-
-
-def test_order_groceries_dry_run():
-    items = ["onion", "tomato", "garlic"]
-    result = order_groceries_from_instamart(items, "Mumbai", dry_run=True)
-    assert result.success is True
-    assert result.platform == "swiggy_instamart"
-    assert result.order_id is not None
-    assert result.estimated_minutes == 15
-    assert result.items == items
-
-
-def test_order_groceries_dry_run_single_item():
-    result = order_groceries_from_instamart(["milk"], "Delhi", dry_run=True)
-    assert result.success is True
-    assert result.items == ["milk"]
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ GitHub: https://github.com/jaybharuka/fridge-to-fork
         -> Gemini generates the recipe (ingredients, quantities, steps)
         -> Deterministic matching marks pantry staples + fridge-photo items as "have"
         -> You check off anything else you already have
-        -> Google ADK Agent -> Swiggy Instamart (missing items) or Swiggy Food (the dish)
+        -> Swiggy Instamart (missing items: staged search -> cart -> checkout) or, via a Google ADK agent, Swiggy Food (the dish)
 ```
 
 ---
@@ -51,13 +51,15 @@ There is no cook/order_groceries/order_dish AI decision anymore — the app just
 **Step 3, Order Router + Swiggy Agent (`fridge_to_fork/step3_order_router.py` + `fridge_to_fork/swiggy_agent.py`)**
 `step3_order_router.py` builds a `MealPlan` and hands it to `run_swiggy_agent()`, a real `google.adk.agents.Agent` wired to all three Swiggy MCP servers at once via `MCPToolset` + `StreamableHTTPConnectionParams`. Your choice (order groceries vs. order the dish) is translated into a natural-language instruction, and the agent decides for itself which tools to call and in what order. See [section 8](#8-swiggy-mcp-integration) for the full integration details.
 
+**Groceries do not use the agent.** Instamart orders go through `fridge_to_fork/instamart.py`, a deterministic MCP call sequence written against Swiggy's documented tool schemas, exposed as three staged endpoints so the user confirms before any real money moves: `POST /api/instamart/search` (real products, prices and photos per missing ingredient, read-only), `POST /api/instamart/cart` (clears the cart, adds the user's picks by `spinId`/`skuId`, returns the real `get_cart` review) and `POST /api/instamart/checkout` (only after a separate "Place order": re-checks the cart total, checks `get_orders` before and after, COD only, idempotent per reviewed cart). The agent above is now used only for ordering a dish from Swiggy Food.
+
 ## 4. Smart Cart
 
-The Smart Cart modal is the shared "add these items to Instamart" flow used both by the recipe checklist's missing-items button and by each Top Up suggestion's Add button.
+The Smart Cart modal is the legacy (vanilla page) version of the shared "add these items to Instamart" flow used both by the recipe checklist's missing-items button and by each Top Up suggestion's Add button.
 
 - `openSmartCart(items)` (in `templates/index.html`) checks `/auth/status`.
 - Not connected: shows a preview list and a "Connect Swiggy to order" button, plus a manual fallback that opens Instamart's search page.
-- Connected: `/api/cart-fill` streams one SSE event per item as it builds a one-item `MealPlan` with `Decision.ORDER_GROCERIES` and runs it through `run_swiggy_agent()` — the same function the main order flow uses.
+- Connected: groceries now use the staged Instamart flow below. `/api/cart-fill` and the agent-based grocery path were removed, so this legacy modal's connected mode no longer works — the Next.js frontend's order sheet replaces it.
 
 ## 5. Tech stack
 
@@ -75,7 +77,7 @@ The Smart Cart modal is the shared "add these items to Instamart" flow used both
 
 ```text
 fridge-to-fork/
-├── app.py                        # FastAPI app: page, scan/order SSE endpoints, cart-fill, OAuth
+├── app.py                        # FastAPI app: page, scan/order SSE endpoints, OAuth, Instamart routes
 ├── templates/
 │   └── index.html                # The whole frontend: recipe flow, checklist, Smart Cart — single page, vanilla JS
 ├── fridge_to_fork/
@@ -177,7 +179,7 @@ All three Swiggy MCP servers are wired into a single agent at the same time, so 
                               |  Cart, single page)    |
                               +----+--------------+----+
                                    |              |
-                    POST /api/scan |              | POST /api/cart-fill
+                    POST /api/scan |              | POST /api/instamart
                     POST /api/order|              |
                                    v              v
 +----------------------------------------------------------------+
