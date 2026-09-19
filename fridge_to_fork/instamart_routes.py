@@ -6,6 +6,9 @@ HTTP surface for the staged Instamart flow (see instamart.py).
   POST /api/instamart/coupon    {address_id, coupon_code}                 -> {review, coupon, coupons}
   POST /api/instamart/checkout  {address_id, expected_total, idempotency_key, payment_key} -> {order}
   POST /api/instamart/payment-status {order_id, paas_id, final}           -> {order}
+  POST /api/instamart/orders    {active_only}                             -> {orders[], hasMore}
+  POST /api/instamart/order-status  {order_id, address_id?, lat?, lng?}   -> {delivery, tracking, notes[]}
+  POST /api/instamart/order-details {order_id}                            -> {details}
 
 Every response is `{ok: true, ...}` or `{ok: false, error: {code, message}}`.
 HTTP status is 401 for auth_required and 502 for upstream failures; Swiggy
@@ -17,9 +20,9 @@ from typing import Annotated, Awaitable, Callable
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from . import instamart
+from . import instamart, instamart_orders
 from .instamart import InstamartError
 
 Ingredient = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -39,6 +42,28 @@ class Selection(BaseModel):
 class CartRequest(BaseModel):
     address_id: Id
     selections: list[Selection] = Field(min_length=1, max_length=40)
+
+
+class OrdersRequest(BaseModel):
+    active_only: bool = False
+
+
+class OrderStatusRequest(BaseModel):
+    order_id: Id
+    address_id: Id | None = None
+    # track_order needs real delivery coordinates (Swiggy exposes none); both or neither.
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def _both_coordinates_or_none(self):
+        if (self.lat is None) != (self.lng is None):
+            raise ValueError("lat and lng must be provided together")
+        return self
+
+
+class OrderDetailsRequest(BaseModel):
+    order_id: Id
 
 
 class CouponRequest(BaseModel):
@@ -113,5 +138,17 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
             return {"order": await instamart.payment_status(token, body.order_id, body.paas_id, body.final)}
 
         return await run(request, act)
+
+    @router.post("/orders")
+    async def orders(body: OrdersRequest, request: Request):
+        return await run(request, lambda t: instamart_orders.list_orders(t, body.active_only))
+
+    @router.post("/order-status")
+    async def order_status(body: OrderStatusRequest, request: Request):
+        return await run(request, lambda t: instamart_orders.order_status(t, body.order_id, body.address_id, body.lat, body.lng))
+
+    @router.post("/order-details")
+    async def order_details(body: OrderDetailsRequest, request: Request):
+        return await run(request, lambda t: instamart_orders.order_details(t, body.order_id))
 
     return router
