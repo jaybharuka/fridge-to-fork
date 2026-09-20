@@ -20,6 +20,7 @@ import {
 } from '../lib/instamart';
 import { setSelectedAddressId } from '../lib/addressStore';
 import { productCacheFor } from '../lib/instamartSearch';
+import { pollPayment as pollPaymentLoop } from '../lib/pollPayment';
 import { keyOf } from '../lib/searchCache';
 
 export type Stage = 'searching' | 'picking' | 'building' | 'reviewing' | 'placing' | 'done' | 'error';
@@ -214,8 +215,6 @@ const UNKNOWN_OUTCOME: InstamartOutcome = {
   payment: null,
 };
 
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-
 function describe(e: unknown): { message: string; authNeeded: boolean; code: string } {
   if (e instanceof InstamartApiError) return { message: e.message, authNeeded: e.code === 'auth_required', code: e.code };
   return { message: "Couldn't reach the server. Check your connection and try again.", authNeeded: false, code: 'network' };
@@ -321,27 +320,23 @@ export function useInstamartOrder() {
     }
   }, []);
 
-  /** Client-driven UPI polling (nothing is held open server-side). At the deadline it asks once more
-   *  with final=true so Swiggy can reconcile a late payment; repeated network failures end as "unknown". */
-  const pollPayment = useCallback(async (payment: PendingPayment) => {
+  /** Client-driven UPI polling (shared with Food): at the deadline it asks once more with final=true so Swiggy can
+   *  reconcile a late payment; repeated network failures end as "unknown". */
+  const pollPayment = useCallback((payment: PendingPayment) => {
     const id = run.current;
-    const deadline = Date.now() + payment.maxPollMs;
-    let failures = 0;
-    while (run.current === id) {
-      await sleep(payment.pollIntervalMs);
-      if (run.current !== id) return;
-      const final = Date.now() >= deadline;
-      try {
-        const { order } = await instamartPaymentStatus(payment.orderId, payment.paasId, final);
-        failures = 0;
-        if (order.status !== 'pending_payment') return dispatch({ type: 'PLACE_OK', outcome: order });
-      } catch (e) {
+    return pollPaymentLoop<InstamartOutcome>({
+      pollIntervalMs: payment.pollIntervalMs,
+      maxPollMs: payment.maxPollMs,
+      isCurrent: () => run.current === id,
+      check: async final => (await instamartPaymentStatus(payment.orderId, payment.paasId, final)).order,
+      onDone: outcome => dispatch({ type: 'PLACE_OK', outcome }),
+      onGiveUp: () => dispatch({ type: 'PLACE_OK', outcome: { ...UNKNOWN_OUTCOME, orderIds: [payment.orderId] } }),
+      onError: e => {
         const d = describe(e);
-        if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true, stage: 'error' });
-        if (++failures >= 4) return dispatch({ type: 'PLACE_OK', outcome: { ...UNKNOWN_OUTCOME, orderIds: [payment.orderId] } });
-      }
-      if (final) return dispatch({ type: 'PLACE_OK', outcome: { ...UNKNOWN_OUTCOME, orderIds: [payment.orderId] } });
-    }
+        if (d.authNeeded) dispatch({ type: 'FAIL', message: d.message, authNeeded: true, stage: 'error' });
+        return d.authNeeded;
+      },
+    });
   }, []);
 
   const placeOrder = useCallback(async (addressId: string, expectedTotal: string, key: string, paymentKey: string) => {

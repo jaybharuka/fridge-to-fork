@@ -1,6 +1,7 @@
 'use client';
 
-import { formatInr, type FoodReview as Review } from '@/lib/food';
+import { formatInr, type AppliedCoupon, type CouponList, type FoodReview as Review } from '@/lib/food';
+import { CouponSection } from './CouponSection';
 import { ProductThumb } from './ProductThumb';
 import { VegMark } from './FoodPicker';
 import styles from './instamart.module.css';
@@ -13,13 +14,17 @@ const PAYMENT_HINT = { cod: 'Pay when it arrives', upi_qr: 'Opens a payment page
 
 interface ReviewProps {
   review: Review;
+  coupons: CouponList;
+  appliedCoupon: AppliedCoupon | null;
+  couponBusy: string | null;
   paymentKey: string | null;
   disabled: boolean;
   onSelectPayment: (key: string) => void;
+  onApplyCoupon: (code: string) => void;
 }
 
 /** The real Food cart, exactly as Swiggy will bill it. Items are read-only: editing goes back a step. */
-export function FoodReview({ review, paymentKey, disabled, onSelectPayment }: ReviewProps) {
+export function FoodReview({ review, coupons, appliedCoupon, couponBusy, paymentKey, disabled, onSelectPayment, onApplyCoupon }: ReviewProps) {
   const where = [review.address.label, review.address.text].filter(Boolean).join(' — ');
   const restaurant = [review.restaurant.name, review.restaurant.area].filter(Boolean).join(' · ');
   return (
@@ -43,6 +48,8 @@ export function FoodReview({ review, paymentKey, disabled, onSelectPayment }: Re
         ))}
       </div>
 
+      <CouponSection coupons={coupons} appliedCoupon={appliedCoupon} couponBusy={couponBusy} disabled={disabled} editLabel="Edit dish" onApply={onApplyCoupon} />
+
       <div className={styles.bill}>
         {review.lineItems.map(li => (
           <div key={li.label} className={styles.billRow}>
@@ -56,7 +63,7 @@ export function FoodReview({ review, paymentKey, disabled, onSelectPayment }: Re
         <div className={styles.billTotal}><span>To pay</span><span>{review.total !== null ? formatInr(review.total) : '—'}</span></div>
       </div>
 
-      <p className={styles.sectionLabel}>Payment</p>
+      <p className={styles.sectionLabel}>Pay with</p>
       {review.payment.options.length === 0 ? (
         <p className={styles.blocker}>No payment method is available for this cart.</p>
       ) : (

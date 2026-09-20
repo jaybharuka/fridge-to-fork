@@ -46,7 +46,12 @@ export interface Coupon {
 }
 
 /** `available: false` means Swiggy doesn't offer coupons on this account (not rolled out to everyone). */
-export interface CouponList { available: boolean; items: Coupon[] }
+export interface CouponList {
+  available: boolean;
+  items: Coupon[];
+  /** Food: how Swiggy filtered the offers (e.g. cash-on-delivery compatible). */
+  filter?: string | null;
+}
 
 export interface AppliedCoupon { code: string; title: string; savings: number | null }
 

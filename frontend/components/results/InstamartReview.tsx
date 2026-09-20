@@ -1,6 +1,7 @@
 'use client';
 
 import { formatInr, type AppliedCoupon, type CouponList, type InstamartReview as Review } from '@/lib/instamart';
+import { CouponSection } from './CouponSection';
 import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
 
@@ -52,44 +53,7 @@ export function InstamartReview({ review, adjustments, coupons, appliedCoupon, c
         ))}
       </div>
 
-      {coupons.available && coupons.items.length > 0 && (
-        <section aria-label="Coupons">
-          <p className={styles.sectionLabel}>Coupons</p>
-          {appliedCoupon && (
-            <p className={styles.couponApplied} role="status">
-              {appliedCoupon.code} applied{appliedCoupon.savings ? ` — you save ${formatInr(appliedCoupon.savings)}` : ''}. To try a different coupon, go back with Edit items and rebuild the cart.
-            </p>
-          )}
-          <ul className={styles.coupons}>
-            {coupons.items.map(c => {
-              const isApplied = appliedCoupon?.code.toLowerCase() === c.code.toLowerCase();
-              return (
-                <li key={c.code} className={`${styles.coupon} ${!c.applicable && !isApplied ? styles.couponOff : ''}`}>
-                  <div className={styles.couponBody}>
-                    <p className={styles.couponTitle}>{c.title} <span className={styles.couponCode}>{c.code}</span></p>
-                    {c.description && <p className={styles.meta}>{c.description}</p>}
-                    {!c.applicable && c.message && <p className={styles.couponWhy}>{c.message}</p>}
-                    {c.terms.length > 0 && (
-                      <details className={styles.terms}>
-                        <summary>Terms</summary>
-                        <ul>{c.terms.map(t => <li key={t}>{t}</li>)}</ul>
-                      </details>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.couponBtn}
-                    disabled={disabled || !c.applicable || !!appliedCoupon || couponBusy !== null}
-                    onClick={() => onApplyCoupon(c.code)}
-                  >
-                    {isApplied ? 'Applied' : couponBusy === c.code ? 'Applying…' : 'Apply'}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <CouponSection coupons={coupons} appliedCoupon={appliedCoupon} couponBusy={couponBusy} disabled={disabled} editLabel="Edit items" onApply={onApplyCoupon} />
 
       <div className={styles.bill}>
         {review.lineItems.map(li => (
