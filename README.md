@@ -1,6 +1,6 @@
 # Fridge to Fork
 
-Fridge to Fork is an AI kitchen assistant: tell it what you want to eat, optionally show it your fridge, and it gives you a full recipe with a checklist of what you need — then hands off to a real Google ADK agent that talks to Swiggy's Food, Instamart, and Dineout MCP servers to order whatever's missing, or the finished dish itself.
+Fridge to Fork is an AI kitchen assistant: tell it what you want to eat, optionally show it your fridge, and it gives you a full recipe with a checklist of what you need — then hands off to deterministic, staged Swiggy flows (Instamart for whatever's missing, Food for the finished dish) that show you the real cart before any money moves.
 
 GitHub: https://github.com/jaybharuka/fridge-to-fork
 
@@ -9,7 +9,7 @@ GitHub: https://github.com/jaybharuka/fridge-to-fork
         -> Gemini generates the recipe (ingredients, quantities, steps)
         -> Deterministic matching marks pantry staples + fridge-photo items as "have"
         -> You check off anything else you already have
-        -> Swiggy Instamart (missing items: staged search -> cart -> checkout) or, via a Google ADK agent, Swiggy Food (the dish)
+        -> Swiggy Instamart (missing items) or Swiggy Food (the dish): staged search -> cart -> review -> checkout -> tracking
 ```
 
 ---
@@ -31,12 +31,12 @@ There is no separate pantry/inventory tab or database — that entire feature wa
     - **Fridge-photo matches** (fuzzy-matched against whatever the scan detected) are pre-checked and tagged `📷 in fridge`.
     - Everything else starts unchecked. Tap any row to toggle it either way — the app never assumes you're out of something, and never assumes you have something it didn't actually detect.
 - A **"What do you want to do?"** card shows two equal, un-ranked options — there's no AI recommendation or "best choice" badge:
-  - **Order missing items from Instamart** — the unchecked ingredients, added to your Instamart cart via the Swiggy agent.
-  - **Order the dish from Swiggy** — the finished dish, ordered from Swiggy Food.
+  - **Order missing items from Instamart** — the unchecked ingredients, searched, carted and reviewed through the staged Instamart flow.
+  - **Order the dish from Swiggy** — the finished dish, searched, customized, carted and reviewed through the staged Food flow.
 - A **Top Up** row suggests small Instamart add-ons (as Instamart-style product cards with an emoji placeholder and an Add button) that pair well with the meal — filtered so nothing already on your missing-items list gets suggested twice.
 - Prices are computed throughout (`estimated_price_inr` on every ingredient) but are not shown anywhere in the UI by design — they stay in the data, not on screen.
 
-## 3. The pipeline: Vision → Meal Planner → Swiggy ADK Agent
+## 3. The pipeline: Vision → Meal Planner → Staged Swiggy flows
 
 **Step 1, Vision (`fridge_to_fork/step1_fridge_vision.py`)** — optional.
 Sends the fridge photo to Gemini with a strict JSON prompt and gets back a list of ingredients, each with a rough quantity and a 0–1 confidence score, plus a one-paragraph description of the fridge. Tries a chain of models (`gemini-2.5-flash` down through `gemini-2.0-flash-lite`) so one model's exhausted quota doesn't stop the request, and falls back to a small hardcoded ingredient list if every model fails. If you don't take a photo, this step is skipped entirely and the ingredient list is just empty.
@@ -48,10 +48,13 @@ Given a target dish (and optionally what the fridge scan found, used only for in
 
 There is no cook/order_groceries/order_dish AI decision anymore — the app just reports what's missing and lets you choose how to handle it. A separate `generate_top_up_suggestions()` call produces up to 3 upsell items, filtered against the missing-ingredients list with the same fuzzy matcher so nothing gets suggested twice.
 
-**Step 3, Order Router + Swiggy Agent (`fridge_to_fork/step3_order_router.py` + `fridge_to_fork/swiggy_agent.py`)**
-`step3_order_router.py` builds a `MealPlan` and hands it to `run_swiggy_agent()`, a real `google.adk.agents.Agent` wired to all three Swiggy MCP servers at once via `MCPToolset` + `StreamableHTTPConnectionParams`. Your choice (order groceries vs. order the dish) is translated into a natural-language instruction, and the agent decides for itself which tools to call and in what order. See [section 8](#8-swiggy-mcp-integration) for the full integration details.
+**Step 3, Staged ordering (no AI in the loop)**
+Neither flow lets a model pick tools or report success. Both are deterministic MCP call sequences written against Swiggy's documented tool schemas, exposed as staged endpoints so the user confirms before any real money moves, with the shared transport, address, payment-classification and checkout-guard logic in `fridge_to_fork/swiggy_common.py`:
 
-**Groceries do not use the agent.** Instamart orders go through `fridge_to_fork/instamart.py`, a deterministic MCP call sequence written against Swiggy's documented tool schemas, exposed as three staged endpoints so the user confirms before any real money moves: `POST /api/instamart/search` (real products, prices and photos per missing ingredient, read-only), `POST /api/instamart/cart` (clears the cart, adds the user's picks by `spinId`/`skuId`, returns the real `get_cart` review) and `POST /api/instamart/checkout` (only after a separate "Place order": re-checks the cart total, checks `get_orders` before and after, COD only, idempotent per reviewed cart). The agent above is now used only for ordering a dish from Swiggy Food.
+- **Groceries: `fridge_to_fork/instamart.py`** (`/api/instamart/*`): `search` (real products, prices and photos, read-only), `cart` (clears the cart, adds the user's picks by `spinId`/`skuId`, returns the real `get_cart` review), `coupon`, `checkout` (only after a separate "Place order": re-checks address and total, checks `get_orders` before and after, idempotent per reviewed cart, UPI via a payment page and polling), plus orders, live tracking, addresses and "Report a problem".
+- **The dish: `fridge_to_fork/food.py`** (`/api/food/*`): `search` (`search_restaurants` + `search_menu`, only open restaurants), `cart` (flushes the cart, adds the chosen dish with its variants and add-ons, then verifies Swiggy's cart is exactly what was picked before offering it), `coupon`, `checkout` (`place_food_order`, documented as not idempotent, so the same guards as Instamart), `payment-status`, `orders` / `order-status` / `order-details` (live tracking) and `report` ("Report a problem" via Swiggy's `report_error`, identifiers only). `fridge_to_fork/features.py`'s `FOOD_ORDERING_ENABLED` is its kill switch.
+
+The old Gemini/Google ADK agent that used to order the dish (it invented order IDs and read success out of free text) has been deleted. `swiggy_agent.py` now only simulates orders for the CLI's `--dry-run` and refuses real ones; `POST /api/order` only handles `cook`.
 
 ## 4. Smart Cart
 
@@ -69,7 +72,7 @@ The Smart Cart modal is the legacy (vanilla page) version of the shared "add the
 | Backend API | FastAPI, Server-Sent Events for streaming pipeline progress |
 | Session / auth | Starlette `SessionMiddleware`, OAuth 2.1 with PKCE against Swiggy's auth server |
 | Frontend | Single vanilla HTML/CSS/JS page, no build step, no framework, `lucide` + Phosphor icons over CDN |
-| Agent framework | Google ADK (`Agent`, `Runner`, `MCPToolset`, `StreamableHTTPConnectionParams`) |
+| Swiggy transport | MCP Python SDK (`streamablehttp_client`), deterministic call sequences (no agent framework) |
 | Commerce integration | Swiggy Food, Instamart, and Dineout MCP servers over streamable HTTP |
 | Testing | pytest, pytest-asyncio, pytest-httpx (network calls mocked) |
 
@@ -84,8 +87,12 @@ fridge-to-fork/
 │   ├── models.py                 # Ingredient, RecipeIngredient, FridgeContents, MealSuggestion, MealPlan, OrderResult
 │   ├── step1_fridge_vision.py    # Gemini Vision ingredient identification (optional step)
 │   ├── step2_meal_planner.py     # Gemini recipe generation + deterministic staple/fridge matching + top-up upsells
-│   ├── step3_order_router.py     # Thin adapters onto swiggy_agent.py, preserves old call signatures
-│   ├── swiggy_agent.py           # Google ADK agent wired to all 3 Swiggy MCP servers
+│   ├── step3_order_router.py     # CLI entry point (route_order): simulates or refuses, the web app doesn't use it
+│   ├── swiggy_agent.py           # CLI --dry-run simulation + refusals (the LLM agent was deleted)
+│   ├── swiggy_common.py          # Transport, addresses, payment classifier, checkout guards, report_error (Instamart + Food)
+│   ├── instamart.py              # Staged Instamart flow (+ instamart_routes/orders/addresses/support)
+│   ├── food.py                   # Staged Food flow (+ food_routes/orders/support)
+│   ├── features.py               # FOOD_ORDERING_ENABLED kill switch
 │   ├── agent.py                  # End-to-end CLI orchestrator (fridge-to-fork console script)
 │   └── swiggy_live_mcp.py        # Legacy stdio MCP stub, not used by the running app
 ├── tests/
@@ -148,26 +155,25 @@ All network calls and LLM calls in the test suite are mocked, so no API key is r
 | `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default `https://mcp.swiggy.com/food`) |
 | `SWIGGY_INSTAMART_MCP_URL` | Optional | Swiggy Instamart MCP endpoint (default `https://mcp.swiggy.com/im`) |
 | `SWIGGY_DINEOUT_MCP_URL` | Optional | Swiggy Dineout MCP endpoint (default `https://mcp.swiggy.com/dineout`) |
-| `SWIGGY_AGENT_MODEL` | Optional | Gemini model the ADK agent uses for tool selection (default `gemini-2.5-flash`) |
 | `APP_BASE_URL` | For real orders | Base URL this app is reachable at, used to build the OAuth redirect URI |
 | `SECRET_KEY` | Recommended | Signs session cookies via `itsdangerous`, set a real random value in production |
-| `DELIVERY_ADDRESS` | Optional | Default delivery address passed to the agent (default `Mumbai, India`) |
+| `DELIVERY_ADDRESS` | Optional | Legacy default delivery address for the CLI (default `Mumbai, India`) |
 
 ## 9. Swiggy MCP integration
 
-All three Swiggy MCP servers are wired into a single agent at the same time, so the agent picks the right platform for the request instead of the app's own logic restricting it up front:
+The app talks to Swiggy's MCP servers directly, one deterministic client per product:
 
-- `SWIGGY_FOOD_MCP_URL`, restaurant delivery
-- `SWIGGY_INSTAMART_MCP_URL`, grocery delivery
-- `SWIGGY_DINEOUT_MCP_URL`, table reservations
+- `SWIGGY_FOOD_MCP_URL`, restaurant delivery (`food.py`)
+- `SWIGGY_INSTAMART_MCP_URL`, grocery delivery (`instamart.py`)
+- `SWIGGY_DINEOUT_MCP_URL`, table reservations (not used by the web app)
 
-**Agent.** `swiggy_agent.py` builds a `google.adk.agents.Agent` backed by Gemini with a `MCPToolset` per server, each using `StreamableHTTPConnectionParams` over standard streamable HTTP. There is no hand-rolled JSON-RPC and no stub server in the active path. The agent discovers whichever tools each server exposes at connection time rather than the app hardcoding tool names.
+**Transport.** `swiggy_common.open_session()` opens a streamable-HTTP MCP session with the user's Bearer token; every tool result goes through one envelope reader (`{success, data | error}`, domain failures arrive as HTTP 200 + `success:false`). Nothing is inferred from free text.
 
-**Auth.** `app.py` implements OAuth 2.1 with PKCE itself: `/auth/login` generates a code verifier and S256 challenge and redirects to Swiggy's authorize endpoint, `/auth/callback` exchanges the returned code for a Bearer access token and stores it in the session, `/auth/status` reports whether that token is still valid, and `/auth/logout` clears it. The Bearer token is forwarded directly into every `MCPToolset`'s `StreamableHTTPConnectionParams(headers=...)`, which is the integration point ADK exposes for authenticated MCP calls.
+**Auth.** `app.py` implements OAuth 2.1 with PKCE itself: `/auth/login` generates a code verifier and S256 challenge and redirects to Swiggy's authorize endpoint, `/auth/callback` exchanges the returned code for a Bearer access token and stores it in the session, `/auth/status` reports whether that token is still valid, and `/auth/logout` clears it. The Bearer token is sent as the `Authorization` header of every MCP session (`swiggy_common.open_session`).
 
-**Token lifetime.** Swiggy MCP issues a 5 day access token with no refresh token, so that token is the entire session. `swiggy_agent.py` treats both raised 401 exceptions and agent responses that mention 401, unauthorized, or a similar phrase as `auth_required`, and the frontend surfaces a "Connect Swiggy" prompt rather than retrying silently in the background.
+**Token lifetime.** Swiggy MCP issues a 5 day access token with no refresh token, so that token is the entire session. `swiggy_common` maps a 401 (or an `invalid_token`/unauthorized tool error) to `auth_required`, and the frontend surfaces a "Connect Swiggy" prompt rather than retrying silently in the background.
 
-**Dry run.** `run_swiggy_agent(..., dry_run=True)` returns a simulated `OrderResult` without contacting Swiggy at all, used by the CLI's `--dry-run` flag and exercised in the test suite.
+**Dry run.** `run_swiggy_agent(..., dry_run=True)` returns a simulated `OrderResult` without contacting Swiggy at all, used by the CLI's `--dry-run` flag and exercised in the test suite. Without `dry_run` it refuses.
 
 ## 10. Architecture
 
@@ -198,15 +204,15 @@ All three Swiggy MCP servers are wired into a single agent at the same time, so 
                                   |
                                   v
                         +-----------------------+
-                        | step3_order_router.py   |
-                        | (thin adapter)           |
+                        | instamart.py / food.py  |
+                        | staged, deterministic   |
                         +-----------+-------------+
                                     |
                                     v
                         +-----------------------+
-                        | swiggy_agent.py         |
-                        | google.adk.agents       |
-                        | .Agent + MCPToolset     |
+                        | swiggy_common.py        |
+                        | MCP session + envelope  |
+                        | + payment/checkout guards|
                         +----+------+------+------+
                              |      |      |
                   StreamableHTTP    |      |

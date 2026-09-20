@@ -9,6 +9,7 @@ HTTP surface for the staged Food flow (see food.py).
   POST /api/food/orders    {address_id?, active_only}                                 -> {address, orders[]}
   POST /api/food/order-status  {order_id}                                             -> {delivery, tracking, notes[]}
   POST /api/food/order-details {order_id}                                             -> {details}
+  POST /api/food/report    {tool, error_message, flow?, context?, notes?}             -> {report{mailto, subject, body}}
 
 Every response is `{ok: true, ...}` or `{ok: false, error: {code, message}}`, the same envelope as the Instamart
 routes. While FOOD_ORDERING_ENABLED is off every route refuses, before it even looks at auth.
@@ -17,9 +18,9 @@ routes. While FOOD_ORDERING_ENABLED is off every route refuses, before it even l
 from typing import Annotated, Awaitable, Callable, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from . import features, food, food_orders
+from . import features, food, food_orders, food_support
 from .swiggy_common import SwiggyError, error_response
 
 Id = Annotated[str, StringConstraints(min_length=1, max_length=120)]
@@ -82,6 +83,30 @@ class OrderRefRequest(BaseModel):
     order_id: Id
 
 
+# The Food tools a report may name (report_error itself excluded).
+ReportTool = Literal[
+    "get_addresses", "search_restaurants", "search_menu", "update_food_cart", "get_food_cart", "flush_food_cart", "fetch_food_coupons",
+    "apply_food_coupon", "get_payment_options", "place_food_order", "check_payment_status", "confirm_order", "get_food_orders",
+    "get_food_delivery_status", "get_food_order_details", "track_food_order",
+]
+
+
+class ReportRequest(BaseModel):
+    tool: ReportTool
+    error_message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+    flow: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    # Identifiers only (order/restaurant/address/coupon/payment method...), per report_error's toolContext.
+    context: dict[str, Annotated[str, StringConstraints(max_length=100)]] = Field(default_factory=dict, max_length=len(food_support.CONTEXT_KEYS))
+    notes: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
+
+    @model_validator(mode="after")
+    def _only_known_context_keys(self):
+        unknown = set(self.context) - set(food_support.CONTEXT_KEYS)
+        if unknown:
+            raise ValueError(f"unsupported context keys: {sorted(unknown)}")
+        return self
+
+
 class CheckoutRequest(BaseModel):
     address_id: Id
     expected_total: float = Field(gt=0, lt=100_000)
@@ -138,6 +163,10 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     @router.post("/order-details")
     async def order_details(body: OrderRefRequest, request: Request):
         return await run(request, lambda t: food_orders.order_details(t, body.order_id))
+
+    @router.post("/report")
+    async def report(body: ReportRequest, request: Request):
+        return await run(request, lambda t: food_support.report_problem(t, body.tool, body.error_message, body.flow, body.context, body.notes))
 
     @router.post("/checkout")
     async def checkout(body: CheckoutRequest, request: Request):

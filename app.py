@@ -44,10 +44,9 @@ def _ascii_safe(value) -> str:
 
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals_stream
-from fridge_to_fork.features import FOOD_AGENT_ENABLED, FOOD_UNAVAILABLE_MESSAGE
+from fridge_to_fork.features import FOOD_MOVED_MESSAGE
 from fridge_to_fork.food_routes import make_router as make_food_router
 from fridge_to_fork.instamart_routes import make_router as make_instamart_router
-from fridge_to_fork.step3_order_router import order_dish_from_swiggy
 from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
@@ -922,87 +921,27 @@ app.include_router(make_food_router(_access_token))
 
 
 # ---------------------------------------------------------------------------
-# Order endpoint — "cook" and Swiggy Food dish orders. Groceries never go
-# through here: they use the explicit-confirmation flow above.
+# Order endpoint: only "cook" lives here now. Nothing is ordered through it: groceries use /api/instamart/* and the
+# dish uses /api/food/* (staged flows that show the real cart and need an explicit confirmation).
 # ---------------------------------------------------------------------------
 
 @app.post("/api/order")
 async def place_order(
-    request: Request,
-    action: str = Form(...),  # "cook" | "order_dish"
+    action: str = Form(...),  # "cook"; "order_dish" only tells a stale page to reload
     meal_name: str = Form(...),
 ):
-    delivery_address = os.environ.get("DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS)
-    access_token = _access_token(request)
-
     async def stream():
-        try:
-            if action == "cook":
-                yield _sse({
-                    "type": "cook_confirmed",
-                    "message": "Great! Here is what to cook.",
-                })
-                yield _sse({"type": "complete"})
-                return
-
-            if action not in ("order_dish",):
-                yield _sse({"type": "error", "message": f"Unknown action: {action}"})
-                yield _sse({"type": "complete"})
-                return
-
-            if not FOOD_AGENT_ENABLED:
-                # Refused before auth or the agent: a bypassed frontend guard still can't place a Food order.
-                yield _sse({"type": "error", "message": FOOD_UNAVAILABLE_MESSAGE})
-                yield _sse({"type": "complete"})
-                return
-
-            if not access_token:
-                yield _sse({
-                    "type": "auth_required",
-                    "message": "Connect your Swiggy account to place this order",
-                })
-                yield _sse({"type": "complete"})
-                return
-
-            yield _sse({"type": "progress", "step": 3, "message": "Routing your order…"})
-
-            result = await order_dish_from_swiggy(meal_name, delivery_address, access_token)
-
-            if result and result.error == "auth_required":
-                yield _sse({
-                    "type": "auth_required",
-                    "message": "Connect your Swiggy account to place this order",
-                })
-                yield _sse({"type": "complete"})
-                return
-
+        if action == "cook":
             yield _sse({
-                "type": "step3",
-                "decision": action,
-                "placed": bool(result and result.success),
-                "order_id": result.order_id if result else None,
-                "platform": result.platform if result else None,
-                "items": result.items if result else [],
-                "eta_minutes": result.estimated_minutes if result else None,
+                "type": "cook_confirmed",
+                "message": "Great! Here is what to cook.",
             })
-
-            yield _sse({"type": "complete"})
-
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 401:
-                request.session.pop("access_token", None)
-                request.session.pop("expires_at", None)
-                yield _sse({"type": "auth_required", "message": "Session expired, reconnect Swiggy"})
-            else:
-                yield _sse({"type": "error", "message": f"Order service error: {exc.response.status_code}"})
-            yield _sse({"type": "complete"})
-
-        except Exception as e:
-            import traceback
-            print(f"[ORDER ERROR] place_order failed: {e}")
-            traceback.print_exc()
-            yield _sse({"type": "error", "message": "Unable to place order."})
-            yield _sse({"type": "complete"})
+        elif action == "order_dish":
+            # The agent-driven route this used to be is deleted; a page cached from before still calls it.
+            yield _sse({"type": "error", "message": FOOD_MOVED_MESSAGE})
+        else:
+            yield _sse({"type": "error", "message": f"Unknown action: {action}"})
+        yield _sse({"type": "complete"})
 
     return StreamingResponse(
         stream(),

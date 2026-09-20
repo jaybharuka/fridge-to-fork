@@ -836,8 +836,7 @@ class AgentPathClosedTests(unittest.IsolatedAsyncioTestCase):
     async def test_agent_refuses_real_instamart_orders_without_touching_the_network(self):
         item = MealSuggestion(name="meal", description="", can_cook_now=False, missing_ingredients=["tomato"])
         plan = MealPlan(suggestions=[item], decision=Decision.ORDER_GROCERIES, recommended_meal=item, reasoning="")
-        with patch("fridge_to_fork.swiggy_agent.Agent", side_effect=AssertionError("agent must not be built")):
-            result = await run_swiggy_agent(plan, "addr", "tok")
+        result = await run_swiggy_agent(plan, "addr", "tok")  # no LLM agent exists to build any more (see test_food_disabled)
         self.assertFalse(result.success)
         self.assertIsNone(result.order_id)
         self.assertIn("fridge_to_fork.instamart", result.error)

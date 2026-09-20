@@ -20,9 +20,6 @@ export type ScanEvent =
       missing_ingredients: string[]; total_order_price_inr: number }
   | { type: 'top_up'; suggestions: TopUpSuggestion[] }
   | { type: 'complete' }
-  | { type: 'cook_confirmed'; message: string }
-  | { type: 'step3'; decision: string; placed: boolean; order_id: string | null;
-      platform: string | null; items: string[]; eta_minutes: number | null }
   | { type: 'error'; message: string }
   | { type: 'auth_required'; message?: string };
 

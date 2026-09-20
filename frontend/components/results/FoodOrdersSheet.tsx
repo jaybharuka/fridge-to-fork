@@ -7,6 +7,7 @@ import { formatInr, type FoodOrderRow } from '@/lib/food';
 import { closeOrders, useOrdersUi } from '@/lib/ordersUi';
 import { useSelectedAddressId } from '@/lib/addressStore';
 import { AddressPicker } from './AddressPicker';
+import { ReportProblem } from './ReportProblem';
 import resultsStyles from './results.module.css';
 import styles from './instamart.module.css';
 
@@ -158,6 +159,7 @@ function Panel({ initialOrderId, initialAddressId, onClose }: { initialOrderId: 
         <div className={styles.centered}>
           <p className={styles.outcomeBody}>{list.error}</p>
           <button type="button" className={styles.primary} onClick={list.reload}>Try again</button>
+          <ReportProblem product="food" input={{ tool: 'get_food_orders', errorMessage: list.error, flow: 'Opening my Food orders in the app', context: addressId ? { addressId } : {} }} />
         </div>
       ) : viewId ? (
         <>
@@ -176,6 +178,16 @@ function Panel({ initialOrderId, initialAddressId, onClose }: { initialOrderId: 
             </div>
           )}
           <Details orderId={viewId} order={order} />
+          <ReportProblem
+            product="food"
+            label="Report a problem with this order"
+            input={{
+              tool: order?.active ? 'get_food_delivery_status' : 'get_food_order_details',
+              errorMessage: `Problem with order ${viewId}${order?.status ? ` (status: ${order.status})` : ''}`,
+              flow: 'Viewing the order in the app',
+              context: { orderId: viewId, ...(list.address?.id ?? addressId ? { addressId: (list.address?.id ?? addressId) as string } : {}) },
+            }}
+          />
         </>
       ) : list.loading ? (
         <div className={styles.list} aria-busy="true">{[0, 1, 2].map(i => <div key={i} className={styles.skeleton} />)}</div>

@@ -14,7 +14,7 @@ import { MealSuggestionsSection } from './MealSuggestionsSection';
 import { IngredientChecklistCard } from './IngredientChecklistCard';
 import { ChoiceCard } from './ChoiceCard';
 import { ChecklistSkeleton, ChoiceSkeleton } from './ResultsSkeleton';
-import { OrderResultCard } from './OrderResultCard';
+import { ScanStatusCard } from './ScanStatusCard';
 import { FoodOrderSheet } from './FoodOrderSheet';
 import { InstamartOrderSheet } from './InstamartOrderSheet';
 import { RecipeStepsSection } from './RecipeStepsSection';
@@ -199,14 +199,13 @@ export function Results({
                 itemsToOrder={itemsToOrder}
                 onOrderGroceries={onOrderGroceries}
                 onOrderDish={() => setFoodSheetOpen(true)}
-                orderPlacing={state.orderPlacing}
               />
             ) : (
               contentPending && <ChoiceSkeleton />
             )}
 
-            <OrderResultCard
-              result={state.orderResult}
+            <ScanStatusCard
+              result={state.scanOutcome}
               resultsAlreadyShown={resultsAlreadyShown}
               onRetry={onResetToLanding}
               onConnectClick={onResultCardConnectClick}

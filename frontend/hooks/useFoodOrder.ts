@@ -40,7 +40,10 @@ export interface FoodState {
   idempotencyKey: string | null;
   outcome: FoodOutcome | null;
   notice: string | null;
+  /** The Swiggy tool behind `notice` / `error` when one refused, so a problem report can name it. */
+  noticeTool: string | null;
   error: string | null;
+  errorTool: string | null;
   authNeeded: boolean;
 }
 
@@ -56,20 +59,20 @@ type Action =
   | { type: 'BUILD_OK'; review: FoodReview; coupons: CouponList; key: string }
   | { type: 'COUPON_START'; code: string }
   | { type: 'COUPON_OK'; review: FoodReview; coupons: CouponList; coupon: AppliedCoupon; key: string }
-  | { type: 'COUPON_FAIL'; notice: string; unusableCode?: string }
+  | { type: 'COUPON_FAIL'; notice: string; unusableCode?: string; tool?: string | null }
   | { type: 'SELECT_PAYMENT'; key: string }
   | { type: 'PLACE_START' }
   | { type: 'PLACE_OK'; outcome: FoodOutcome }
-  | { type: 'REVIEW_NOTICE'; notice: string }
-  | { type: 'BACK'; notice?: string | null }
-  | { type: 'FAIL'; message: string; authNeeded: boolean }
+  | { type: 'REVIEW_NOTICE'; notice: string; tool?: string | null }
+  | { type: 'BACK'; notice?: string | null; tool?: string | null }
+  | { type: 'FAIL'; message: string; authNeeded: boolean; tool?: string | null }
   | { type: 'RESET' };
 
 const NO_COUPONS: CouponList = { available: false, items: [] };
 
 const initial: FoodState = {
   stage: 'searching', address: null, results: [], openId: null, picks: null, review: null, coupons: NO_COUPONS, appliedCoupon: null, couponBusy: null, paymentKey: null,
-  idempotencyKey: null, outcome: null, notice: null, error: null, authNeeded: false,
+  idempotencyKey: null, outcome: null, notice: null, noticeTool: null, error: null, errorTool: null, authNeeded: false,
 };
 
 /** Keep the user's payment choice if Swiggy still offers it, else prefer cash on delivery, else the first option. */
@@ -86,7 +89,7 @@ function reducer(state: FoodState, action: Action): FoodState {
     case 'SEARCH_OK':
       return { ...state, stage: 'picking', address: action.address, results: action.results };
     case 'OPEN':
-      return { ...state, openId: action.result.menuItemId, picks: initialPicks(action.result), notice: null };
+      return { ...state, openId: action.result.menuItemId, picks: initialPicks(action.result), notice: null, noticeTool: null };
     case 'CLOSE_ITEM':
       return { ...state, openId: null, picks: null };
     case 'VARIANT':
@@ -96,20 +99,21 @@ function reducer(state: FoodState, action: Action): FoodState {
     case 'QTY':
       return state.picks ? { ...state, picks: setQuantity(state.picks, action.quantity) } : state;
     case 'BUILD_START':
-      return { ...state, stage: 'building', notice: null, error: null };
+      return { ...state, stage: 'building', notice: null, noticeTool: null, error: null, errorTool: null };
     case 'BUILD_OK':
       // a rebuilt cart starts without a coupon (the cart is flushed first)
-      return { ...state, stage: 'reviewing', review: action.review, coupons: action.coupons, appliedCoupon: null, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null };
+      return { ...state, stage: 'reviewing', review: action.review, coupons: action.coupons, appliedCoupon: null, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null, noticeTool: null };
     case 'COUPON_START':
-      return { ...state, couponBusy: action.code, notice: null };
+      return { ...state, couponBusy: action.code, notice: null, noticeTool: null };
     case 'COUPON_OK':
       // the cart changed: never reuse an idempotency key from before the discount
-      return { ...state, review: action.review, coupons: action.coupons, appliedCoupon: action.coupon, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null };
+      return { ...state, review: action.review, coupons: action.coupons, appliedCoupon: action.coupon, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null, noticeTool: null };
     case 'COUPON_FAIL':
       return {
         ...state,
         couponBusy: null,
         notice: action.notice,
+        noticeTool: action.tool ?? null,
         coupons: action.unusableCode
           ? { ...state.coupons, items: state.coupons.items.map(c => (c.code === action.unusableCode ? { ...c, applicable: false, message: action.notice } : c)) }
           : state.coupons,
@@ -117,15 +121,15 @@ function reducer(state: FoodState, action: Action): FoodState {
     case 'SELECT_PAYMENT':
       return { ...state, paymentKey: action.key };
     case 'PLACE_START':
-      return { ...state, stage: 'placing', notice: null };
+      return { ...state, stage: 'placing', notice: null, noticeTool: null };
     case 'PLACE_OK':
       return { ...state, stage: 'done', outcome: action.outcome };
     case 'REVIEW_NOTICE':
-      return { ...state, stage: 'reviewing', notice: action.notice };
+      return { ...state, stage: 'reviewing', notice: action.notice, noticeTool: action.tool ?? null };
     case 'BACK':
-      return { ...state, stage: 'picking', review: null, appliedCoupon: null, couponBusy: null, idempotencyKey: null, notice: action.notice ?? null };
+      return { ...state, stage: 'picking', review: null, appliedCoupon: null, couponBusy: null, idempotencyKey: null, notice: action.notice ?? null, noticeTool: action.tool ?? null };
     case 'FAIL':
-      return { ...state, stage: 'error', error: action.message, authNeeded: action.authNeeded };
+      return { ...state, stage: 'error', error: action.message, errorTool: action.tool ?? null, authNeeded: action.authNeeded };
     case 'RESET':
       return { ...initial };
   }
@@ -146,9 +150,9 @@ const UNKNOWN_OUTCOME: FoodOutcome = {
   payment: null,
 };
 
-function describe(e: unknown): { message: string; authNeeded: boolean; code: string } {
-  if (e instanceof FoodApiError) return { message: e.message, authNeeded: e.code === 'auth_required', code: e.code };
-  return { message: "Couldn't reach the server. Check your connection and try again.", authNeeded: false, code: 'network' };
+function describe(e: unknown): { message: string; authNeeded: boolean; code: string; tool: string | null } {
+  if (e instanceof FoodApiError) return { message: e.message, authNeeded: e.code === 'auth_required', code: e.code, tool: e.tool };
+  return { message: "Couldn't reach the server. Check your connection and try again.", authNeeded: false, code: 'network', tool: null };
 }
 
 export function useFoodOrder() {
@@ -174,7 +178,7 @@ export function useFoodOrder() {
           target = null;
           continue;
         }
-        return dispatch({ type: 'FAIL', message: d.message, authNeeded: d.authNeeded });
+        return dispatch({ type: 'FAIL', message: d.message, authNeeded: d.authNeeded, tool: d.tool });
       }
     }
   }, []);
@@ -198,7 +202,7 @@ export function useFoodOrder() {
       const d = describe(e);
       if (run.current !== id) return;
       if (d.authNeeded) dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
-      else dispatch({ type: 'BACK', notice: d.message });
+      else dispatch({ type: 'BACK', notice: d.message, tool: d.tool });
     }
   }, []);
 
@@ -212,8 +216,8 @@ export function useFoodOrder() {
       const d = describe(e);
       if (run.current !== id) return;
       if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
-      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.` });
-      dispatch({ type: 'COUPON_FAIL', notice: d.message, unusableCode: COUPON_UNUSABLE.has(d.code) ? code : undefined });
+      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.`, tool: d.tool });
+      dispatch({ type: 'COUPON_FAIL', notice: d.message, unusableCode: COUPON_UNUSABLE.has(d.code) ? code : undefined, tool: COUPON_UNUSABLE.has(d.code) ? null : d.tool });
     }
   }, []);
 
@@ -248,7 +252,7 @@ export function useFoodOrder() {
       const d = describe(e);
       if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
       if (d.code === 'payment_unavailable' || d.code === 'checkout_in_progress') return dispatch({ type: 'REVIEW_NOTICE', notice: d.message });
-      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.` });
+      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.`, tool: d.tool });
       // No response at all (dropped connection): the order may or may not exist — never invite a blind retry.
       const ambiguous = d.code === 'network' || d.code === 'unexpected_response';
       dispatch({ type: 'PLACE_OK', outcome: ambiguous ? UNKNOWN_OUTCOME : { ...UNKNOWN_OUTCOME, status: 'failed', message: d.message } });

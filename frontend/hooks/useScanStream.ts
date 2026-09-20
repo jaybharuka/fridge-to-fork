@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useReducer, useRef } from 'react';
-import { authHeaders, markDisconnected } from '../lib/auth';
+import { useCallback, useReducer } from 'react';
+import { authHeaders } from '../lib/auth';
 import { BACKEND_URL } from '../lib/backend';
-import { FOOD_UNAVAILABLE_MESSAGE } from '../lib/features';
 import { readSSEStream } from '../lib/sse';
 import type { ChecklistItem, DetectedIngredient, MealSuggestion, ScanEvent, TopUpSuggestion } from '../lib/types';
 
@@ -20,18 +19,13 @@ export interface ScanState {
   topUpSuggestions: TopUpSuggestion[];
   awaitingChoice: boolean;
   recipeTabUnlocked: boolean;
-  orderResult:
+  /** What a failed scan leaves on screen (ScanStatusCard): an error, or an expired Swiggy session. */
+  scanOutcome:
     | null
-    | { kind: 'cook_confirmed' }
-    | { kind: 'order_placed'; orderId: string; platform: string; items: string[]; etaMinutes: number }
-    | { kind: 'cook_no_order' }
     | { kind: 'auth_required'; message?: string }
     | { kind: 'error'; message: string };
   scanError: string | null;
   timedOutVision: boolean;
-  /** True for the whole /api/order round trip — ChoiceCard disables its
-   *  buttons and spins the clicked one (templates/index.html:3849-3856). */
-  orderPlacing: boolean;
   /** True once the 'step1' event has actually arrived, even if it detected
    *  zero ingredients. Distinguishes "not scanned yet" from "scanned, found
    *  nothing" — both leave `detectedIngredients` as `[]`, so consumers that
@@ -44,8 +38,6 @@ type Action =
   | ScanEvent
   | { type: 'SCAN_START'; hasPhoto: boolean }
   | { type: 'TOGGLE_ITEM'; index: number }
-  | { type: 'ORDER_START' }
-  | { type: 'ORDER_END' }
   | { type: 'RESET' }
   | {
       type: 'RESTORE';
@@ -68,10 +60,9 @@ const initialState: ScanState = {
   topUpSuggestions: [],
   awaitingChoice: false,
   recipeTabUnlocked: false,
-  orderResult: null,
+  scanOutcome: null,
   scanError: null,
   timedOutVision: false,
-  orderPlacing: false,
   step1Received: false,
 };
 
@@ -137,28 +128,6 @@ function reducer(state: ScanState, action: Action): ScanState {
     case 'complete':
       return { ...state, phase: 'results' };
 
-    case 'cook_confirmed':
-      return { ...state, orderResult: { kind: 'cook_confirmed' } };
-
-    case 'step3': {
-      if (action.placed) {
-        return {
-          ...state,
-          orderResult: {
-            kind: 'order_placed',
-            orderId: action.order_id ?? '',
-            platform: action.platform ?? '',
-            items: action.items,
-            etaMinutes: action.eta_minutes ?? 0,
-          },
-        };
-      }
-      if (action.decision === 'cook') {
-        return { ...state, orderResult: { kind: 'cook_no_order' } };
-      }
-      return state;
-    }
-
     case 'error':
       return {
         ...state,
@@ -166,23 +135,14 @@ function reducer(state: ScanState, action: Action): ScanState {
         // revealResultsSection() (templates/index.html:4693-4695), so an
         // error must leave 'loading'/'photo-scanning' or the overlay hangs
         // forever. Results that were already on screen stay 'results' —
-        // OrderResultCard keys its inline-vs-full error card off that.
+        // ScanStatusCard keys its inline-vs-full error card off that.
         phase: state.phase === 'results' ? 'results' : 'error',
-        orderResult: { kind: 'error', message: action.message },
+        scanOutcome: { kind: 'error', message: action.message },
         scanError: action.message,
       };
 
     case 'auth_required':
-      return { ...state, orderResult: { kind: 'auth_required', message: action.message } };
-
-    // chooseAction() clears the order card before a retry
-    // (templates/index.html:3858) so a stale error doesn't linger for the
-    // whole second attempt.
-    case 'ORDER_START':
-      return { ...state, orderPlacing: true, orderResult: null, scanError: null };
-
-    case 'ORDER_END':
-      return { ...state, orderPlacing: false };
+      return { ...state, scanOutcome: { kind: 'auth_required', message: action.message } };
 
     case 'TOGGLE_ITEM':
       return {
@@ -238,7 +198,6 @@ function reducer(state: ScanState, action: Action): ScanState {
 
 export function useScanStream() {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const orderInFlight = useRef(false);
 
   const startScan = useCallback(
     async (mode: 'photo' | 'recipe', opts: { files?: File[]; targetDish: string; servings: number }) => {
@@ -263,37 +222,6 @@ export function useScanStream() {
     []
   );
 
-  const placeOrder = useCallback(
-    async (action: 'cook' | 'order_dish', mealName: string) => {
-      if (action === 'order_dish') {
-        // The Gemini-agent path for ordering the dish is retired for good (the backend refuses it too); the dish is
-        // ordered through the staged flow in FoodOrderSheet. Never send a Food order down this route.
-        dispatch({ type: 'error', message: FOOD_UNAVAILABLE_MESSAGE });
-        return;
-      }
-      if (orderInFlight.current) return;
-      orderInFlight.current = true;
-      dispatch({ type: 'ORDER_START' });
-      const form = new FormData();
-      form.append('action', action);
-      form.append('meal_name', mealName || '');
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/order`, { method: 'POST', body: form, credentials: 'include', headers: await authHeaders() });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        await readSSEStream(res, ev => {
-          if (ev.type === 'auth_required') markDisconnected();
-          dispatch(ev);
-        });
-      } catch {
-        dispatch({ type: 'error', message: 'Something went wrong. Try again.' });
-      } finally {
-        orderInFlight.current = false;
-        dispatch({ type: 'ORDER_END' });
-      }
-    },
-    []
-  );
-
   const toggleChecklistItem = useCallback((index: number) => {
     dispatch({ type: 'TOGGLE_ITEM', index });
   }, []);
@@ -309,5 +237,5 @@ export function useScanStream() {
     []
   );
 
-  return { state, startScan, placeOrder, toggleChecklistItem, reset, restore };
+  return { state, startScan, toggleChecklistItem, reset, restore };
 }

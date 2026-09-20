@@ -1,53 +1,20 @@
 """
-Swiggy MCP Agent — Google ADK
-==============================
-A real AI agent that connects to Swiggy's MCP servers and autonomously
-selects from available tools to fulfill food/grocery ordering tasks.
+Swiggy order hand-off for the CLI (`fridge-to-fork`, fridge_to_fork/agent.py).
 
-This replaces the hardcoded step3_order_router.py routing logic.
-The agent receives a natural language instruction derived from the
-meal plan decision and uses Gemini to decide which Swiggy tools to call.
+This used to be a Google ADK / Gemini agent that picked Swiggy MCP tools on its own. It invented order IDs and read
+success or failure out of free text, so it was retired: real orders are placed only by the deterministic, staged flows
+that show the user the real cart before any money moves:
+
+  * groceries -> fridge_to_fork/instamart.py
+  * the dish  -> fridge_to_fork/food.py
+
+What is left is the offline simulation the CLI's --dry-run uses (no network, no Swiggy) and refusals that point at
+those flows.
 """
 
-import os
-import re
 import uuid
 
-from google.adk.agents import Agent
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.adk.tools.mcp_tool.mcp_session_manager import (
-    StreamableHTTPConnectionParams,
-)
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.genai import types
-
-from .features import FOOD_AGENT_ENABLED
 from .models import Decision, MealPlan, OrderResult
-
-FOOD_MCP_URL = os.environ.get(
-    "SWIGGY_FOOD_MCP_URL", "https://mcp.swiggy.com/food"
-)
-DINEOUT_MCP_URL = os.environ.get(
-    "SWIGGY_DINEOUT_MCP_URL", "https://mcp.swiggy.com/dineout"
-)
-AGENT_MODEL = os.environ.get("SWIGGY_AGENT_MODEL", "gemini-2.5-flash")
-
-
-def _build_instruction(plan: MealPlan, delivery_address: str) -> str:
-    """Convert a MealPlan into a natural language instruction for the agent."""
-    meal_name = plan.recommended_meal.name if plan.recommended_meal else "the meal"
-
-    if plan.decision == Decision.ORDER_DISH:
-        return (
-            f"You have access to Swiggy Food tools. "
-            f"The user wants to order '{meal_name}' as a ready-made dish from "
-            f"a restaurant. Use Swiggy Food tools to search for this dish, "
-            f"find the best restaurant, and place a delivery order to: {delivery_address}. "
-            f"Report the order ID and ETA."
-        )
-    else:
-        return f"The user has all ingredients to cook '{meal_name}' at home."
 
 
 async def run_swiggy_agent(
@@ -57,12 +24,7 @@ async def run_swiggy_agent(
     *,
     dry_run: bool = False,
 ) -> OrderResult | None:
-    """
-    Run the Google ADK Swiggy agent to fulfill the meal plan.
-
-    The agent autonomously selects from all available Swiggy MCP tools
-    rather than following hardcoded routing logic.
-    """
+    """Simulate (dry_run) or refuse. Never contacts Swiggy and never places an order."""
     if plan.decision == Decision.COOK:
         return None
 
@@ -79,133 +41,14 @@ async def run_swiggy_agent(
         )
 
     if plan.decision == Decision.ORDER_GROCERIES:
-        # Real orders for Instamart go through fridge_to_fork.instamart only: this agent
-        # invented order IDs and guessed success from free text. (dry_run above still simulates.)
         return OrderResult(
             success=False,
             platform="swiggy_instamart",
             error="Instamart orders use the staged flow in fridge_to_fork.instamart",
         )
 
-    if plan.decision == Decision.ORDER_DISH and not FOOD_AGENT_ENABLED:
-        return OrderResult(
-            success=False,
-            platform="swiggy_food",
-            error="Ordering the finished dish is temporarily unavailable.",
-        )
-
-    if not access_token:
-        return OrderResult(
-            success=False,
-            platform="swiggy",
-            error="auth_required",
-        )
-
-    platform = "swiggy_food"
-
-    auth_headers = {"Authorization": f"Bearer {access_token}"}
-
-    tools = [
-        MCPToolset(
-            connection_params=StreamableHTTPConnectionParams(
-                url=FOOD_MCP_URL,
-                headers=auth_headers,
-            )
-        ),
-        MCPToolset(
-            connection_params=StreamableHTTPConnectionParams(
-                url=DINEOUT_MCP_URL,
-                headers=auth_headers,
-            )
-        ),
-    ]
-
-    agent = Agent(
-        name="swiggy_ordering_agent",
-        model=AGENT_MODEL,
-        instruction=(
-            "You are a food assistant integrated with Swiggy. "
-            "You have access to Swiggy Food (restaurant delivery) and Swiggy Dineout "
-            "(table reservations) tools. Grocery orders are not handled here. "
-            "Choose the right platform and tools based on the user's request. "
-            "Always confirm what you ordered or booked and provide the confirmation "
-            "ID and ETA or time. Use COD as the default payment method for orders."
-        ),
-        tools=tools,
-    )
-
-    session_service = InMemorySessionService()
-    runner = Runner(
-        agent=agent,
-        app_name="fridge_to_fork",
-        session_service=session_service,
-    )
-
-    session = await session_service.create_session(
-        app_name="fridge_to_fork",
-        user_id="user",
-    )
-
-    instruction = _build_instruction(plan, delivery_address)
-    message = types.Content(
-        role="user",
-        parts=[types.Part(text=instruction)],
-    )
-
-    final_response = ""
-
-    try:
-        async for event in runner.run_async(
-            user_id="user",
-            session_id=session.id,
-            new_message=message,
-        ):
-            if event.is_final_response() and event.content:
-                for part in event.content.parts:
-                    if part.text:
-                        final_response += part.text
-    except Exception as e:
-        err_str = str(e).lower()
-        if any(x in err_str for x in ["401", "32001", "unauthorized", "unauthenticated", "token"]):
-            return OrderResult(
-                success=False,
-                platform=platform,
-                error="auth_required",
-            )
-        return OrderResult(
-            success=False,
-            platform=platform,
-            error=f"Agent error: {str(e)[:200]}",
-        )
-
-    order_match = re.search(
-        r'(SWG-[A-Z0-9\-]+|IM-[A-Z0-9\-]+|order[_\s]?id[:\s]+([A-Z0-9\-]+))',
-        final_response, re.IGNORECASE
-    )
-    order_id = order_match.group(0) if order_match else None
-
-    eta_match = re.search(r'(\d+)[\s-]*(min|minute)', final_response, re.IGNORECASE)
-    eta = int(eta_match.group(1)) if eta_match else None
-
-    meal_name = plan.recommended_meal.name if plan.recommended_meal else "meal"
-    missing = plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
-
-    success = bool(order_id) or "confirmed" in final_response.lower() or "placed" in final_response.lower()
-
-    if not success:
-        resp_lower = final_response.lower()
-        if any(x in resp_lower for x in ["401", "unauthorized", "unauthenticated", "token expired"]):
-            return OrderResult(
-                success=False,
-                platform=platform,
-                error="auth_required",
-            )
-
     return OrderResult(
-        success=success,
-        order_id=order_id or f"SWG-{uuid.uuid4().hex[:8].upper()}",
-        platform=platform,
-        items=[meal_name] if plan.decision == Decision.ORDER_DISH else missing,
-        estimated_minutes=eta or (35 if plan.decision == Decision.ORDER_DISH else 15),
-        error=None if success else f"Agent could not complete order: {final_response[:200]}",
+        success=False,
+        platform="swiggy_food",
+        error="Food orders use the staged flow in fridge_to_fork.food",
     )

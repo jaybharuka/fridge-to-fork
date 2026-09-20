@@ -100,8 +100,8 @@ export default function Home() {
   // Stashes just enough state to resume the in-progress order after the
   // full-page OAuth redirect a "Connect with Swiggy" click triggers — see
   // lib/pendingOrder.ts. Two call sites: the order sheet's inline CTA
-  // (reopens the sheet with top-up picks intact) and OrderResultCard's CTA
-  // for the sheet-less order_dish flow (no top-ups, sheet not reopened).
+  // (reopens the sheet with top-up picks intact) and ScanStatusCard's CTA
+  // (no top-ups, sheet not reopened).
   const handleSheetConnectClick = useCallback((selectedTopUpNames: string[]) => {
     savePendingOrder({
       recommendedMeal: state.recommendedMeal ?? '',
@@ -165,7 +165,7 @@ export default function Home() {
     state.hasPhoto &&
     !photoDetectionRevealed &&
     (state.phase === 'photo-scanning' || state.step1Received);
-  // "Has the user actually seen results yet" — drives OrderResultCard's
+  // "Has the user actually seen results yet" — drives ScanStatusCard's
   // inline-strip vs. full-page error variant. `phase === 'results'` alone
   // misses an error that lands after the reveal finished but before
   // 'complete' (phase is 'error' by then, but results ARE on screen).

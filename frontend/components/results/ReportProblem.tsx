@@ -2,6 +2,7 @@
 
 import { Mail } from 'lucide-react';
 import { useState } from 'react';
+import { foodReport } from '@/lib/food';
 import { instamartReport, localReportText, type ProblemReport, type ReportInput } from '@/lib/instamart';
 import styles from './instamart.module.css';
 
@@ -16,6 +17,8 @@ interface ReportProblemProps {
   /** What went wrong, in Swiggy's terms: the failing tool, the error and the identifiers involved. */
   input: Omit<ReportInput, 'notes'>;
   label?: string;
+  /** Which Swiggy server the failing tool belongs to (its report goes to that server's report_error). */
+  product?: 'instamart' | 'food';
 }
 
 async function copy(text: string): Promise<boolean> {
@@ -30,7 +33,7 @@ async function copy(text: string): Promise<boolean> {
 // A way out of a dead end: asks Swiggy (report_error) to prepare a report, then hands the user a pre-filled
 // email to send themselves. Nothing is sent by us. If Swiggy can't prepare one, the user still gets the
 // technical details as text they can paste into Swiggy's own Help.
-export function ReportProblem({ input, label = 'Report a problem' }: ReportProblemProps) {
+export function ReportProblem({ input, label = 'Report a problem', product = 'instamart' }: ReportProblemProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [notes, setNotes] = useState('');
   const [copied, setCopied] = useState(false);
@@ -39,10 +42,10 @@ export function ReportProblem({ input, label = 'Report a problem' }: ReportProbl
     setPhase({ kind: 'busy' });
     const full: ReportInput = { ...input, ...(notes.trim() ? { notes: notes.trim() } : {}) };
     try {
-      const { report } = await instamartReport(full);
+      const { report } = await (product === 'food' ? foodReport(full) : instamartReport(full));
       setPhase({ kind: 'ready', report });
     } catch {
-      setPhase({ kind: 'unavailable', text: localReportText(full) });
+      setPhase({ kind: 'unavailable', text: localReportText(full, product === 'food' ? 'Food' : 'Instamart') });
     }
   };
 

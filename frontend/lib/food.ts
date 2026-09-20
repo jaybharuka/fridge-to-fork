@@ -2,7 +2,7 @@
 // search -> (item options) -> cart + review -> checkout. Real dishes from real restaurants and the real cart Swiggy
 // will bill are shown before the user's separate, explicit "Place order" action.
 
-import { InstamartApiError, postJson, type AppliedCoupon, type CouponList, type DeliveryStatus, type InstamartAddress, type PaymentOption } from './instamart';
+import { InstamartApiError, postJson, type AppliedCoupon, type CouponList, type DeliveryStatus, type InstamartAddress, type PaymentOption, type ProblemReport, type ReportInput } from './instamart';
 
 export { formatInr, newIdempotencyKey } from './instamart';
 export type { AppliedCoupon, Coupon, CouponList, DeliveryStatus, InstamartAddress, PaymentOption } from './instamart';
@@ -197,3 +197,15 @@ export const foodOrders = (addressId: string | null, activeOnly = false) =>
 export const foodOrderStatus = (orderId: string) => post<FoodOrderStatus>('order-status', { order_id: orderId });
 
 export const foodOrderDetails = (orderId: string) => post<{ details: FoodOrderDetails }>('order-details', { order_id: orderId });
+
+// ---- Report a problem (backend: fridge_to_fork/food_support.py -> Swiggy's report_error, domain "food") ----
+
+/** Same request as Instamart's report, to /api/food/report: identifiers only, never names, phones or addresses. */
+export const foodReport = (r: ReportInput) =>
+  post<{ report: ProblemReport }>('report', {
+    tool: r.tool,
+    error_message: r.errorMessage,
+    ...(r.flow ? { flow: r.flow } : {}),
+    ...(r.context && Object.keys(r.context).length ? { context: r.context } : {}),
+    ...(r.notes ? { notes: r.notes } : {}),
+  });
