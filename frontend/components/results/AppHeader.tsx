@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Check, Moon, Package, Sun } from 'lucide-react';
+import { Check, Moon, Package, Sun, UtensilsCrossed } from 'lucide-react';
+import { FOOD_ORDERING_ENABLED } from '@/lib/features';
 import { openOrders } from '@/lib/ordersUi';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -39,6 +40,11 @@ export function AppHeader() {
           {status === 'connected' && (
             <button type="button" className={styles.themeToggle} onClick={() => openOrders()} aria-label="Your Instamart orders">
               <Package />
+            </button>
+          )}
+          {status === 'connected' && FOOD_ORDERING_ENABLED && (
+            <button type="button" className={styles.themeToggle} onClick={() => openOrders(null, 'food')} aria-label="Your Food orders">
+              <UtensilsCrossed />
             </button>
           )}
           <button

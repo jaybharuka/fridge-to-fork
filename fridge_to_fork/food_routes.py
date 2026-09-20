@@ -6,6 +6,9 @@ HTTP surface for the staged Food flow (see food.py).
   POST /api/food/coupon    {address_id, coupon_code}                                  -> {review, coupon, coupons}
   POST /api/food/checkout  {address_id, expected_total, idempotency_key, payment_key} -> {order}
   POST /api/food/payment-status {order_id, paas_id, address_id, cart_id?, lat?, lng?, final} -> {order}
+  POST /api/food/orders    {address_id?, active_only}                                 -> {address, orders[]}
+  POST /api/food/order-status  {order_id}                                             -> {delivery, tracking, notes[]}
+  POST /api/food/order-details {order_id}                                             -> {details}
 
 Every response is `{ok: true, ...}` or `{ok: false, error: {code, message}}`, the same envelope as the Instamart
 routes. While FOOD_ORDERING_ENABLED is off every route refuses, before it even looks at auth.
@@ -16,7 +19,7 @@ from typing import Annotated, Awaitable, Callable, Literal
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, StringConstraints
 
-from . import features, food
+from . import features, food, food_orders
 from .swiggy_common import SwiggyError, error_response
 
 Id = Annotated[str, StringConstraints(min_length=1, max_length=120)]
@@ -70,6 +73,15 @@ class PaymentStatusRequest(BaseModel):
     final: bool = False  # polling deadline reached: confirm once and let Swiggy reconcile
 
 
+class OrdersRequest(BaseModel):
+    address_id: Id | None = None  # get_food_orders needs an address; omitted = Home/first
+    active_only: bool = False
+
+
+class OrderRefRequest(BaseModel):
+    order_id: Id
+
+
 class CheckoutRequest(BaseModel):
     address_id: Id
     expected_total: float = Field(gt=0, lt=100_000)
@@ -114,6 +126,18 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
             return {"order": order}
 
         return await run(request, act)
+
+    @router.post("/orders")
+    async def orders(body: OrdersRequest, request: Request):
+        return await run(request, lambda t: food_orders.list_orders(t, body.address_id, body.active_only))
+
+    @router.post("/order-status")
+    async def order_status(body: OrderRefRequest, request: Request):
+        return await run(request, lambda t: food_orders.order_status(t, body.order_id))
+
+    @router.post("/order-details")
+    async def order_details(body: OrderRefRequest, request: Request):
+        return await run(request, lambda t: food_orders.order_details(t, body.order_id))
 
     @router.post("/checkout")
     async def checkout(body: CheckoutRequest, request: Request):

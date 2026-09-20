@@ -11,11 +11,13 @@ interface OutcomeProps {
   payOnDelivery: boolean;
   onClose: () => void;
   onBackToCart: () => void;
+  /** Open live tracking for a placed order. */
+  onTrack: (orderId: string) => void;
 }
 
 const total = (value: Outcome['total']): string | null => (typeof value === 'number' ? formatInr(value) : value ? String(value) : null);
 
-export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart }: OutcomeProps) {
+export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
 
   // The parent hook is polling Swiggy; this screen just gives the user the payment page.
@@ -34,9 +36,10 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart }: O
           {payOnDelivery && amount ? <>Pay {amount} on delivery.</> : !payOnDelivery ? <>Payment received.</> : null}
         </p>
         {outcome.notice && <p className={styles.warn}>{outcome.notice}</p>}
-        <p className={styles.hint}>You can follow it in the Swiggy app.</p>
+        <p className={styles.hint}>Track it here or in the Swiggy app.</p>
         {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy — it&apos;s worth a glance in the app.</p>}
-        <button type="button" className={styles.primary} onClick={onClose}>Done</button>
+        {outcome.orderIds[0] && <button type="button" className={styles.primary} onClick={() => onTrack(outcome.orderIds[0])}>Track order</button>}
+        <button type="button" className={outcome.orderIds[0] ? styles.secondary : styles.primary} onClick={onClose}>Done</button>
       </div>
     );
   }

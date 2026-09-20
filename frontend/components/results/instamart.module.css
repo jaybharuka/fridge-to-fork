@@ -166,3 +166,5 @@ select.input { appearance: auto; }
 .qtyLabel { font-size: 13px; color: rgba(255,255,255,0.6); }
 .cartVariants { font-size: 12px; color: rgba(255,255,255,0.45); margin: 2px 0 0 0; }
 .strike { text-decoration: line-through; color: rgba(255,255,255,0.35); margin-right: 6px; }
+.progressTrack { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.1); margin: 10px 0 2px 0; overflow: hidden; }
+.progressBar { height: 100%; border-radius: 999px; background: #FC8019; transition: width .6s ease; }
