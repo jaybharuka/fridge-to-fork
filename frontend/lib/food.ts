@@ -126,8 +126,14 @@ export const foodSearch = (dish: string, addressId: string | null = null) =>
 export const foodCart = (addressId: string, selection: FoodSelection) =>
   post<{ review: FoodReview; adjustments: string[]; coupons: CouponList }>('cart', { address_id: addressId, selection });
 
-export const foodApplyCoupon = (addressId: string, couponCode: string) =>
-  post<{ review: FoodReview; coupon: AppliedCoupon; coupons: CouponList }>('coupon', { address_id: addressId, coupon_code: couponCode });
+/** `restaurant` is the one the reviewed cart was built for: fetch_food_coupons needs it and the cart doesn't always name it. */
+export const foodApplyCoupon = (addressId: string, couponCode: string, restaurant: { id: string | null; name: string | null } | null = null) =>
+  post<{ review: FoodReview; coupon: AppliedCoupon; coupons: CouponList }>('coupon', {
+    address_id: addressId,
+    coupon_code: couponCode,
+    ...(restaurant?.id ? { restaurant_id: restaurant.id } : {}),
+    ...(restaurant?.name ? { restaurant_name: restaurant.name } : {}),
+  });
 
 export const foodPaymentStatus = (payment: FoodPendingPayment, final: boolean) =>
   post<{ order: FoodOutcome }>('payment-status', {

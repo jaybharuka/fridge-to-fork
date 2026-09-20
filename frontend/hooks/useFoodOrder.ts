@@ -206,11 +206,11 @@ export function useFoodOrder() {
     }
   }, []);
 
-  const applyCoupon = useCallback(async (addressId: string, code: string) => {
+  const applyCoupon = useCallback(async (addressId: string, code: string, restaurant: { id: string | null; name: string | null } | null) => {
     const id = run.current;
     dispatch({ type: 'COUPON_START', code });
     try {
-      const { review, coupons, coupon } = await foodApplyCoupon(addressId, code);
+      const { review, coupons, coupon } = await foodApplyCoupon(addressId, code, restaurant);
       if (run.current === id) dispatch({ type: 'COUPON_OK', review, coupons, coupon, key: newIdempotencyKey() });
     } catch (e) {
       const d = describe(e);

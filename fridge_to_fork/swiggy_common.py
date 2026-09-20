@@ -337,6 +337,25 @@ async def _fetch_payment(
     return {"options": options, "amount": (view or {}).get("paymentAmount")}
 
 
+def _describe_view_extras(view: dict) -> str:
+    """The parts of a PaymentOptionsView the classifier does NOT read, so "no cash offered" can be told from "cash is
+    somewhere we don't look". Food's view (get_food_cart docs) adds upiMethods, allGroups[{group_name, display_name,
+    methods}] (snake_case, unlike groupName) and markdown. Ids, group names and field types only; nothing personal."""
+    def ids(methods) -> list[str]:
+        return [str(m.get("id")) for m in methods if isinstance(m, dict)][:20] if isinstance(methods, list) else []
+
+    groups_raw = view.get("allGroups")
+    groups = [
+        {"group": g.get("group_name") or g.get("groupName"), "display": g.get("display_name") or g.get("displayName"), "ids": ids(g.get("methods"))}
+        for g in (groups_raw if isinstance(groups_raw, list) else []) if isinstance(g, dict)
+    ]
+    platforms = {name: ids(g.get("methods")) for name, g in (view.get("platforms") or {}).items() if isinstance(g, dict)}
+    return (
+        f"allGroups={groups} upiMethods={ids(view.get('upiMethods'))} platform_ids={platforms} "
+        f"placeOrderToolName={view.get('placeOrderToolName')!r} field_types={ {k: type(v).__name__ for k, v in view.items()} }"
+    )
+
+
 def _log_payment_view(tag: str, stage: str, source: str, tool_error: str | None, view: dict | None, options: list[dict], cart_note: str) -> None:
     """Diagnostic: exactly what Swiggy listed before our filtering, next to the cart's value, so "Swiggy offered
     only cash" can be told from "we filtered a method out". Identifiers and amounts only; nothing personal."""
@@ -344,9 +363,9 @@ def _log_payment_view(tag: str, stage: str, source: str, tool_error: str | None,
     platforms = {name: len((group or {}).get("methods") or []) for name, group in (view.get("platforms") or {}).items()}
     log.warning(
         "[%s][diag] payment options (%s): source=%s tool_error=%r view_keys=%s cod=%s allMethods=%d platform_methods=%s "
-        "paymentAmount=%r | offered=%s | methods=%s | cart: %s",
+        "paymentAmount=%r | offered=%s | methods=%s | extras: %s | cart: %s",
         tag, stage, source, tool_error, sorted(view), view.get("cod"), len(view.get("allMethods") or []), platforms,
-        view.get("paymentAmount"), [o["key"] for o in options], _explain_methods(view), cart_note,
+        view.get("paymentAmount"), [o["key"] for o in options], _explain_methods(view), _describe_view_extras(view), cart_note,
     )
 
 

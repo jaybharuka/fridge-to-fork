@@ -299,11 +299,15 @@ async def _fetch_payment(session: ClientSession, cart: dict, address_id: str, st
     return {**payment, "options": [o for o in payment["options"] if o["type"] in OFFERED_PAYMENT_TYPES]}
 
 
-def _review(cart: dict, payment: dict, address: dict) -> dict:
+def _review(cart: dict, payment: dict, address: dict, fallback_restaurant: dict | None = None) -> dict:
+    """`fallback_restaurant` ({id, name}) fills in what the cart doesn't say: the docs type the cart's `restaurant` as
+    optional ("the cart API does not always return it"). It only ever comes from the request that built or reviewed
+    this very cart, and the cart's own id wins whenever it has one."""
     inner = _inner(cart)
     pricing = inner.get("pricing") or {}
     offers = inner.get("offers") or {}
     restaurant = inner.get("restaurant") or {}
+    fallback = fallback_restaurant or {}
     items = [_cart_line(i) for i in inner.get("items") or [] if isinstance(i, dict)]
     to_pay = _num(pricing.get("to_pay"))
     discount = _num(offers.get("coupon_discount")) or 0
@@ -327,7 +331,12 @@ def _review(cart: dict, payment: dict, address: dict) -> dict:
         lines.append({"label": f"Coupon {offers.get('coupon_applied') or ''}".strip(), "value": -discount})
     return {
         "address": {"id": address["id"], "text": address["addressLine"], "label": address["label"]},
-        "restaurant": {"id": restaurant.get("id"), "name": restaurant.get("name"), "area": restaurant.get("area"), "deliverySubtitle": restaurant.get("deliverySubtitle")},
+        "restaurant": {
+            "id": restaurant.get("id") if restaurant.get("id") not in (None, "") else (fallback.get("id") or None),
+            "name": restaurant.get("name") or fallback.get("name") or None,
+            "area": restaurant.get("area"),
+            "deliverySubtitle": restaurant.get("deliverySubtitle"),
+        },
         "items": items,
         "lineItems": lines,
         "total": to_pay,
@@ -362,7 +371,7 @@ def _coupon(item: dict) -> dict:
 
 
 async def _list_coupons(session: ClientSession, restaurant_id: str, address_id: str) -> dict:
-    data = await _call(session, "fetch_food_coupons", restaurantId=restaurant_id, addressId=address_id)
+    data = await _logged(session, "fetch_food_coupons", restaurantId=restaurant_id, addressId=address_id)
     seen: dict[str, dict] = {}
     for section in data.get("coupon_sections") or []:
         for raw in (section or {}).get("coupons") or []:
@@ -432,7 +441,8 @@ async def build_cart(token: str, address_id: str, sel: dict) -> dict:
             raise SwiggyError("cart_mismatch", f"{mismatch} Nothing was ordered. Try again, or order in the Swiggy app.", tool="update_food_cart")
         payment = await _fetch_payment(session, cart, address["id"], stage="cart")
         coupons = await _coupons_or_none(session, sel["restaurant_id"], address["id"])
-    return {"review": _review(cart, payment, address), "adjustments": [], "coupons": coupons}
+    review = _review(cart, payment, address, {"id": sel["restaurant_id"], "name": sel.get("restaurant_name")})
+    return {"review": review, "adjustments": [], "coupons": coupons}
 
 
 def _same_items(a: dict, b: dict) -> bool:
@@ -440,35 +450,49 @@ def _same_items(a: dict, b: dict) -> bool:
     return key(a) == key(b)
 
 
-async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
+async def apply_coupon(token: str, address_id: str, coupon_code: str, restaurant_id: str | None = None, restaurant_name: str | None = None) -> dict:
     """Apply one of the coupons Swiggy currently lists for this cart, then re-read the cart.
 
     Everything is re-verified server-side, never trusted from the client: the cart must be orderable and hold the same
     items before and after, the coupon must still be listed AND applicable now, and the cart must then show a positive
     discount with a lower total. (Swiggy: a coupon with discount 0 is only a suggestion, not applied.)
+
+    fetch_food_coupons needs a restaurantId, and the cart doesn't always name its restaurant. So the restaurant the
+    reviewed cart was built for (`restaurant_id`, sent back by the review) is used when the cart is silent, and must
+    agree with the cart whenever the cart does say. The name is passed to get_food_cart the way build_cart does.
     """
     async with _session(token) as session:
         address = await _resolve_address(session, address_id)
-        before_cart = await _call(session, "get_food_cart", addressId=address["id"])
-        before = _review(before_cart, await _fetch_payment(session, before_cart, address["id"], stage="coupon-before"), address)
+        name_arg = {"restaurantName": restaurant_name} if restaurant_name else {}
+        before_cart = await _logged(session, "get_food_cart", addressId=address["id"], **name_arg)
+        cart_restaurant = _inner(before_cart).get("restaurant") or {}
+        cart_restaurant_id = cart_restaurant.get("id") if cart_restaurant.get("id") not in (None, "") else None
+        log.warning(
+            "[FOOD][diag] coupon: cart restaurant fields=%s cart_restaurant_id=%r supplied_restaurant_id=%r name_sent=%s",
+            sorted(cart_restaurant), cart_restaurant_id, restaurant_id, bool(restaurant_name),
+        )
+        if cart_restaurant_id is not None and restaurant_id and str(cart_restaurant_id) != str(restaurant_id):
+            raise SwiggyError("cart_changed", "Your cart is now for a different restaurant. Please review it again.")
+        fallback = {"id": restaurant_id, "name": restaurant_name}
+        before = _review(before_cart, await _fetch_payment(session, before_cart, address["id"], stage="coupon-before"), address, fallback)
         if before["blockers"]:
             raise SwiggyError("cart_blocked", before["blockers"][0])
-        restaurant_id = before["restaurant"]["id"]
-        if not restaurant_id:
+        coupon_restaurant_id = before["restaurant"]["id"]
+        if not coupon_restaurant_id:
             raise SwiggyError("cart_blocked", "Swiggy didn't say which restaurant this cart is for. Please review it again.")
 
-        listed = (await _list_coupons(session, str(restaurant_id), address["id"]))["items"]
+        listed = (await _list_coupons(session, str(coupon_restaurant_id), address["id"]))["items"]
         match = next((c for c in listed if c["code"].lower() == coupon_code.strip().lower()), None)
         if match is None:
             raise SwiggyError("coupon_not_found", "That coupon isn't available for this cart anymore.")
         if not match["applicable"]:
             raise SwiggyError("coupon_not_applicable", match["message"] or "That coupon can't be applied to this cart.")
 
-        await _call(session, "apply_food_coupon", couponCode=match["code"], addressId=address["id"])
-        after_cart = await _call(session, "get_food_cart", addressId=address["id"])
+        await _logged(session, "apply_food_coupon", couponCode=match["code"], addressId=address["id"])
+        after_cart = await _logged(session, "get_food_cart", addressId=address["id"], **name_arg)
         payment = await _fetch_payment(session, after_cart, address["id"], stage="coupon-after")
-        relisted = await _coupons_or_none(session, str(restaurant_id), address["id"])
-        after = _review(after_cart, payment, address)
+        relisted = await _coupons_or_none(session, str(coupon_restaurant_id), address["id"])
+        after = _review(after_cart, payment, address, fallback)
 
     offers = _inner(after_cart).get("offers") or {}
     discount = _num(offers.get("coupon_discount")) or 0
