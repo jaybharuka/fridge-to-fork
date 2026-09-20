@@ -63,9 +63,41 @@ def _order_summary(order: dict, saved: list[dict]) -> dict:
     }
 
 
+def _describe_orders(data) -> str:
+    """Shape of a get_orders `data` for the log: counts, field names, status values, timestamps. No addresses,
+    names, phone numbers or item names, only structure and identifiers."""
+    if not isinstance(data, dict):
+        return f"data is {type(data).__name__}"
+    raw = data.get("orders")
+    orders = [o for o in raw if isinstance(o, dict)] if isinstance(raw, list) else []
+    first = orders[0] if orders else {}
+    address = first.get("deliveryAddress")
+    return (
+        f"data_keys={sorted(data)} orders_is={type(raw).__name__} returned={len(orders)} hasMore={data.get('hasMore')!r} "
+        f"without_orderId={sum(1 for o in orders if not o.get('orderId'))} "
+        f"status={sorted({str(o.get('status')) for o in orders})} currentStatus={sorted({str(o.get('currentStatus')) for o in orders})} "
+        f"isActive={sorted({str(o.get('isActive')) for o in orders})} createdAt={[o.get('createdAt') for o in orders][:10]} "
+        f"first_order_fields={ {k: type(v).__name__ for k, v in first.items()} } "
+        f"first_deliveryAddress_fields={sorted(address) if isinstance(address, dict) else type(address).__name__} "
+        f"orderIds={[str(o.get('orderId')) for o in orders][:10]}"
+    )
+
+
+async def _probe_without_order_type(session) -> str:
+    """Diagnostic only, run when INSTAMART came back empty: does get_orders with no orderType (Swiggy's own default)
+    list anything? Logged, never shown."""
+    try:
+        return _describe_orders(await _call(session, "get_orders", activeOnly=False, count=10))
+    except InstamartError as exc:
+        return f"probe failed: {exc.code} {exc.message}"
+
+
 async def list_orders(token: str, active_only: bool = False) -> dict:
     async with instamart._session(token) as session:
         data = await _call(session, "get_orders", orderType="INSTAMART", activeOnly=active_only, count=10)
+        log.warning("[INSTAMART][diag] get_orders (orderType=INSTAMART activeOnly=%s count=10): %s", active_only, _describe_orders(data))
+        if not (data.get("orders") or []):
+            log.warning("[INSTAMART][diag] get_orders returned nothing; raw data=%.300r | same call with no orderType: %s", data, await _probe_without_order_type(session))
         try:
             saved = (await _call(session, "get_addresses")).get("addresses") or []
         except InstamartError as exc:
@@ -73,6 +105,7 @@ async def list_orders(token: str, active_only: bool = False) -> dict:
                 raise
             saved = []
     orders = [_order_summary(o, saved) for o in data.get("orders") or [] if o.get("orderId")]
+    log.warning("[INSTAMART][diag] get_orders parsed: kept=%d with_address_id=%d", len(orders), sum(1 for o in orders if o["addressId"]))
     return {"orders": orders, "hasMore": bool(data.get("hasMore"))}
 
 
