@@ -8,10 +8,12 @@ import { useSelectedAddressId } from '@/lib/addressStore';
 import { pickProblem } from '@/lib/foodSelection';
 import { openOrders } from '@/lib/ordersUi';
 import { formatInr } from '@/lib/food';
+import type { ReportContext } from '@/lib/instamart';
 import { AddressPicker } from './AddressPicker';
 import { FoodOutcome } from './FoodOutcome';
 import { FoodPicker } from './FoodPicker';
 import { FoodReview } from './FoodReview';
+import { ReportProblem } from './ReportProblem';
 import resultsStyles from './results.module.css';
 import styles from './instamart.module.css';
 
@@ -80,6 +82,22 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
   const openResult = state.results.find(r => r.menuItemId === state.openId) ?? null;
   const problem = openResult && state.picks ? pickProblem(openResult, state.picks) : null;
   const selectedPayment = state.review?.payment.options.find(o => o.key === state.paymentKey) ?? null;
+  // Identifiers a problem report should carry (no names, phone numbers or address text).
+  const restaurantId = state.review?.restaurant.id ?? openResult?.restaurant.id ?? null;
+  const addressId = state.review?.address.id ?? state.address?.id ?? null;
+  const reportContext: ReportContext = {
+    ...(addressId ? { addressId } : {}),
+    ...(restaurantId ? { restaurantId } : {}),
+    ...(openResult ? { menu_item_id: openResult.menuItemId } : {}),
+    ...(selectedPayment ? { paymentMethod: selectedPayment.type === 'cod' ? 'Cash' : 'UPI' } : {}),
+    ...(state.appliedCoupon ? { couponCode: state.appliedCoupon.code } : {}),
+  };
+  const noticeReport = state.notice && state.noticeTool && (
+    <ReportProblem
+      product="food"
+      input={{ tool: state.noticeTool, errorMessage: state.notice, flow: state.review ? 'Reviewed the Food cart' : 'Chose a dish and built the Food cart', context: reportContext }}
+    />
+  );
   const needsConnect = auth.status === 'disconnected' || state.authNeeded;
   const busy = auth.status === 'loading' || state.stage === 'searching' || state.stage === 'building';
 
@@ -109,9 +127,13 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
             <p className={styles.outcomeBody}>{state.error}</p>
             <button type="button" className={styles.primary} onClick={() => order.search(dish, selectedAddressId)}>Try again</button>
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
+            <ReportProblem
+              product="food"
+              input={{ tool: state.errorTool ?? 'search_menu', errorMessage: state.error ?? 'Search failed', flow: 'Searched Swiggy Food for the dish', context: { ...((state.address?.id ?? selectedAddressId) ? { addressId: (state.address?.id ?? selectedAddressId) as string } : {}), query: dish } }}
+            />
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <FoodOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id, 'food', state.review?.address.id ?? null); }} />
+          <FoodOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id, 'food', state.review?.address.id ?? null); }} reportTool={selectedPayment && selectedPayment.type !== 'cod' ? 'check_payment_status' : 'place_food_order'} reportContext={reportContext} />
         ) : state.stage === 'picking' && addressOpen ? (
           <AddressPicker
             currentId={state.address?.id ?? null}
@@ -125,6 +147,7 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
         ) : state.stage === 'picking' ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
+            {noticeReport}
             {state.address && (
               <p className={styles.address}>
                 Delivering to <strong>{state.address.label}</strong> — {state.address.addressLine}{' '}
@@ -156,6 +179,7 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
         ) : state.review ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
+            {noticeReport}
             <FoodReview
               review={state.review}
               coupons={state.coupons}

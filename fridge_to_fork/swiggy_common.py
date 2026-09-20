@@ -418,7 +418,8 @@ async def _settle_payment(session: ClientSession, order_id: str, *, check_args: 
     status = await _call(session, "check_payment_status", **check_args)
     state = str(status.get("status") or "").lower()
     if status.get("isTerminalFailure") or state in _PAYMENT_FAILED_STATES:
-        return _outcome("failed", _PAYMENT_MESSAGES.get(state, "The payment didn't go through. Nothing was ordered."))
+        # the order id stays on a failure: it exists on Swiggy's side, and a problem report has to name it
+        return _outcome("failed", _PAYMENT_MESSAGES.get(state, "The payment didn't go through. Nothing was ordered."), [order_id])
     succeeded = bool(status.get("isTerminalSuccess")) or state in {"success", "paid"}
     if succeeded and status.get("confirmed"):
         return _outcome("placed", "Order placed.", [order_id])
@@ -429,7 +430,35 @@ async def _settle_payment(session: ClientSession, order_id: str, *, check_args: 
     if result == "success":
         return _outcome("placed", "Order placed.", [order_id])
     if result == "failed":
-        return _outcome("failed", "Swiggy couldn't complete the order after payment. Check the Swiggy app.")
+        return _outcome("failed", "Swiggy couldn't complete the order after payment. Check the Swiggy app.", [order_id])
     if final:
         return _outcome("unknown", "We couldn't confirm the payment yet. Check the Swiggy app before trying again.", [order_id])
     return _outcome("pending_payment", "Confirming your payment…", [order_id])
+
+
+# ---------------------------------------------------------------------------
+# "Report a problem": Swiggy's report_error is one tool on every server, so preparing a report is shared too
+# ---------------------------------------------------------------------------
+
+async def _prepare_report(
+    session: ClientSession, *, domain: str, tool: str, error_message: str, flow: str | None, context: dict[str, str], notes: str | None
+) -> dict:
+    """report_error(tool, errorMessage, domain?, flowDescription?, toolContext?, userNotes?) -> data.mailto (a pre-filled
+    mailto: link) + data.summary {subject, body}. Nothing is sent by the tool: the user opens the email and sends it to
+    the Swiggy MCP team themselves. Identity and token come from the authenticated session, never from arguments."""
+    args: dict = {"tool": tool, "errorMessage": error_message, "domain": domain}
+    if flow:
+        args["flowDescription"] = flow
+    if context:
+        args["toolContext"] = context
+    if notes:
+        args["userNotes"] = notes
+    data = await _call(session, "report_error", **args)
+    mailto = data.get("mailto")
+    if not (isinstance(mailto, str) and mailto.lower().startswith("mailto:")):
+        # Only ever hand the browser a real mailto: link, whatever the tool returned.
+        mailto = None
+    summary = data.get("summary") or {}
+    if not mailto and not summary.get("body"):
+        raise SwiggyError("tool_error", "Swiggy didn't return a report to send.")
+    return {"report": {"mailto": mailto, "subject": summary.get("subject"), "body": summary.get("body")}}

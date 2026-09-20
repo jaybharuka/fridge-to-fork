@@ -267,7 +267,7 @@ class OrderRouteTests(unittest.TestCase):
 
     def test_the_routes_refuse_while_the_flow_is_off_even_without_auth(self):
         for path, body in (("orders", {}), ("order-status", {"order_id": "o"}), ("order-details", {"order_id": "o"})):
-            with patch.object(food_orders, "list_orders", AsyncMock()) as fn:
+            with patch.object(features, "FOOD_ORDERING_ENABLED", False), patch.object(food_orders, "list_orders", AsyncMock()) as fn:
                 r = self.post(path, body)
             self.assertEqual((r.status_code, r.json()["error"]["code"]), (403, "food_disabled"), path)
             fn.assert_not_awaited()

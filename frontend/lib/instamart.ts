@@ -264,10 +264,12 @@ export const instamartGoToItems = (addressId: string) =>
 // ---- Report a problem (backend: fridge_to_fork/instamart_support.py -> Swiggy's report_error) ----
 
 /** Identifiers report_error accepts as toolContext. Names and phone numbers are deliberately not among them. */
-export type ReportContext = Partial<Record<'orderId' | 'addressId' | 'spinId' | 'couponCode' | 'query' | 'cartId' | 'paymentMethod', string>>;
+export type ReportContext = Partial<
+  Record<'orderId' | 'addressId' | 'spinId' | 'couponCode' | 'query' | 'cartId' | 'paymentMethod' | 'restaurantId' | 'menu_item_id', string>
+>;
 
 export interface ReportInput {
-  /** The Instamart tool that failed (e.g. "checkout"). */
+  /** The Swiggy tool that failed (e.g. "checkout" for Instamart, "place_food_order" for Food). */
   tool: string;
   errorMessage: string;
   flow?: string;
@@ -288,8 +290,8 @@ export const instamartReport = (r: ReportInput) =>
   });
 
 /** Plain-text version of a report, for when Swiggy can't prepare one: nothing personal, just what failed. */
-export function localReportText(r: ReportInput): string {
-  const lines = ['Problem with Instamart in Fridge to Fork', `Tool: ${r.tool}`, `Error: ${r.errorMessage}`];
+export function localReportText(r: ReportInput, product = 'Instamart'): string {
+  const lines = [`Problem with ${product} in Fridge to Fork`, `Tool: ${r.tool}`, `Error: ${r.errorMessage}`];
   if (r.flow) lines.push(`What I was doing: ${r.flow}`);
   for (const [key, value] of Object.entries(r.context ?? {})) lines.push(`${key}: ${value}`);
   if (r.notes) lines.push(`Notes: ${r.notes}`);

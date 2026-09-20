@@ -481,28 +481,6 @@
 .authCta:active { background: #D4640A; transform: translateY(0) scale(.98); }
 .authCta svg { width: 20px; height: 20px; }
 
-/* Order confirmed — templates/index.html:968-979 */
-.orderCard { background: transparent; border: none; box-shadow: none; border-radius: 0; padding: 20px; margin-bottom: 32px; }
-.orderIconWrap { text-align: center; margin-bottom: 8px; }
-.orderIconWrap svg {
-  color: var(--swiggy-green); display: inline-flex; align-items: center; justify-content: center;
-  width: 48px; height: 48px; border-radius: 50%; background: var(--orange-light);
-}
-.orderTitle { text-align: center; color: var(--swiggy-green); font-size: 18px; font-weight: 700; }
-.orderId { text-align: center; font-family: 'Courier New', monospace; color: var(--swiggy-text-2); font-size: 13px; margin-top: 6px; overflow-wrap: break-word; word-break: break-all; }
-.orderDetails { margin-top: 14px; }
-.orderRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--swiggy-hairline); flex-wrap: wrap; }
-.orderRow:first-child { border-top: none; }
-.orderLabel { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--swiggy-text-3); flex-shrink: 0; }
-.orderValue { font-size: 13px; font-weight: 400; color: var(--swiggy-text); text-align: right; min-width: 0; overflow-wrap: break-word; word-break: normal; }
-.orderValue.eta { color: var(--swiggy-orange); font-weight: 700; }
-
-/* Cook confirmed — templates/index.html:981-985 */
-.cookCard { background: transparent; border: none; box-shadow: none; border-radius: 0; padding: 20px; margin-bottom: 32px; text-align: center; }
-.cookCard svg { font-size: 24px; color: var(--swiggy-green); margin-bottom: 8px; display: inline-block; width: 24px; height: 24px; }
-.cookCardTitle { color: var(--swiggy-green); font-weight: 600; font-size: 16px; }
-.cookCardSub { color: var(--swiggy-text-2); font-size: 13px; margin-top: 6px; }
-
 /* Error card (inline, resultsAlreadyShown) — templates/index.html:987-1004 */
 .errorCard {
   background: var(--red-dim); border: 1px solid var(--red-border); border-radius: 16px; padding: 16px; font-size: 13px;

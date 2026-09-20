@@ -768,6 +768,7 @@ class PaymentStatusTests(FoodCase):
             out, s = await self.poll(status)
             self.assertEqual(out["status"], "failed", status)
             self.assertIn(expected, out["message"], status)
+            self.assertEqual(out["orderIds"], ["F-1001"], status)  # a failed payment still names its order (a report needs it)
             self.assertNotIn("confirm_order", s.names(), status)
 
     async def test_confirm_reporting_pending_keeps_waiting(self):
@@ -776,7 +777,7 @@ class PaymentStatusTests(FoodCase):
 
     async def test_confirm_reporting_failure_is_a_failure(self):
         out, _ = await self.poll({"status": "success", "isTerminalSuccess": True}, confirm={"orderId": "F-1001", "result": "failed"})
-        self.assertEqual(out["status"], "failed")
+        self.assertEqual((out["status"], out["orderIds"]), ("failed", ["F-1001"]))
 
     async def test_at_the_deadline_it_asks_swiggy_to_reconcile_once_then_gives_up_as_unknown(self):
         out, s = await self.poll({"status": "pending", "terminal": False}, confirm={"orderId": "F-1001", "result": "pending"}, final=True)
@@ -826,10 +827,9 @@ class FoodRouteTests(unittest.TestCase):
         return self.client.post(f"/api/food/{path}", json=body, headers=headers or {})
 
     def test_every_route_refuses_while_the_flow_is_off_even_without_auth(self):
-        self.assertFalse(features.FOOD_ORDERING_ENABLED)
         for path, body in (("search", {"dish": "x"}), ("cart", {"address_id": "a", "selection": selection()}),
                            ("checkout", {"address_id": "a", "expected_total": 100, "payment_key": "cod", "idempotency_key": "idem-key-0001"})):
-            with patch.object(food, "search_dish", AsyncMock()) as fn:
+            with patch.object(features, "FOOD_ORDERING_ENABLED", False), patch.object(food, "search_dish", AsyncMock()) as fn:
                 r = self.post(path, body)
             self.assertEqual(r.status_code, 403, path)
             self.assertEqual(r.json()["error"]["code"], "food_disabled", path)
@@ -875,7 +875,8 @@ class FoodRouteTests(unittest.TestCase):
 
     def test_the_new_routes_refuse_while_the_flow_is_off_even_without_auth(self):
         for path, body in (("coupon", {"address_id": "a", "coupon_code": "X"}), ("payment-status", {"order_id": "o", "paas_id": "p", "address_id": "a"})):
-            r = self.post(path, body)
+            with patch.object(features, "FOOD_ORDERING_ENABLED", False):
+                r = self.post(path, body)
             self.assertEqual((r.status_code, r.json()["error"]["code"]), (403, "food_disabled"), path)
 
     def test_bad_payment_status_input_is_rejected(self):
