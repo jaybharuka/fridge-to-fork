@@ -26,8 +26,9 @@ function StatusChip({ status }: { status: string }) {
   return <span className={`${styles.chip} ${kind}`}>{status || 'Placed'}</span>;
 }
 
+// get_orders only returns the last 15 days (per Swiggy's reference), so an empty list means "none recently", not "never".
 function OrderList({ orders, onPick }: { orders: OrderSummary[]; onPick: (id: string) => void }) {
-  if (orders.length === 0) return <p className={styles.none}>No Instamart orders yet.</p>;
+  if (orders.length === 0) return <p className={styles.none}>No Instamart orders in the last 15 days.</p>;
   const active = orders.filter(o => !isPastOrder(o.status));
   const past = orders.filter(o => isPastOrder(o.status));
   const group = (label: string, rows: OrderSummary[]) =>
