@@ -6,6 +6,7 @@ import { useFoodOrder, type Stage } from '@/hooks/useFoodOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedAddressId } from '@/lib/addressStore';
 import { pickProblem } from '@/lib/foodSelection';
+import { openOrders } from '@/lib/ordersUi';
 import { formatInr } from '@/lib/food';
 import { AddressPicker } from './AddressPicker';
 import { FoodOutcome } from './FoodOutcome';
@@ -110,7 +111,7 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <FoodOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} />
+          <FoodOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id, 'food', state.review?.address.id ?? null); }} />
         ) : state.stage === 'picking' && addressOpen ? (
           <AddressPicker
             currentId={state.address?.id ?? null}

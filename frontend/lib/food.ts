@@ -2,10 +2,10 @@
 // search -> (item options) -> cart + review -> checkout. Real dishes from real restaurants and the real cart Swiggy
 // will bill are shown before the user's separate, explicit "Place order" action.
 
-import { InstamartApiError, postJson, type AppliedCoupon, type CouponList, type InstamartAddress, type PaymentOption } from './instamart';
+import { InstamartApiError, postJson, type AppliedCoupon, type CouponList, type DeliveryStatus, type InstamartAddress, type PaymentOption } from './instamart';
 
 export { formatInr, newIdempotencyKey } from './instamart';
-export type { AppliedCoupon, Coupon, CouponList, InstamartAddress, PaymentOption } from './instamart';
+export type { AppliedCoupon, Coupon, CouponList, DeliveryStatus, InstamartAddress, PaymentOption } from './instamart';
 
 /** Same error type and envelope as Instamart (`ok: false, error: {code, message}`). */
 export const FoodApiError = InstamartApiError;
@@ -147,3 +147,53 @@ export const foodCheckout = (addressId: string, expectedTotal: number, idempoten
     idempotency_key: idempotencyKey,
     payment_key: paymentKey,
   });
+
+// ---- Order history, live status, details (backend: fridge_to_fork/food_orders.py) ----
+
+export interface FoodOrderRow {
+  orderId: string;
+  restaurant: string;
+  area: string | null;
+  status: string;
+  deliveryStatus: string | null;
+  /** Display strings exactly as Swiggy formats them. */
+  total: string | null;
+  items: string | null;
+  orderedTime: string | null;
+  /** Swiggy's own isActiveOrder flag (not guessed from the status text). */
+  active: boolean;
+}
+
+export interface FoodTracking { title: string | null; subtitle: string | null; etaText: string | null; status: string | null; progress: number | null }
+
+export interface FoodOrderStatus { delivery: DeliveryStatus | null; tracking: FoodTracking | null; notes: string[] }
+
+export type FoodOrderDetails =
+  | {
+      available: true;
+      orderId: string;
+      status: string | null;
+      restaurant: { name: string | null; area: string | null };
+      items: { name: string; quantity: number | string | null; price: number | null; options: string[] }[];
+      charges: { label: string; value: string }[];
+      itemTotal: number | null;
+      delivery: number | null;
+      tax: number | null;
+      discount: number | null;
+      coupon: { code: string; discount: number | null } | null;
+      total: number | null;
+      paymentMethod: string | null;
+      orderTime: string | null;
+      cancellable: boolean;
+      /** There is no cancel tool: Swiggy says to call customer care. */
+      cancelHelp: string | null;
+    }
+  | { available: false; message: string };
+
+/** get_food_orders needs an address (the docs don't say whether it scopes the list): the one used comes back with it. */
+export const foodOrders = (addressId: string | null, activeOnly = false) =>
+  post<{ address: InstamartAddress; orders: FoodOrderRow[] }>('orders', { active_only: activeOnly, ...(addressId ? { address_id: addressId } : {}) });
+
+export const foodOrderStatus = (orderId: string) => post<FoodOrderStatus>('order-status', { order_id: orderId });
+
+export const foodOrderDetails = (orderId: string) => post<{ details: FoodOrderDetails }>('order-details', { order_id: orderId });

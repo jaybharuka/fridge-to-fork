@@ -11,6 +11,7 @@ import { useSelectedAddressId } from '@/lib/addressStore';
 import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
 import { ConnectGate } from '@/components/auth/ConnectGate';
+import { FoodOrdersSheet } from '@/components/results/FoodOrdersSheet';
 import { InstamartOrdersSheet } from '@/components/results/InstamartOrdersSheet';
 import { Landing } from '@/components/landing/Landing';
 import { LoadingOverlay } from '@/components/loading/LoadingOverlay';
@@ -240,6 +241,7 @@ export default function Home() {
       </main>
 
       {connected && <InstamartOrdersSheet />}
+      {connected && <FoodOrdersSheet />}
       <Toast message={toast.message} />
     </div>
   );

@@ -206,11 +206,12 @@ function Panel({ initialOrderId, onClose }: { initialOrderId: string | null; onC
 // order-placed screen. Same always-dark sheet as the order flow.
 export function InstamartOrdersSheet() {
   const ui = useOrdersUi();
-  const [mounted, setMounted] = useState(ui.open);
+  const isOpen = ui.open && ui.kind === 'instamart';
+  const [mounted, setMounted] = useState(isOpen);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (ui.open) {
+    if (isOpen) {
       setMounted(true);
       const raf = requestAnimationFrame(() => setVisible(true));
       return () => cancelAnimationFrame(raf);
@@ -218,7 +219,7 @@ export function InstamartOrdersSheet() {
     setVisible(false);
     const timer = setTimeout(() => setMounted(false), 400);
     return () => clearTimeout(timer);
-  }, [ui.open]);
+  }, [isOpen]);
 
   if (!mounted) return null;
   return (

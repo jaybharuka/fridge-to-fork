@@ -12,6 +12,7 @@ import {
   type OrderSummary,
 } from '../lib/instamart';
 import { coordsFor } from '../lib/addressStore';
+import { startLivePoll } from '../lib/livePoll';
 
 const message = (e: unknown) =>
   e instanceof InstamartApiError ? e.message : "Couldn't reach the server. Check your connection and try again.";
@@ -49,8 +50,6 @@ export function useOrderList(open: boolean, waitFor: string | null) {
   return { orders: current?.data ?? null, error: current?.error ?? null, loading: current === null, reload };
 }
 
-const MAX_STATUS_FAILURES = 5;
-
 /** Polls live delivery status at the interval Swiggy asks for (never faster), and stops when the order
  *  is delivered/cancelled, the sheet closes, or repeated failures. Past orders aren't polled. */
 export function useLiveStatus(order: OrderSummary | null) {
@@ -61,27 +60,14 @@ export function useLiveStatus(order: OrderSummary | null) {
 
   useEffect(() => {
     if (!orderId || !live) return;
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let failures = 0;
-    const tick = async () => {
-      let wait = 30;
-      try {
-        // Coordinates exist only for addresses created here with the user's shared location; else none is sent.
-        const { delivery, tracking, notes } = await instamartOrderStatus(orderId, addressId, coordsFor(addressId));
-        if (!alive) return;
-        failures = 0;
-        setSnap({ orderId, delivery, tracking, notes, failed: false });
-        if (delivery?.terminal || (!delivery && !tracking)) return; // finished, or nothing pollable
-        wait = delivery?.pollIntervalSec ?? tracking?.pollIntervalSec ?? wait;
-      } catch {
-        if (!alive) return;
-        if (++failures >= MAX_STATUS_FAILURES) return setSnap(s => ({ orderId, delivery: s?.delivery ?? null, tracking: s?.tracking ?? null, notes: [], failed: true }));
-      }
-      timer = setTimeout(tick, wait * 1000);
-    };
-    void tick();
-    return () => { alive = false; if (timer) clearTimeout(timer); };
+    // Coordinates exist only for addresses created here with the user's shared location; else none is sent.
+    return startLivePoll({
+      fetch: () => instamartOrderStatus(orderId, addressId, coordsFor(addressId)),
+      onResult: ({ delivery, tracking, notes }) => setSnap({ orderId, delivery, tracking, notes, failed: false }),
+      // finished, or nothing pollable: stop; else the interval Swiggy asked for
+      nextWaitSec: ({ delivery, tracking }) => (delivery?.terminal || (!delivery && !tracking) ? null : delivery?.pollIntervalSec ?? tracking?.pollIntervalSec ?? 30),
+      onGiveUp: () => setSnap(s => ({ orderId, delivery: s?.delivery ?? null, tracking: s?.tracking ?? null, notes: [], failed: true })),
+    });
   }, [orderId, addressId, live]);
 
   const current = snap?.orderId === orderId ? snap : null;
