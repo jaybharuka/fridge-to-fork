@@ -261,23 +261,58 @@ def _view_methods(view: dict) -> list[dict]:
     ]
 
 
+# Friendly names for UPI app URI schemes, used only when Swiggy sends no displayName.
+_UPI_APP_NAMES = {
+    "gpay": "Google Pay", "phonepe": "PhonePe", "paytmmp": "Paytm", "bhim": "BHIM", "credpay": "CRED", "super": "super.money",
+}
+
+
+def _method_kind(m: dict) -> str | None:
+    """Is this method a UPI "qr" or an app "intent"? Swiggy's types make `kind` optional and a real account
+    sends none at all, so: use `kind` when it is valid, else classify by `groupName` (real values seen: "UPI",
+    "COD", "SWIGGYPAY") and the id. Inside the UPI group an id with a URI scheme ("gpay://upi/") is an app,
+    and an id naming a QR ("PayWithQR") is the QR method. Anything else is not something we can complete."""
+    kind = m.get("kind")
+    if kind in ("qr", "intent"):
+        return kind
+    if str(m.get("groupName") or "").strip().casefold() != "upi":
+        return None
+    method_id = str(m.get("id") or "")
+    if "://" in method_id:
+        return "intent"
+    if "qr" in method_id.casefold():
+        return "qr"
+    return None
+
+
+def _intent_label(m: dict) -> str:
+    if m.get("displayName"):
+        return m["displayName"]
+    scheme = str(m.get("id") or "").partition("://")[0].casefold()
+    return _UPI_APP_NAMES.get(scheme) or (f"UPI app ({scheme})" if scheme else "UPI app")
+
+
 def _explain_methods(view: dict) -> list[str]:
-    """One entry per method Swiggy listed, with why _payment_options offered or dropped it (mirrors its rules)."""
+    """One entry per method Swiggy listed, with how it was classified and why it was offered or dropped
+    (mirrors _payment_options)."""
     seen_qr, out = False, []
     for m in _view_methods(view)[:20]:
-        method_id, kind, enabled = m.get("id"), m.get("kind"), m.get("enabled")
+        method_id, kind, enabled, group = m.get("id"), m.get("kind"), m.get("enabled"), m.get("groupName")
+        as_kind = _method_kind(m)
         if enabled is False:
             why = "dropped: enabled=false"
         elif not method_id:
             why = "dropped: no id"
-        elif kind == "qr":
+        elif as_kind == "qr":
             why = "dropped: extra qr" if seen_qr else "offered"
             seen_qr = True
-        elif kind == "intent":
+        elif as_kind == "intent":
             why = "offered"
+        elif str(group or "").strip().casefold() == "cod":
+            why = "dropped: cash is offered from the cod object"
         else:
-            why = f"dropped: kind={kind!r} is not qr/intent"
-        out.append(f"{method_id!r} kind={kind!r} enabled={enabled!r} group={m.get('groupName')!r} -> {why}")
+            why = f"dropped: not a UPI qr/app method (group={group!r})"
+        out.append(f"{method_id!r} kind={kind!r} enabled={enabled!r} group={group!r} as={as_kind!r} -> {why}")
     return out
 
 
@@ -298,11 +333,12 @@ def _payment_options(view: dict | None) -> list[dict]:
     for m in _view_methods(view):
         if m.get("enabled") is False or not m.get("id"):
             continue
-        if m.get("kind") == "qr" and not has_qr:
+        kind = _method_kind(m)
+        if kind == "qr" and not has_qr:
             has_qr = True
-            options.append({"key": "upi_qr", "type": "upi_qr", "label": m.get("displayName") or "Pay with UPI", "methodId": m["id"]})
-        elif m.get("kind") == "intent":
-            options.append({"key": f"upi_intent:{m['id']}", "type": "upi_intent", "label": m.get("displayName") or "UPI app", "methodId": m["id"]})
+            options.append({"key": "upi_qr", "type": "upi_qr", "label": m.get("displayName") or "Pay with UPI (scan QR)", "methodId": m["id"]})
+        elif kind == "intent":
+            options.append({"key": f"upi_intent:{m['id']}", "type": "upi_intent", "label": _intent_label(m), "methodId": m["id"]})
     return options
 
 
