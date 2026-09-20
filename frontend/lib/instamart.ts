@@ -90,8 +90,9 @@ export class InstamartApiError extends Error {
   }
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BACKEND_URL}/api/instamart/${path}`, {
+/** POST to `/api/<prefix>/<path>` with the caller's auth. Shared by the Instamart and Food clients (same envelope and errors). */
+export async function postJson<T>(prefix: string, path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BACKEND_URL}/api/${prefix}/${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(body),
@@ -110,6 +111,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   }
   return data as T;
 }
+
+const post = <T>(path: string, body: unknown) => postJson<T>('instamart', path, body);
 
 export const instamartSearch = (items: string[], addressId: string | null = null) =>
   post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', { items, ...(addressId ? { address_id: addressId } : {}) });
