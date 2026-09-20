@@ -15,6 +15,7 @@ import { IngredientChecklistCard } from './IngredientChecklistCard';
 import { ChoiceCard } from './ChoiceCard';
 import { ChecklistSkeleton, ChoiceSkeleton } from './ResultsSkeleton';
 import { OrderResultCard } from './OrderResultCard';
+import { FoodOrderSheet } from './FoodOrderSheet';
 import { InstamartOrderSheet } from './InstamartOrderSheet';
 import { RecipeStepsSection } from './RecipeStepsSection';
 import { YoutubeCarousel } from './YoutubeCarousel';
@@ -45,7 +46,6 @@ interface ResultsProps {
   onOpenProduct: (ingredientName: string) => void;
   /** Which checklist item the order sheet should scroll to and highlight. */
   focusIngredient?: string | null;
-  onOrderDish: () => void;
   orderSheetOpen: boolean;
   onCloseOrderSheet: () => void;
   /** Fired just before the sheet's "Connect with Swiggy" CTA navigates —
@@ -79,7 +79,6 @@ export function Results({
   onOrderGroceries,
   onOpenProduct,
   focusIngredient,
-  onOrderDish,
   orderSheetOpen,
   onCloseOrderSheet,
   onSheetConnectClick,
@@ -93,6 +92,7 @@ export function Results({
   const fridgeRowRef = useRef<HTMLDivElement>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const closeDropdown = useCallback(() => setDropdownOpen(false), []);
 
   const dishName = state.recommendedMeal ?? '';
@@ -198,7 +198,7 @@ export function Results({
                 reasoning={state.reasoning}
                 itemsToOrder={itemsToOrder}
                 onOrderGroceries={onOrderGroceries}
-                onOrderDish={onOrderDish}
+                onOrderDish={() => setFoodSheetOpen(true)}
                 orderPlacing={state.orderPlacing}
               />
             ) : (
@@ -223,6 +223,7 @@ export function Results({
       </div>
 
       <FridgeLightbox open={lightboxOpen} imageUrl={heroPhotoUrl} onClose={() => setLightboxOpen(false)} />
+      <FoodOrderSheet open={foodSheetOpen} dish={dishName} onClose={() => setFoodSheetOpen(false)} />
       <InstamartOrderSheet
         open={orderSheetOpen}
         itemsToOrder={itemsToOrder}

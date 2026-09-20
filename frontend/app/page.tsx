@@ -37,7 +37,7 @@ export default function Home() {
   const [recipeDotDismissed, setRecipeDotDismissed] = useState(false);
 
   const photos = usePhotoUpload();
-  const { state, startScan, placeOrder, toggleChecklistItem, reset, restore } = useScanStream();
+  const { state, startScan, toggleChecklistItem, reset, restore } = useScanStream();
   const { fetchVideos } = useYoutubeVideos();
   const toast = useToast();
   const auth = useAuth();
@@ -227,7 +227,6 @@ export default function Home() {
           onOrderGroceries={handleOrderGroceries}
           onOpenProduct={handleOpenProduct}
           focusIngredient={focusIngredient}
-          onOrderDish={() => placeOrder('order_dish', state.recommendedMeal ?? '')}
           orderSheetOpen={orderSheetOpen}
           onCloseOrderSheet={() => setOrderSheetOpen(false)}
           onSheetConnectClick={handleSheetConnectClick}

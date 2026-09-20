@@ -22,7 +22,7 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from google.genai import types
 
-from .features import FOOD_ORDERING_ENABLED
+from .features import FOOD_AGENT_ENABLED
 from .models import Decision, MealPlan, OrderResult
 
 FOOD_MCP_URL = os.environ.get(
@@ -87,7 +87,7 @@ async def run_swiggy_agent(
             error="Instamart orders use the staged flow in fridge_to_fork.instamart",
         )
 
-    if plan.decision == Decision.ORDER_DISH and not FOOD_ORDERING_ENABLED:
+    if plan.decision == Decision.ORDER_DISH and not FOOD_AGENT_ENABLED:
         return OrderResult(
             success=False,
             platform="swiggy_food",

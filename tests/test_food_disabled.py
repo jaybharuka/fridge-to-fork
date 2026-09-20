@@ -32,8 +32,17 @@ def plan(decision: Decision) -> MealPlan:
 
 
 class RouteRefusalTests(unittest.TestCase):
-    def test_the_switch_is_off(self):
+    def test_the_switches_are_off(self):
         self.assertFalse(features.FOOD_ORDERING_ENABLED)
+        self.assertFalse(features.FOOD_AGENT_ENABLED)
+
+    def test_turning_the_new_flow_on_never_reopens_the_old_agent(self):
+        # The two are independent switches: FOOD_ORDERING_ENABLED is the deterministic flow (fridge_to_fork/food.py),
+        # FOOD_AGENT_ENABLED is the retired Gemini agent, which the route and the agent both still refuse.
+        with patch.object(features, "FOOD_ORDERING_ENABLED", True), patch.object(a, "order_dish_from_swiggy", AsyncMock()) as agent:
+            r = order_dish(bearer())
+        self.assertIn(features.FOOD_UNAVAILABLE_MESSAGE, r.text)
+        agent.assert_not_awaited()
 
     def test_order_dish_is_refused_with_a_clear_message_and_never_reaches_the_agent(self):
         for label, headers in (("with a valid session", bearer()), ("with no session at all", None)):
