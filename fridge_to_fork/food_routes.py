@@ -3,7 +3,7 @@ HTTP surface for the staged Food flow (see food.py).
 
   POST /api/food/search    {dish, address_id?}                                        -> {address, dish, results[], hasMore}
   POST /api/food/cart      {address_id, selection}                                    -> {review, adjustments[], coupons}
-  POST /api/food/coupon    {address_id, coupon_code}                                  -> {review, coupon, coupons}
+  POST /api/food/coupon    {address_id, coupon_code, restaurant_id?, restaurant_name?} -> {review, coupon, coupons}
   POST /api/food/checkout  {address_id, expected_total, idempotency_key, payment_key} -> {order}
   POST /api/food/payment-status {order_id, paas_id, address_id, cart_id?, lat?, lng?, final} -> {order}
   POST /api/food/orders    {address_id?, active_only}                                 -> {address, orders[]}
@@ -61,6 +61,10 @@ class CartRequest(BaseModel):
 class CouponRequest(BaseModel):
     address_id: Id
     coupon_code: str = Field(min_length=1, max_length=64)
+    # The restaurant the reviewed cart was built for: fetch_food_coupons needs one and the cart doesn't always name it.
+    # Cross-checked against the cart whenever the cart does.
+    restaurant_id: Id | None = None
+    restaurant_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
 
 
 class PaymentStatusRequest(BaseModel):
@@ -142,7 +146,7 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
 
     @router.post("/coupon")
     async def coupon(body: CouponRequest, request: Request):
-        return await run(request, lambda t: food.apply_coupon(t, body.address_id, body.coupon_code))
+        return await run(request, lambda t: food.apply_coupon(t, body.address_id, body.coupon_code, body.restaurant_id, body.restaurant_name))
 
     @router.post("/payment-status")
     async def payment_status(body: PaymentStatusRequest, request: Request):

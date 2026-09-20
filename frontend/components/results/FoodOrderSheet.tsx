@@ -188,7 +188,7 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
               paymentKey={state.paymentKey}
               disabled={placing}
               onSelectPayment={order.selectPayment}
-              onApplyCoupon={code => order.applyCoupon(state.review!.address.id, code)}
+              onApplyCoupon={code => order.applyCoupon(state.review!.address.id, code, state.review!.restaurant)}
             />
             <button
               type="button"

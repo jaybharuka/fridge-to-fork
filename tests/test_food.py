@@ -309,6 +309,20 @@ class CartTests(FoodCase):
         self.assertIn("'gpay://upi/' kind=None enabled=True group='UPI' as='intent' -> offered", text)  # the real all-kind=None shape
         self.assertIn("'PayWithQR' kind=None enabled=True group='UPI' as='qr' -> offered", text)
 
+    async def test_the_parts_of_the_payment_view_nothing_reads_are_logged_so_missing_cash_can_be_explained(self):
+        # Food's view has allGroups (snake_case group_name), upiMethods and markdown, which the classifier never looks at.
+        view = {**PAYMENT, "cod": None, "allGroups": [
+            {"group_name": "UPI", "display_name": "Pay via UPI", "methods": [{"id": "gpay://upi/"}, {"id": "PayWithQR"}]},
+            {"group_name": "CASH", "display_name": "Pay on Delivery", "methods": [{"id": "Cash"}]}],
+            "upiMethods": [{"id": "gpay://upi/"}], "markdown": "long text with a name"}
+        out, _, text = await self.build(get_payment_options=envelope(view))
+        self.assertIn("extras: allGroups=[{'group': 'UPI', 'display': 'Pay via UPI', 'ids': ['gpay://upi/', 'PayWithQR']}, {'group': 'CASH', 'display': 'Pay on Delivery', 'ids': ['Cash']}]", text)
+        self.assertIn("upiMethods=['gpay://upi/']", text)
+        self.assertIn("'markdown': 'str'", text)  # the type, never the text
+        self.assertNotIn("long text with a name", text)
+        self.assertIn("cod=None", text)
+        self.assertNotIn("cod", [o["type"] for o in out["review"]["payment"]["options"]])  # diagnostics only: nothing about what is offered changed
+
     async def test_only_what_swiggy_lists_and_enables_is_offered(self):
         out, _, _ = await self.build(get_payment_options=envelope({**PAYMENT, "cod": {"available": False, "id": "Cash"}, "allMethods": [
             {"id": "gpay://upi/", "groupName": "UPI", "enabled": True}, {"id": "phonepe://", "groupName": "UPI", "enabled": False}, {"id": "SwiggyPay", "groupName": "SWIGGYPAY", "enabled": True}]}))
@@ -592,7 +606,7 @@ class CouponTests(FoodCase):
     def session(self, **over):
         before, after = food_cart(), food_cart(to_pay=336, coupon="SAVE50", discount=50)
         applied = {"statusCode": 0, "data": {"offers": {"coupon_applied": "SAVE50", "coupon_discount": 50}, "pricing": {"coupon_discount": 50, "to_pay": 336}}}
-        return cart_session(get_food_cart=[envelope(before), envelope(after)], apply_food_coupon=envelope(applied), **over)
+        return cart_session(**{"get_food_cart": [envelope(before), envelope(after)], "apply_food_coupon": envelope(applied), **over})
 
     async def apply(self, s, code="SAVE50"):
         with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
@@ -656,6 +670,84 @@ class CouponTests(FoodCase):
         exc = await self.refuse(s, code="BIG150")
         self.assertEqual((exc.code, exc.message), ("coupon_not_applicable", "Add ₹200 more to use this"))
         self.assertNotIn("apply_food_coupon", s.names())
+
+    def silent(self, cart):
+        """The same cart with no `restaurant` block at all: the docs type it as optional."""
+        cart = copy.deepcopy(cart)
+        cart["data"].pop("restaurant", None)
+        return cart
+
+    def session_without_restaurant(self, **over):
+        before = self.silent(food_cart())
+        after = self.silent(food_cart(to_pay=336, coupon="SAVE50", discount=50))
+        applied = {"statusCode": 0, "data": {"offers": {"coupon_applied": "SAVE50", "coupon_discount": 50}}}
+        return cart_session(**{"get_food_cart": [envelope(before), envelope(after)], "apply_food_coupon": envelope(applied), **over})
+
+    async def test_a_cart_that_does_not_name_its_restaurant_still_gets_coupons_via_the_restaurant_the_review_carried(self):
+        # Real account: "Swiggy didn't say which restaurant this cart is for". The coupon call was never even made.
+        s = self.session_without_restaurant()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            out = await food.apply_coupon("tok", "addr-home", "SAVE50", "1404575", "Punjabi Tadka")
+        self.assertEqual(s.args("fetch_food_coupons"), {"restaurantId": "1404575", "addressId": "addr-home"})
+        self.assertEqual(s.args("get_food_cart"), {"addressId": "addr-home", "restaurantName": "Punjabi Tadka"})  # the name is passed like build_cart does
+        self.assertEqual(s.args("apply_food_coupon"), {"couponCode": "SAVE50", "addressId": "addr-home"})
+        self.assertEqual((out["review"]["total"], out["review"]["restaurant"]["id"], out["review"]["restaurant"]["name"]), (336.0, "1404575", "Punjabi Tadka"))
+        self.assertIn("cart restaurant fields=[] cart_restaurant_id=None supplied_restaurant_id='1404575' name_sent=True", "\n".join(logs.output))
+
+    async def test_an_id_less_restaurant_block_counts_as_silent(self):
+        cart = food_cart(restaurant_id=None)
+        s = cart_session(get_food_cart=[envelope(cart), envelope(food_cart(to_pay=336, coupon="SAVE50", discount=50, restaurant_id=None))],
+                         apply_food_coupon=envelope({"statusCode": 0}))
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+            out = await food.apply_coupon("tok", "addr-home", "SAVE50", "r1", None)
+        self.assertEqual((s.args("fetch_food_coupons")["restaurantId"], out["review"]["restaurant"]["id"]), ("r1", "r1"))
+
+    async def test_when_nothing_names_the_restaurant_it_is_refused_before_any_coupon_call_and_the_log_says_why(self):
+        s = self.session_without_restaurant()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs, self.assertRaises(SwiggyError) as ctx:
+            await food.apply_coupon("tok", "addr-home", "SAVE50")
+        self.assertEqual(ctx.exception.code, "cart_blocked")
+        self.assertNotIn("fetch_food_coupons", s.names())
+        self.assertNotIn("apply_food_coupon", s.names())
+        self.assertIn("cart_restaurant_id=None supplied_restaurant_id=None", "\n".join(logs.output))
+
+    async def test_a_restaurant_the_review_names_that_disagrees_with_the_cart_is_refused_untouched(self):
+        s = self.session()  # the cart says r1
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"), self.assertRaises(SwiggyError) as ctx:
+            await food.apply_coupon("tok", "addr-home", "SAVE50", "r9", "Somewhere Else")
+        self.assertEqual(ctx.exception.code, "cart_changed")
+        for tool in ("fetch_food_coupons", "apply_food_coupon"):
+            self.assertNotIn(tool, s.names())
+
+    async def test_when_the_cart_names_its_restaurant_that_wins_and_agreement_is_fine(self):
+        s = self.session()
+        await self.apply(s)  # nothing supplied: the cart's r1 is used, as before
+        self.assertEqual(s.args("fetch_food_coupons")["restaurantId"], "r1")
+        s = self.session()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+            await food.apply_coupon("tok", "addr-home", "SAVE50", "r1", None)  # supplied and equal: fine
+        self.assertEqual(s.args("fetch_food_coupons")["restaurantId"], "r1")
+
+    async def test_the_review_carries_the_restaurant_it_was_built_for_even_if_the_cart_does_not_name_it(self):
+        cart = self.silent(food_cart())
+        s = cart_session(update_food_cart=envelope(cart), get_food_cart=envelope(cart))
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+            out = await food.build_cart("tok", "addr-home", selection(restaurant_id="1404575", restaurant_name="Punjabi Tadka"))
+        self.assertEqual((out["review"]["restaurant"]["id"], out["review"]["restaurant"]["name"]), ("1404575", "Punjabi Tadka"))
+        self.assertEqual(s.args("fetch_food_coupons")["restaurantId"], "1404575")
+
+    async def test_a_cart_naming_a_different_restaurant_than_the_dish_is_still_refused_at_build(self):
+        s = cart_session(update_food_cart=envelope(food_cart(restaurant_id="r7")), get_food_cart=envelope(food_cart(restaurant_id="r7")))
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"), self.assertRaises(SwiggyError) as ctx:
+            await food.build_cart("tok", "addr-home", selection())
+        self.assertEqual(ctx.exception.code, "cart_mismatch")
+
+    async def test_a_refusal_of_the_coupon_listing_or_apply_is_logged_with_swiggys_message(self):
+        for tool in ("fetch_food_coupons", "apply_food_coupon"):
+            s = self.session(**{tool: envelope(success=False, error=f"{tool}: nope")})
+            with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs, self.assertRaises(SwiggyError):
+                await food.apply_coupon("tok", "addr-home", "SAVE50")
+            self.assertIn(f"[FOOD][diag] {tool} refused: code=tool_error message='{tool}: nope'", "\n".join(logs.output), tool)
 
     async def test_a_blocked_cart_is_never_offered_a_coupon(self):
         s = cart_session(get_food_cart=envelope(food_cart(items=[])))
@@ -904,8 +996,18 @@ class FoodRouteTests(unittest.TestCase):
             r1 = self.post("coupon", {"address_id": "addr-home", "coupon_code": "SAVE50"}, signed_bearer())
             r2 = self.post("payment-status", {"order_id": "F-1", "paas_id": "pp", "address_id": "addr-home", "cart_id": "cart-1", "lat": 12.9, "lng": 77.5, "final": True}, signed_bearer())
         self.assertTrue(r1.json()["ok"] and r2.json() == {"ok": True, "order": {"status": "pending_payment"}})
-        c.assert_awaited_once_with("swiggy-tok", "addr-home", "SAVE50")
+        c.assert_awaited_once_with("swiggy-tok", "addr-home", "SAVE50", None, None)
         p.assert_awaited_once_with("swiggy-tok", "F-1", "pp", "addr-home", "cart-1", 12.9, 77.5, True)
+
+    def test_the_coupon_route_forwards_the_restaurant_the_review_carried(self):
+        with patch.object(features, "FOOD_ORDERING_ENABLED", True), patch.object(food, "apply_coupon", AsyncMock(return_value={"review": {}, "coupon": {}, "coupons": {}})) as c:
+            r = self.post("coupon", {"address_id": "addr-home", "coupon_code": "SAVE50", "restaurant_id": "1404575", "restaurant_name": " Punjabi Tadka "}, signed_bearer())
+        self.assertTrue(r.json()["ok"])
+        c.assert_awaited_once_with("swiggy-tok", "addr-home", "SAVE50", "1404575", "Punjabi Tadka")
+        with patch.object(features, "FOOD_ORDERING_ENABLED", True), patch.object(food, "apply_coupon", AsyncMock()) as c:
+            self.assertEqual(self.post("coupon", {"address_id": "a", "coupon_code": "X", "restaurant_id": ""}, signed_bearer()).status_code, 422)
+            self.assertEqual(self.post("coupon", {"address_id": "a", "coupon_code": "X", "restaurant_name": "x" * 121}, signed_bearer()).status_code, 422)
+        c.assert_not_awaited()
 
     def test_the_new_routes_refuse_while_the_flow_is_off_even_without_auth(self):
         for path, body in (("coupon", {"address_id": "a", "coupon_code": "X"}), ("payment-status", {"order_id": "o", "paas_id": "p", "address_id": "a"})):
