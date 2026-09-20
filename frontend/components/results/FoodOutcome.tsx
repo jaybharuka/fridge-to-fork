@@ -2,6 +2,7 @@
 
 import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
 import { formatInr, type FoodOutcome as Outcome } from '@/lib/food';
+import { PaymentPending } from './PaymentPending';
 import styles from './instamart.module.css';
 
 interface OutcomeProps {
@@ -17,6 +18,9 @@ const total = (value: Outcome['total']): string | null => (typeof value === 'num
 export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
 
+  // The parent hook is polling Swiggy; this screen just gives the user the payment page.
+  if (outcome.status === 'pending_payment' && outcome.payment) return <PaymentPending bridgeUrl={outcome.payment.bridgeUrl} onClose={onClose} />;
+
   if (outcome.status === 'placed') {
     const amount = total(outcome.total);
     return (
@@ -27,8 +31,9 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart }: O
           {outcome.detail?.restaurant && <>From {outcome.detail.restaurant}. </>}
           {ids && <>Order {ids}. </>}
           {outcome.detail?.eta && <>Arriving in about {outcome.detail.eta}. </>}
-          {payOnDelivery && amount ? <>Pay {amount} on delivery.</> : null}
+          {payOnDelivery && amount ? <>Pay {amount} on delivery.</> : !payOnDelivery ? <>Payment received.</> : null}
         </p>
+        {outcome.notice && <p className={styles.warn}>{outcome.notice}</p>}
         <p className={styles.hint}>You can follow it in the Swiggy app.</p>
         {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy — it&apos;s worth a glance in the app.</p>}
         <button type="button" className={styles.primary} onClick={onClose}>Done</button>

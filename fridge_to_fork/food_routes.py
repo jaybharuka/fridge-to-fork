@@ -2,8 +2,10 @@
 HTTP surface for the staged Food flow (see food.py).
 
   POST /api/food/search    {dish, address_id?}                                        -> {address, dish, results[], hasMore}
-  POST /api/food/cart      {address_id, selection}                                    -> {review, adjustments[]}
+  POST /api/food/cart      {address_id, selection}                                    -> {review, adjustments[], coupons}
+  POST /api/food/coupon    {address_id, coupon_code}                                  -> {review, coupon, coupons}
   POST /api/food/checkout  {address_id, expected_total, idempotency_key, payment_key} -> {order}
+  POST /api/food/payment-status {order_id, paas_id, address_id, cart_id?, lat?, lng?, final} -> {order}
 
 Every response is `{ok: true, ...}` or `{ok: false, error: {code, message}}`, the same envelope as the Instamart
 routes. While FOOD_ORDERING_ENABLED is off every route refuses, before it even looks at auth.
@@ -52,6 +54,22 @@ class CartRequest(BaseModel):
     selection: Selection
 
 
+class CouponRequest(BaseModel):
+    address_id: Id
+    coupon_code: str = Field(min_length=1, max_length=64)
+
+
+class PaymentStatusRequest(BaseModel):
+    order_id: Id
+    paas_id: Id
+    # Echoed from place_food_order's PENDING_PAYMENT reply: Food confirms with these, not with paasId.
+    address_id: Id
+    cart_id: Id | None = None
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+    final: bool = False  # polling deadline reached: confirm once and let Swiggy reconcile
+
+
 class CheckoutRequest(BaseModel):
     address_id: Id
     expected_total: float = Field(gt=0, lt=100_000)
@@ -84,6 +102,18 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     @router.post("/cart")
     async def cart(body: CartRequest, request: Request):
         return await run(request, lambda t: food.build_cart(t, body.address_id, body.selection.model_dump()))
+
+    @router.post("/coupon")
+    async def coupon(body: CouponRequest, request: Request):
+        return await run(request, lambda t: food.apply_coupon(t, body.address_id, body.coupon_code))
+
+    @router.post("/payment-status")
+    async def payment_status(body: PaymentStatusRequest, request: Request):
+        async def act(token: str) -> dict:
+            order = await food.payment_status(token, body.order_id, body.paas_id, body.address_id, body.cart_id, body.lat, body.lng, body.final)
+            return {"order": order}
+
+        return await run(request, act)
 
     @router.post("/checkout")
     async def checkout(body: CheckoutRequest, request: Request):

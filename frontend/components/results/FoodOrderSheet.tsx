@@ -155,17 +155,28 @@ export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
         ) : state.review ? (
           <>
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
-            <FoodReview review={state.review} paymentKey={state.paymentKey} disabled={placing} onSelectPayment={order.selectPayment} />
+            <FoodReview
+              review={state.review}
+              coupons={state.coupons}
+              appliedCoupon={state.appliedCoupon}
+              couponBusy={state.couponBusy}
+              paymentKey={state.paymentKey}
+              disabled={placing}
+              onSelectPayment={order.selectPayment}
+              onApplyCoupon={code => order.applyCoupon(state.review!.address.id, code)}
+            />
             <button
               type="button"
               className={styles.primary}
-              disabled={placing || !selectedPayment || !state.review.canCheckout || state.review.total === null || !state.idempotencyKey}
+              disabled={placing || state.couponBusy !== null || !selectedPayment || !state.review.canCheckout || state.review.total === null || !state.idempotencyKey}
               onClick={() => order.placeOrder(state.review!.address.id, state.review!.total!, state.idempotencyKey!, selectedPayment!.key)}
             >
               {placing ? (
                 <><LoaderCircle className={styles.spin} style={{ width: 16, height: 16, verticalAlign: '-3px' }} /> Placing your order…</>
               ) : (
-                `Place order · ${state.review.total !== null ? formatInr(state.review.total) : ''} · Pay on delivery`
+                selectedPayment?.type === 'cod'
+                  ? `Place order · ${state.review.total !== null ? formatInr(state.review.total) : ''} · Pay on delivery`
+                  : `Continue to payment · ${state.review.total !== null ? formatInr(state.review.total) : ''}`
               )}
             </button>
             <button type="button" className={styles.secondary} disabled={placing} onClick={order.backToPicking}>Edit dish</button>

@@ -2,16 +2,22 @@
 import { useCallback, useReducer, useRef } from 'react';
 import {
   FoodApiError,
+  foodApplyCoupon,
   foodCart,
   foodCheckout,
+  foodPaymentStatus,
   foodSearch,
   newIdempotencyKey,
+  type AppliedCoupon,
+  type CouponList,
   type FoodOutcome,
+  type FoodPendingPayment,
   type FoodResult,
   type FoodReview,
   type InstamartAddress,
 } from '../lib/food';
 import { setSelectedAddressId } from '../lib/addressStore';
+import { pollPayment as pollPaymentLoop } from '../lib/pollPayment';
 import { initialPicks, setQuantity, setVariant, toggleAddon, toSelection, type Picks } from '../lib/foodSelection';
 
 export type Stage = 'searching' | 'picking' | 'building' | 'reviewing' | 'placing' | 'done' | 'error';
@@ -24,6 +30,11 @@ export interface FoodState {
   openId: string | null;
   picks: Picks | null;
   review: FoodReview | null;
+  coupons: CouponList;
+  /** Set once Swiggy's cart actually shows the discount; there is no remove-coupon tool. */
+  appliedCoupon: AppliedCoupon | null;
+  /** Code currently being applied (disables the coupon buttons). */
+  couponBusy: string | null;
   /** Key of the chosen PaymentOption; re-validated server-side at checkout. */
   paymentKey: string | null;
   idempotencyKey: string | null;
@@ -42,7 +53,10 @@ type Action =
   | { type: 'ADDON'; groupId: string; addonId: string; max: number | null }
   | { type: 'QTY'; quantity: number }
   | { type: 'BUILD_START' }
-  | { type: 'BUILD_OK'; review: FoodReview; key: string }
+  | { type: 'BUILD_OK'; review: FoodReview; coupons: CouponList; key: string }
+  | { type: 'COUPON_START'; code: string }
+  | { type: 'COUPON_OK'; review: FoodReview; coupons: CouponList; coupon: AppliedCoupon; key: string }
+  | { type: 'COUPON_FAIL'; notice: string; unusableCode?: string }
   | { type: 'SELECT_PAYMENT'; key: string }
   | { type: 'PLACE_START' }
   | { type: 'PLACE_OK'; outcome: FoodOutcome }
@@ -51,8 +65,10 @@ type Action =
   | { type: 'FAIL'; message: string; authNeeded: boolean }
   | { type: 'RESET' };
 
+const NO_COUPONS: CouponList = { available: false, items: [] };
+
 const initial: FoodState = {
-  stage: 'searching', address: null, results: [], openId: null, picks: null, review: null, paymentKey: null,
+  stage: 'searching', address: null, results: [], openId: null, picks: null, review: null, coupons: NO_COUPONS, appliedCoupon: null, couponBusy: null, paymentKey: null,
   idempotencyKey: null, outcome: null, notice: null, error: null, authNeeded: false,
 };
 
@@ -82,7 +98,22 @@ function reducer(state: FoodState, action: Action): FoodState {
     case 'BUILD_START':
       return { ...state, stage: 'building', notice: null, error: null };
     case 'BUILD_OK':
-      return { ...state, stage: 'reviewing', review: action.review, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null };
+      // a rebuilt cart starts without a coupon (the cart is flushed first)
+      return { ...state, stage: 'reviewing', review: action.review, coupons: action.coupons, appliedCoupon: null, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null };
+    case 'COUPON_START':
+      return { ...state, couponBusy: action.code, notice: null };
+    case 'COUPON_OK':
+      // the cart changed: never reuse an idempotency key from before the discount
+      return { ...state, review: action.review, coupons: action.coupons, appliedCoupon: action.coupon, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null };
+    case 'COUPON_FAIL':
+      return {
+        ...state,
+        couponBusy: null,
+        notice: action.notice,
+        coupons: action.unusableCode
+          ? { ...state.coupons, items: state.coupons.items.map(c => (c.code === action.unusableCode ? { ...c, applicable: false, message: action.notice } : c)) }
+          : state.coupons,
+      };
     case 'SELECT_PAYMENT':
       return { ...state, paymentKey: action.key };
     case 'PLACE_START':
@@ -92,7 +123,7 @@ function reducer(state: FoodState, action: Action): FoodState {
     case 'REVIEW_NOTICE':
       return { ...state, stage: 'reviewing', notice: action.notice };
     case 'BACK':
-      return { ...state, stage: 'picking', review: null, idempotencyKey: null, notice: action.notice ?? null };
+      return { ...state, stage: 'picking', review: null, appliedCoupon: null, couponBusy: null, idempotencyKey: null, notice: action.notice ?? null };
     case 'FAIL':
       return { ...state, stage: 'error', error: action.message, authNeeded: action.authNeeded };
     case 'RESET':
@@ -102,6 +133,8 @@ function reducer(state: FoodState, action: Action): FoodState {
 
 // Server-side reasons the reviewed cart is no longer safe to order: go back and rebuild it.
 const REVIEW_AGAIN = new Set(['cart_changed', 'cart_blocked', 'cart_mismatch', 'out_of_stock', 'unserviceable', 'cart_expired']);
+// A coupon Swiggy no longer lists / accepts: mark it unusable, keep the cart.
+const COUPON_UNUSABLE = new Set(['coupon_not_found', 'coupon_not_applicable']);
 
 const UNKNOWN_OUTCOME: FoodOutcome = {
   status: 'unknown',
@@ -110,6 +143,7 @@ const UNKNOWN_OUTCOME: FoodOutcome = {
   verified: false,
   total: null,
   detail: null,
+  payment: null,
 };
 
 function describe(e: unknown): { message: string; authNeeded: boolean; code: string } {
@@ -158,8 +192,8 @@ export function useFoodOrder() {
     const id = run.current;
     dispatch({ type: 'BUILD_START' });
     try {
-      const { review } = await foodCart(addressId, toSelection(result, picks));
-      if (run.current === id) dispatch({ type: 'BUILD_OK', review, key: newIdempotencyKey() });
+      const { review, coupons } = await foodCart(addressId, toSelection(result, picks));
+      if (run.current === id) dispatch({ type: 'BUILD_OK', review, coupons, key: newIdempotencyKey() });
     } catch (e) {
       const d = describe(e);
       if (run.current !== id) return;
@@ -168,12 +202,47 @@ export function useFoodOrder() {
     }
   }, []);
 
+  const applyCoupon = useCallback(async (addressId: string, code: string) => {
+    const id = run.current;
+    dispatch({ type: 'COUPON_START', code });
+    try {
+      const { review, coupons, coupon } = await foodApplyCoupon(addressId, code);
+      if (run.current === id) dispatch({ type: 'COUPON_OK', review, coupons, coupon, key: newIdempotencyKey() });
+    } catch (e) {
+      const d = describe(e);
+      if (run.current !== id) return;
+      if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
+      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.` });
+      dispatch({ type: 'COUPON_FAIL', notice: d.message, unusableCode: COUPON_UNUSABLE.has(d.code) ? code : undefined });
+    }
+  }, []);
+
+  /** Client-driven UPI polling (shared with Instamart): nothing is held open server-side. */
+  const pollPayment = useCallback((payment: FoodPendingPayment) => {
+    const id = run.current;
+    return pollPaymentLoop<FoodOutcome>({
+      pollIntervalMs: payment.pollIntervalMs,
+      maxPollMs: payment.maxPollMs,
+      isCurrent: () => run.current === id,
+      check: async final => (await foodPaymentStatus(payment, final)).order,
+      onDone: outcome => dispatch({ type: 'PLACE_OK', outcome }),
+      onGiveUp: () => dispatch({ type: 'PLACE_OK', outcome: { ...UNKNOWN_OUTCOME, orderIds: [payment.orderId] } }),
+      onError: e => {
+        const d = describe(e);
+        if (d.authNeeded) dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
+        return d.authNeeded;
+      },
+    });
+  }, []);
+
   const placeOrder = useCallback(async (addressId: string, expectedTotal: number, key: string, paymentKey: string) => {
     const id = run.current;
     dispatch({ type: 'PLACE_START' });
     try {
       const { order } = await foodCheckout(addressId, expectedTotal, key, paymentKey);
-      if (run.current === id) dispatch({ type: 'PLACE_OK', outcome: order });
+      if (run.current !== id) return;
+      dispatch({ type: 'PLACE_OK', outcome: order });
+      if (order.status === 'pending_payment' && order.payment) void pollPayment(order.payment);
     } catch (e) {
       if (run.current !== id) return;
       const d = describe(e);
@@ -184,7 +253,7 @@ export function useFoodOrder() {
       const ambiguous = d.code === 'network' || d.code === 'unexpected_response';
       dispatch({ type: 'PLACE_OK', outcome: ambiguous ? UNKNOWN_OUTCOME : { ...UNKNOWN_OUTCOME, status: 'failed', message: d.message } });
     }
-  }, []);
+  }, [pollPayment]);
 
-  return { state, search, open, closeItem, chooseVariant, chooseAddon, setQty, selectPayment, backToPicking, buildCart, placeOrder, reset };
+  return { state, search, open, closeItem, chooseVariant, chooseAddon, setQty, selectPayment, backToPicking, buildCart, applyCoupon, placeOrder, reset };
 }

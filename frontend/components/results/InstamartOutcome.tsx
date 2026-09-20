@@ -1,7 +1,8 @@
 'use client';
 
-import { CircleAlert, CircleCheck, ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react';
+import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
 import type { InstamartOutcome as Outcome, ReportContext } from '@/lib/instamart';
+import { PaymentPending } from './PaymentPending';
 import { ReportProblem } from './ReportProblem';
 import styles from './instamart.module.css';
 
@@ -30,21 +31,7 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
     />
   );
 
-  if (outcome.status === 'pending_payment' && outcome.payment) {
-    // The parent hook is polling payment-status; this screen just gives the user the payment page.
-    return (
-      <div className={styles.centered}>
-        <LoaderCircle className={`${styles.bigIcon} ${styles.warnIcon} ${styles.spin}`} />
-        <h4 className={styles.outcomeTitle}>Complete your payment</h4>
-        <p className={styles.outcomeBody}>Open Swiggy&apos;s payment page to scan the QR or tap to pay in your UPI app. We&apos;ll update this screen as soon as it goes through.</p>
-        <a className={styles.primary} style={{ display: 'block', textDecoration: 'none' }} href={outcome.payment.bridgeUrl} target="_blank" rel="noopener noreferrer">
-          <ExternalLink style={{ width: 16, height: 16, verticalAlign: '-3px' }} /> Open payment page
-        </a>
-        <p className={styles.hint}>Waiting for your payment… If you&apos;ve already paid, you can close this — check the Swiggy app for the order.</p>
-        <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
-      </div>
-    );
-  }
+  if (outcome.status === 'pending_payment' && outcome.payment) return <PaymentPending bridgeUrl={outcome.payment.bridgeUrl} onClose={onClose} />;
 
   if (outcome.status === 'placed') {
     return (

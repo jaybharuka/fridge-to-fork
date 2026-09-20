@@ -27,7 +27,7 @@ from mcp import ClientSession
 from . import swiggy_common
 from .swiggy_common import (
     SwiggyError, _call, _fetch_payment as _fetch_payment_common, _num, _outcome, _pick_address, _public_address, _saved_addresses,
-    _same_address_id, _same_id, _account, _attempts, _inflight, _remember,
+    _same_address_id, _same_id, _account, _attempts, _inflight, _remember, _pending_outcome, _settle_payment,
 )
 
 log = logging.getLogger("uvicorn.error")
@@ -35,8 +35,8 @@ log = logging.getLogger("uvicorn.error")
 FOOD_MCP_URL = os.environ.get("SWIGGY_FOOD_MCP_URL", "https://mcp.swiggy.com/food")
 MAX_RESULTS = 8
 MAX_QUANTITY = 20
-# Phase 1 completes cash on delivery only; the UPI bridge/polling flow is added with the payment phase.
-OFFERED_PAYMENT_TYPES = {"cod"}
+# Every payment type get_payment_options can list that this app can complete: cash, UPI via the bridge page (QR or an app).
+OFFERED_PAYMENT_TYPES = {"cod", "upi_qr", "upi_intent"}
 
 _FAILED_STATUSES = {"FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED"}
 
@@ -338,6 +338,52 @@ def _review(cart: dict, payment: dict, address: dict) -> dict:
     }
 
 
+def _coupon(item: dict) -> dict:
+    """One fetch_food_coupons entry. The docs give a coupon an `id` and no separate code field, while apply_food_coupon
+    takes a `couponCode`: `id` is used as the code, and apply_coupon only counts it if the cart then shows the discount."""
+    code = str(item.get("id") or "").strip()
+    status = str(item.get("applicabilityStatus") or "").upper()
+    applicable = item.get("applicable") is not False and (item.get("applicable") is True or status in {"APPLICABLE", "APPLIED"})
+    if status == "NOT_APPLICABLE":
+        applicable = False
+    terms = item.get("terms_and_conditions") or {}
+    described, subtitle = item.get("description"), item.get("subtitle")
+    message = None if applicable else (subtitle or described)  # why it can't be used, as Swiggy worded it
+    description = described or (subtitle if applicable else None)
+    return {
+        "code": code,
+        "title": item.get("title") or code,
+        "description": None if description == message else description,  # never the same sentence twice
+        "applicable": applicable,
+        "message": message,
+        "terms": [t for t in terms.get("bullet_texts") or [] if isinstance(t, str)],
+    }
+
+
+async def _list_coupons(session: ClientSession, restaurant_id: str, address_id: str) -> dict:
+    data = await _call(session, "fetch_food_coupons", restaurantId=restaurant_id, addressId=address_id)
+    seen: dict[str, dict] = {}
+    for section in data.get("coupon_sections") or []:
+        for raw in (section or {}).get("coupons") or []:
+            coupon = _coupon(raw) if isinstance(raw, dict) else None
+            if coupon and coupon["code"]:
+                seen.setdefault(coupon["code"].lower(), coupon)
+    return {"items": list(seen.values()), "filter": (data.get("summary") or {}).get("filter_applied")}
+
+
+async def _coupons_or_none(session: ClientSession, restaurant_id: str | None, address_id: str) -> dict:
+    """`available: False` = coupons couldn't be listed. Never fails the cart over it; auth problems still propagate."""
+    if not restaurant_id:
+        return {"available": False, "items": [], "filter": None}
+    try:
+        return {"available": True, **await _list_coupons(session, str(restaurant_id), address_id)}
+    except SwiggyError as exc:
+        if exc.code == "auth_required":
+            raise
+        log.info("[FOOD] fetch_food_coupons unavailable: %s", exc.message)
+        return {"available": False, "items": [], "filter": None}
+
+
 def _describe_cart(update: dict, cart: dict) -> str:
     inner, first = _inner(cart), next((i for i in _inner(cart).get("items") or [] if isinstance(i, dict)), {})
     return (
@@ -370,7 +416,62 @@ async def build_cart(token: str, address_id: str, sel: dict) -> dict:
             log.warning("[FOOD] cart refused: %s requested_variants=%d requested_addons=%d format=%s", mismatch, len(sel["variants"]), len(sel["addons"]), sel.get("format"))
             raise SwiggyError("cart_mismatch", f"{mismatch} Nothing was ordered. Try again, or order in the Swiggy app.", tool="update_food_cart")
         payment = await _fetch_payment(session, cart, address["id"], stage="cart")
-    return {"review": _review(cart, payment, address), "adjustments": []}
+        coupons = await _coupons_or_none(session, sel["restaurant_id"], address["id"])
+    return {"review": _review(cart, payment, address), "adjustments": [], "coupons": coupons}
+
+
+def _same_items(a: dict, b: dict) -> bool:
+    key = lambda review: sorted((i["menuItemId"], i["quantity"]) for i in review["items"])  # noqa: E731
+    return key(a) == key(b)
+
+
+async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
+    """Apply one of the coupons Swiggy currently lists for this cart, then re-read the cart.
+
+    Everything is re-verified server-side, never trusted from the client: the cart must be orderable and hold the same
+    items before and after, the coupon must still be listed AND applicable now, and the cart must then show a positive
+    discount with a lower total. (Swiggy: a coupon with discount 0 is only a suggestion, not applied.)
+    """
+    async with _session(token) as session:
+        address = await _resolve_address(session, address_id)
+        before_cart = await _call(session, "get_food_cart", addressId=address["id"])
+        before = _review(before_cart, await _fetch_payment(session, before_cart, address["id"], stage="coupon-before"), address)
+        if before["blockers"]:
+            raise SwiggyError("cart_blocked", before["blockers"][0])
+        restaurant_id = before["restaurant"]["id"]
+        if not restaurant_id:
+            raise SwiggyError("cart_blocked", "Swiggy didn't say which restaurant this cart is for. Please review it again.")
+
+        listed = (await _list_coupons(session, str(restaurant_id), address["id"]))["items"]
+        match = next((c for c in listed if c["code"].lower() == coupon_code.strip().lower()), None)
+        if match is None:
+            raise SwiggyError("coupon_not_found", "That coupon isn't available for this cart anymore.")
+        if not match["applicable"]:
+            raise SwiggyError("coupon_not_applicable", match["message"] or "That coupon can't be applied to this cart.")
+
+        await _call(session, "apply_food_coupon", couponCode=match["code"], addressId=address["id"])
+        after_cart = await _call(session, "get_food_cart", addressId=address["id"])
+        payment = await _fetch_payment(session, after_cart, address["id"], stage="coupon-after")
+        relisted = await _coupons_or_none(session, str(restaurant_id), address["id"])
+        after = _review(after_cart, payment, address)
+
+    offers = _inner(after_cart).get("offers") or {}
+    discount = _num(offers.get("coupon_discount")) or 0
+    applied = offers.get("coupon_applied")
+    dropped = before["total"] is not None and after["total"] is not None and after["total"] < before["total"] - 0.005
+    log.warning("[FOOD][diag] coupon: code_listed=%s applied=%r discount=%r total_before=%r total_after=%r", match["code"], applied, discount, before["total"], after["total"])
+    if not _same_items(before, after):
+        raise SwiggyError("cart_changed", "Your cart changed while applying the coupon. Please review it again.")
+    if discount <= 0 or not dropped or (applied and str(applied).strip().lower() != match["code"].lower()):
+        raise SwiggyError(
+            "coupon_not_reflected",
+            "Swiggy accepted the code but your total didn't change, so it wasn't counted. Use Edit dish to rebuild the cart if you want to be sure.",
+        )
+    return {
+        "review": after,
+        "coupon": {"code": match["code"], "title": match["title"], "savings": round(before["total"] - after["total"], 2)},
+        "coupons": relisted,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -392,16 +493,31 @@ def _placed_outcome(order_ids: list[str], data: dict | None = None, verified: bo
     return {**outcome, "detail": {"restaurant": data.get("restaurantName"), "eta": data.get("estimatedDelivery"), "items": [i.get("name") for i in data.get("items") or [] if isinstance(i, dict) and i.get("name")]}}
 
 
-def _read_placed(data: dict) -> dict:
+def _read_placed(data: dict, expected: float | None = None) -> dict:
     """place_food_order `data` -> outcome. COD is placed immediately (status CONFIRMED)."""
     status = str(data.get("status") or "").upper()
-    if status == "PENDING_PAYMENT":  # never requested in this phase (only cash is offered), but never call it an order
-        order_id = str(data.get("orderId") or "")
-        return _outcome("unknown", "A payment was started that we can't complete here. Check the Swiggy app before trying again.", [order_id] if order_id else None)
     order_id = data.get("orderId")
     if not order_id or status in _FAILED_STATUSES or str(data.get("normalizedStatus") or "").lower() == "failed":
         return _outcome("failed", "Swiggy couldn't place the order.")
-    return _placed_outcome([str(order_id)], data)
+    outcome = _placed_outcome([str(order_id)], data)
+    charged = _num(data.get("totalAmount"))
+    if expected is not None and charged is not None and abs(charged - expected) > 0.005:
+        # e.g. a coupon that only holds for online payment: the order exists, but not at the price the user reviewed
+        log.warning("[FOOD] placed total differs from the reviewed total: reviewed=%s placed=%s", expected, charged)
+        outcome["notice"] = f"Swiggy's order total is ₹{charged:g}, not the ₹{expected:g} you reviewed. Check the Swiggy app."
+    return outcome
+
+
+def _number(value) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _food_pending(data: dict, address_id: str) -> dict:
+    """place_food_order returned PENDING_PAYMENT. Food confirms with addressId + cartId + lat + lng echoed from this
+    response (not paasId), so they ride along in `payment` and come back on every poll."""
+    echo = {"addressId": str(data.get("addressId") or address_id), "cartId": None if data.get("cartId") in (None, "") else str(data["cartId"]), "lat": _number(data.get("lat")), "lng": _number(data.get("lng"))}
+    log.warning("[FOOD][diag] place_food_order pending: keys=%s has_paasId=%s has_bridgeUrl=%s has_cartId=%s has_lat_lng=%s", sorted(data), bool(data.get("paasId")), bool(data.get("bridgeUrl")), echo["cartId"] is not None, echo["lat"] is not None and echo["lng"] is not None)
+    return _pending_outcome(data, total=data.get("totalAmount"), echo=echo)
 
 
 async def _verify(token: str, address_id: str, outcome: dict, before: set[str] | None) -> dict:
@@ -425,7 +541,12 @@ async def _verify(token: str, address_id: str, outcome: dict, before: set[str] |
 
 def _checkout_args(address_id: str, choice: dict) -> dict:
     """Arguments for place_food_order, straight from the option Swiggy listed (ids echoed, not rebuilt)."""
-    return {"addressId": address_id, "paymentMethod": choice["methodId"]}
+    base = {"addressId": address_id}
+    if choice["type"] == "cod":
+        return {**base, "paymentMethod": choice["methodId"]}
+    if choice["type"] == "upi_qr":
+        return {**base, "paymentMethod": "UPI", "generateUPIQR": True}
+    return {**base, "paymentMethod": "UPI", "intentApp": choice["methodId"]}
 
 
 async def checkout(token: str, address_id: str, expected_total: float, key: str, payment_key: str) -> dict:
@@ -475,4 +596,19 @@ async def _checkout_locked(token: str, address_id: str, expected_total: float, p
             return await _verify(token, address["id"], fallback, before)
 
         log.warning("[FOOD][diag] place_food_order: keys=%s status=%r normalizedStatus=%r has_orderId=%s", sorted(data), data.get("status"), data.get("normalizedStatus"), bool(data.get("orderId")))
-        return await _verify(token, address["id"], _read_placed(data), before)
+        if str(data.get("status") or "").upper() == "PENDING_PAYMENT":
+            return _food_pending(data, address["id"])  # not an order yet: the payment page + payment_status() finish it
+        return await _verify(token, address["id"], _read_placed(data, expected_total), before)
+
+
+async def payment_status(
+    token: str, order_id: str, paas_id: str, address_id: str, cart_id: str | None, lat: float | None, lng: float | None, final: bool = False
+) -> dict:
+    """One poll of a pending UPI payment (see swiggy_common._settle_payment). Food is identified by orderId + the
+    addressId/cartId/lat/lng that place_food_order returned, echoed exactly; it never uses paasId to confirm."""
+    echo = {"addressId": address_id, **({"cartId": cart_id} if cart_id else {}), **({"lat": lat} if lat is not None else {}), **({"lng": lng} if lng is not None else {})}
+    async with _session(token) as session:
+        outcome = await _settle_payment(
+            session, order_id, check_args={"paasId": paas_id, "orderId": order_id, **echo}, confirm_args={"orderId": order_id, **echo}, final=final
+        )
+    return await _verify(token, address_id, outcome, None) if outcome["status"] == "placed" else outcome

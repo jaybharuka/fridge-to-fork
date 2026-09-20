@@ -15,6 +15,7 @@ import logging
 import re
 import time
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi.responses import JSONResponse
@@ -374,3 +375,61 @@ def _outcome(
     status: str, message: str, order_ids: list[str] | None = None, verified: bool = False, total=None, payment: dict | None = None
 ) -> dict:
     return {"status": status, "orderIds": order_ids or [], "message": message, "verified": verified, "total": total, "payment": payment}
+
+
+# ---------------------------------------------------------------------------
+# UPI: the pending-payment outcome and one poll/confirm step (the same recipe on every server; only the arguments differ)
+# ---------------------------------------------------------------------------
+
+MAX_PAYMENT_POLL_SECONDS = 300
+_PAYMENT_FAILED_STATES = {"failed", "cancelled", "cart_changed", "refund-initiated"}
+_PAYMENT_MESSAGES = {
+    "cancelled": "The payment was cancelled. If money was debited it will be refunded — check the Swiggy app.",
+    "refund-initiated": "The payment couldn't be completed and a refund has started. Check the Swiggy app.",
+    "cart_changed": "Prices or stock changed while paying, so the order wasn't placed. Review your cart and order again.",
+}
+
+
+def _pending_outcome(data: dict, *, total, echo: dict | None = None) -> dict:
+    """The place-order call returned PENDING_PAYMENT (UPI). The browser opens `bridgeUrl` (a scan-or-tap page) and
+    polls; nothing is held open server-side. `echo` carries whatever else the server needs handed back on each poll."""
+    order_id = str(data.get("orderId") or "")
+    bridge = data.get("bridgeUrl")
+    if not (order_id and data.get("paasId") and isinstance(bridge, str) and urlsplit(bridge).scheme == "https"):
+        return _outcome(
+            "unknown", "Payment was started but Swiggy didn't give us a payment page. Check the Swiggy app before trying again.",
+            [order_id] if order_id else None,
+        )
+    payment = {
+        "orderId": order_id,
+        "paasId": str(data["paasId"]),
+        "bridgeUrl": bridge,
+        "pollIntervalMs": min(max(int(data.get("pollingIntervalInMs") or 3000), 1000), 10_000),
+        "maxPollMs": min(int(data.get("maxTimeToPollForInMs") or 120_000), MAX_PAYMENT_POLL_SECONDS * 1000),
+        **(echo or {}),
+    }
+    return _outcome("pending_payment", "Complete the payment to place your order.", [order_id], total=total, payment=payment)
+
+
+async def _settle_payment(session: ClientSession, order_id: str, *, check_args: dict, confirm_args: dict, final: bool) -> dict:
+    """One poll of a pending UPI payment. Per the payment recipe: on terminal success that isn't already confirmed,
+    call confirm_order once; at the polling deadline (`final`) call it once more and let Swiggy reconcile a late
+    payment. Never confirms after a failure. Returns an outcome; "placed" is a claim the caller cross-checks."""
+    status = await _call(session, "check_payment_status", **check_args)
+    state = str(status.get("status") or "").lower()
+    if status.get("isTerminalFailure") or state in _PAYMENT_FAILED_STATES:
+        return _outcome("failed", _PAYMENT_MESSAGES.get(state, "The payment didn't go through. Nothing was ordered."))
+    succeeded = bool(status.get("isTerminalSuccess")) or state in {"success", "paid"}
+    if succeeded and status.get("confirmed"):
+        return _outcome("placed", "Order placed.", [order_id])
+    if not (succeeded or final):
+        return _outcome("pending_payment", "Waiting for your payment…", [order_id])
+    confirmed = await _call(session, "confirm_order", **confirm_args)
+    result = str(confirmed.get("result") or "").lower()
+    if result == "success":
+        return _outcome("placed", "Order placed.", [order_id])
+    if result == "failed":
+        return _outcome("failed", "Swiggy couldn't complete the order after payment. Check the Swiggy app.")
+    if final:
+        return _outcome("unknown", "We couldn't confirm the payment yet. Check the Swiggy app before trying again.", [order_id])
+    return _outcome("pending_payment", "Confirming your payment…", [order_id])

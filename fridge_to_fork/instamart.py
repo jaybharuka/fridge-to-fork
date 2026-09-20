@@ -15,7 +15,6 @@ import asyncio
 import logging
 import os
 import re
-from urllib.parse import urlsplit
 
 from mcp import ClientSession
 
@@ -32,7 +31,6 @@ INSTAMART_MCP_URL = os.environ.get("SWIGGY_INSTAMART_MCP_URL", "https://mcp.swig
 MIN_ORDER_INR = 99  # Instamart minimum, per the order-groceries recipe
 MAX_OPTIONS_PER_ITEM = 5
 SEARCH_CONCURRENCY = 4
-MAX_PAYMENT_POLL_SECONDS = 300
 
 _FAILED_STATUSES = {"FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED"}
 
@@ -355,59 +353,17 @@ async def _active_order_ids(session: ClientSession) -> set[str] | None:
 
 
 def _pending_outcome(data: dict) -> dict:
-    """checkout returned PENDING_PAYMENT (UPI). The browser opens `bridgeUrl` (a scan-or-tap page)
-    and polls payment_status(); nothing is held open server-side."""
-    order_id = str(data.get("orderId") or "")
-    bridge = data.get("bridgeUrl")
-    if not (order_id and data.get("paasId") and isinstance(bridge, str) and urlsplit(bridge).scheme == "https"):
-        return _outcome(
-            "unknown", "Payment was started but Swiggy didn't give us a payment page. Check the Swiggy app before trying again.",
-            [order_id] if order_id else None,
-        )
-    payment = {
-        "orderId": order_id,
-        "paasId": str(data["paasId"]),
-        "bridgeUrl": bridge,
-        "pollIntervalMs": min(max(int(data.get("pollingIntervalInMs") or 3000), 1000), 10_000),
-        "maxPollMs": min(int(data.get("maxTimeToPollForInMs") or 120_000), MAX_PAYMENT_POLL_SECONDS * 1000),
-    }
-    return _outcome("pending_payment", "Complete the payment to place your order.", [order_id], total=data.get("cartTotal"), payment=payment)
-
-
-_PAYMENT_FAILED_STATES = {"failed", "cancelled", "cart_changed", "refund-initiated"}
-_PAYMENT_MESSAGES = {
-    "cancelled": "The payment was cancelled. If money was debited it will be refunded — check the Swiggy app.",
-    "refund-initiated": "The payment couldn't be completed and a refund has started. Check the Swiggy app.",
-    "cart_changed": "Prices or stock changed while paying, so the order wasn't placed. Review your cart and order again.",
-}
+    return swiggy_common._pending_outcome(data, total=data.get("cartTotal"))
 
 
 async def payment_status(token: str, order_id: str, paas_id: str, final: bool = False) -> dict:
-    """One poll of a pending UPI payment. Per the payment recipe: on terminal success that isn't
-    already confirmed, call confirm_order(orderId, paasId) once; at the polling deadline (`final`)
-    call it once more and let Swiggy reconcile a late payment. Never confirms after a failure."""
+    """One poll of a pending UPI payment (see swiggy_common._settle_payment); Instamart identifies it by paasId + orderId."""
     async with _session(token) as session:
-        status = await _call(session, "check_payment_status", paasId=paas_id, orderId=order_id)
-        state = str(status.get("status") or "").lower()
-        if status.get("isTerminalFailure") or state in _PAYMENT_FAILED_STATES:
-            return _outcome("failed", _PAYMENT_MESSAGES.get(state, "The payment didn't go through. Nothing was ordered."))
-        succeeded = bool(status.get("isTerminalSuccess")) or state in {"success", "paid"}
-        if succeeded and status.get("confirmed"):
-            outcome = _outcome("placed", "Order placed.", [order_id])
-        elif succeeded or final:
-            confirmed = await _call(session, "confirm_order", orderId=order_id, paasId=paas_id)
-            result = str(confirmed.get("result") or "").lower()
-            if result == "success":
-                outcome = _outcome("placed", "Order placed.", [order_id])
-            elif result == "failed":
-                return _outcome("failed", "Swiggy couldn't complete the order after payment. Check the Swiggy app.")
-            elif final:
-                return _outcome("unknown", "We couldn't confirm the payment yet. Check the Swiggy app before trying again.", [order_id])
-            else:
-                return _outcome("pending_payment", "Confirming your payment…", [order_id])
-        else:
-            return _outcome("pending_payment", "Waiting for your payment…", [order_id])
-    return await _verify(token, outcome, None)
+        outcome = await swiggy_common._settle_payment(
+            session, order_id, check_args={"paasId": paas_id, "orderId": order_id},
+            confirm_args={"orderId": order_id, "paasId": paas_id}, final=final,
+        )
+    return await _verify(token, outcome, None) if outcome["status"] == "placed" else outcome
 
 
 def _read_checkout(data: dict) -> dict:

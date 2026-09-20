@@ -2,10 +2,10 @@
 // search -> (item options) -> cart + review -> checkout. Real dishes from real restaurants and the real cart Swiggy
 // will bill are shown before the user's separate, explicit "Place order" action.
 
-import { InstamartApiError, postJson, type InstamartAddress, type PaymentOption } from './instamart';
+import { InstamartApiError, postJson, type AppliedCoupon, type CouponList, type InstamartAddress, type PaymentOption } from './instamart';
 
 export { formatInr, newIdempotencyKey } from './instamart';
-export type { InstamartAddress, PaymentOption } from './instamart';
+export type { AppliedCoupon, Coupon, CouponList, InstamartAddress, PaymentOption } from './instamart';
 
 /** Same error type and envelope as Instamart (`ok: false, error: {code, message}`). */
 export const FoodApiError = InstamartApiError;
@@ -78,13 +78,30 @@ export interface FoodReview {
   coupon: { code: string | null; discount: number } | null;
 }
 
+/** A started UPI payment: open `bridgeUrl` (scan-or-tap page) while we poll. Food confirms with the echoed
+ *  addressId/cartId/lat/lng from place_food_order (never paasId), so they are handed back on every poll. */
+export interface FoodPendingPayment {
+  orderId: string;
+  paasId: string;
+  bridgeUrl: string;
+  pollIntervalMs: number;
+  maxPollMs: number;
+  addressId: string;
+  cartId: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
 export interface FoodOutcome {
   status: 'placed' | 'failed' | 'unknown' | 'pending_payment' | 'partial';
   orderIds: string[];
   message: string;
   verified: boolean;
   total: number | string | null;
-  detail: { restaurant: string | null; eta: string | null; items: string[] } | null;
+  payment?: FoodPendingPayment | null;
+  detail?: { restaurant: string | null; eta: string | null; items: string[] } | null;
+  /** Set when Swiggy placed the order at a different total than the one reviewed. */
+  notice?: string;
 }
 
 /** The cart request: every id exactly as Swiggy returned it. */
@@ -107,7 +124,21 @@ export const foodSearch = (dish: string, addressId: string | null = null) =>
   });
 
 export const foodCart = (addressId: string, selection: FoodSelection) =>
-  post<{ review: FoodReview; adjustments: string[] }>('cart', { address_id: addressId, selection });
+  post<{ review: FoodReview; adjustments: string[]; coupons: CouponList }>('cart', { address_id: addressId, selection });
+
+export const foodApplyCoupon = (addressId: string, couponCode: string) =>
+  post<{ review: FoodReview; coupon: AppliedCoupon; coupons: CouponList }>('coupon', { address_id: addressId, coupon_code: couponCode });
+
+export const foodPaymentStatus = (payment: FoodPendingPayment, final: boolean) =>
+  post<{ order: FoodOutcome }>('payment-status', {
+    order_id: payment.orderId,
+    paas_id: payment.paasId,
+    address_id: payment.addressId,
+    ...(payment.cartId ? { cart_id: payment.cartId } : {}),
+    ...(payment.lat !== null ? { lat: payment.lat } : {}),
+    ...(payment.lng !== null ? { lng: payment.lng } : {}),
+    final,
+  });
 
 export const foodCheckout = (addressId: string, expectedTotal: number, idempotencyKey: string, paymentKey: string) =>
   post<{ order: FoodOutcome }>('checkout', {
