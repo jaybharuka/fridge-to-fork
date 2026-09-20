@@ -2,9 +2,9 @@
 The four layers around Food ordering after the deterministic flow replaced the Gemini agent
 (fridge_to_fork/features.py):
 
-  1. frontend card    - enabled by FOOD_ORDERING_ENABLED, disabled when it is False (mirrored in frontend/lib/features.ts)
+  1. frontend card    - disabled while FOOD_ORDERING_ENABLED is False (mirrored in frontend/lib/features.ts)
   2. frontend hook    - useScanStream.placeOrder never sends order_dish (checked in the browser run)
-  3. backend routes   - /api/food/* refuse (before auth) when FOOD_ORDERING_ENABLED is False: the kill switch
+  3. backend routes   - /api/food/* refuse (before auth) while FOOD_ORDERING_ENABLED is False: the kill switch
   4. agent            - deleted: swiggy_agent only simulates (--dry-run) or refuses, and POST /api/order order_dish
                         only tells a stale page to reload
 
@@ -41,10 +41,11 @@ def plan(decision: Decision) -> MealPlan:
 
 
 class SwitchTests(unittest.TestCase):
-    def test_the_flow_is_on_for_the_first_real_order_and_the_old_agent_switch_no_longer_exists(self):
+    def test_the_flow_is_switched_off_and_the_old_agent_switch_no_longer_exists(self):
         # Pinned on purpose: switching the flow on or off is a deliberate step (a real order), so it must be a visible
-        # change to this test, never something that rides along with another deploy.
-        self.assertTrue(features.FOOD_ORDERING_ENABLED)
+        # change to this test, never something that rides along with another deploy. It is OFF until it is established
+        # that place_food_order places a real, charged order against the connected account.
+        self.assertFalse(features.FOOD_ORDERING_ENABLED)
         self.assertFalse(hasattr(features, "FOOD_AGENT_ENABLED"))
 
     def test_the_kill_switch_refuses_every_food_route_before_auth_and_before_touching_swiggy(self):
