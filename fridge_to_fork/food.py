@@ -19,6 +19,7 @@ What the docs do NOT say, and how that is handled (see also _cart_item):
 """
 
 import asyncio
+import json
 import logging
 import os
 
@@ -391,9 +392,21 @@ def _describe_cart(update: dict, cart: dict) -> str:
         f"cart_keys={sorted(cart)} inner_keys={sorted(inner)} item_count={inner.get('item_count')!r} items={len(inner.get('items') or [])} "
         f"restaurant_fields={sorted(inner.get('restaurant') or {})} pricing={inner.get('pricing')} offers={inner.get('offers')} "
         f"first_item_fields={ {k: type(v).__name__ for k, v in first.items()} } "
+        f"first_item_raw={json.dumps({k: v for k, v in first.items() if k != 'imageUrl'}, ensure_ascii=False, default=str)[:900]} "
         f"first_item_variants={first.get('variants')!r} first_item_addons={first.get('addons')!r} "
         f"valid_addon_groups={[(g.get('group_id') or g.get('groupId')) for g in first.get('valid_addons') or [] if isinstance(g, dict)]}"
     )
+
+
+async def _logged(session: ClientSession, name: str, **arguments) -> dict:
+    """_call, but a refusal is logged with Swiggy's own message first (the route only hands it to the browser), so the
+    first real attempt shows WHY a tool said no. Auth expiry is routine and not logged."""
+    try:
+        return await _call(session, name, **arguments)
+    except SwiggyError as exc:
+        if exc.code != "auth_required":
+            log.warning("[FOOD][diag] %s refused: code=%s message=%.300r", name, exc.code, exc.message)
+        raise
 
 
 async def build_cart(token: str, address_id: str, sel: dict) -> dict:
@@ -404,12 +417,14 @@ async def build_cart(token: str, address_id: str, sel: dict) -> dict:
     """
     async with _session(token) as session:
         address = await _resolve_address(session, address_id)
-        await _call(session, "flush_food_cart")
+        await _logged(session, "flush_food_cart")
         name_arg = {"restaurantName": sel["restaurant_name"]} if sel.get("restaurant_name") else {}
-        update = await _call(
-            session, "update_food_cart", restaurantId=sel["restaurant_id"], cartItems=[_cart_item(sel)], addressId=address["id"], **name_arg
-        )
-        cart = await _call(session, "get_food_cart", addressId=address["id"], **name_arg)
+        cart_items = [_cart_item(sel)]
+        # The cartItems shape is not documented (see _cart_item): log exactly what was sent so it can be checked against
+        # what Swiggy accepts. Ids only; the restaurant name is left out.
+        log.warning("[FOOD][diag] update_food_cart sent: restaurantId=%r addressId=%r cartItems=%s", sel["restaurant_id"], address["id"], json.dumps(cart_items))
+        update = await _logged(session, "update_food_cart", restaurantId=sel["restaurant_id"], cartItems=cart_items, addressId=address["id"], **name_arg)
+        cart = await _logged(session, "get_food_cart", addressId=address["id"], **name_arg)
         log.warning("[FOOD][diag] cart: %s", _describe_cart(update, cart))
         mismatch = _check_cart(cart, sel)
         if mismatch:
@@ -579,11 +594,15 @@ async def _checkout_locked(token: str, address_id: str, expected_total: float, p
 
         before = await _active_order_ids(session, address["id"])
         log.info("[FOOD] placing %s order, total=%s", choice["type"], review["total"])
+        place_args = _checkout_args(address["id"], choice)
+        # The exact payment method value sent (cod.id echoed, or the documented "Cash" fallback) is an open question.
+        log.warning("[FOOD][diag] place_food_order sent: %s", json.dumps(place_args))
         try:
-            data = await _call(session, "place_food_order", **_checkout_args(address["id"], choice))
+            data = await _call(session, "place_food_order", **place_args)
         except SwiggyError as exc:
             if exc.code == "auth_required":
                 raise
+            log.warning("[FOOD][diag] place_food_order refused: code=%s message=%.300r", exc.code, exc.message)
             ambiguous = exc.code == "upstream_unavailable"
             fallback = (
                 _outcome("unknown", "We couldn't confirm whether the order went through. Check the Swiggy app before trying again.")

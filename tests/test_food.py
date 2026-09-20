@@ -349,6 +349,27 @@ class CartTests(FoodCase):
         for private in ("9876543210", "12 MG Road", "Bengaluru"):
             self.assertNotIn(private, text)
 
+    async def test_the_request_sent_and_the_raw_first_cart_item_are_logged_for_the_first_real_attempt(self):
+        _, _, text = await self.build()
+        self.assertIn('[FOOD][diag] update_food_cart sent: restaurantId=\'r1\' addressId=\'addr-home\' cartItems=[{"menu_item_id": "m-plain", "quantity": 1}]', text)
+        self.assertIn('first_item_raw={"menu_item_id": "m-plain", "name": "Butter Chicken", "quantity": 1', text)
+        self.assertNotIn("imageUrl", text.split("first_item_raw=")[1])  # a URL is noise, and everything else here is ids and prices
+        for private in ("9876543210", "12 MG Road", "Bengaluru", "Punjabi Tadka"):
+            self.assertNotIn(private, text)  # not even the restaurant name is sent to the log
+
+    async def test_a_refusal_from_any_cart_tool_is_logged_with_swiggys_message(self):
+        for tool in ("flush_food_cart", "update_food_cart", "get_food_cart"):
+            s = cart_session(**{tool: envelope(success=False, error=f"{tool} says: Restaurant is closed")})
+            with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs, self.assertRaises(SwiggyError):
+                await food.build_cart("tok", "addr-home", selection())
+            self.assertIn(f"[FOOD][diag] {tool} refused: code=tool_error message='{tool} says: Restaurant is closed'", "\n".join(logs.output), tool)
+
+    async def test_auth_expiry_is_not_logged_as_a_refusal(self):
+        s = cart_session(update_food_cart=envelope(success=False, error="401 Unauthorized"))
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs, self.assertRaises(SwiggyError):
+            await food.build_cart("tok", "addr-home", selection())
+        self.assertNotIn("refused", "\n".join(logs.output))
+
     async def test_a_swiggy_refusal_of_the_cart_update_is_surfaced_with_its_tool(self):
         s = cart_session(update_food_cart=envelope(success=False, error="Restaurant is closed"))
         with using(s), self.assertRaises(SwiggyError) as ctx:
@@ -478,6 +499,19 @@ class CheckoutTests(FoodCase):
         with using(checkout_session()), self.assertRaises(SwiggyError) as ctx:
             await place()
         self.assertEqual(ctx.exception.code, "checkout_in_progress")
+
+    async def test_the_exact_payment_method_sent_to_place_food_order_is_logged(self):
+        s = checkout_session()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            await place()
+        self.assertIn('[FOOD][diag] place_food_order sent: {"addressId": "addr-home", "paymentMethod": "Cash"}', "\n".join(logs.output))
+
+    async def test_a_place_food_order_refusal_is_logged_with_swiggys_message(self):
+        s = checkout_session(place_food_order=envelope(success=False, error="Invalid paymentMethod COD"), get_food_orders=[envelope(NONE_ACTIVE), envelope(NONE_ACTIVE)])
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            out = await place()
+        self.assertEqual(out["status"], "failed")
+        self.assertIn("[FOOD][diag] place_food_order refused: code=tool_error message='Invalid paymentMethod COD'", "\n".join(logs.output))
 
     async def test_the_lock_is_shared_with_instamart_and_released_afterwards(self):
         from fridge_to_fork import instamart
