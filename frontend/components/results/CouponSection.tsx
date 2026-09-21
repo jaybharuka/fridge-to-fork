@@ -14,13 +14,20 @@ interface CouponSectionProps {
   onApply: (code: string) => void;
 }
 
+/** Swiggy's `filter_applied` is terse ("COD only"): say what it means for the person choosing a coupon. */
+export function filterNote(filter: string): string {
+  return /cod|cash on delivery/i.test(filter)
+    ? 'Swiggy is only listing coupons that work with pay on delivery. Coupons that need online payment are not shown, and a coupon here may not apply if you pay online.'
+    : filter;
+}
+
 /** Coupons Swiggy currently lists for this cart. There is no remove-coupon tool: changing the coupon means rebuilding the cart. */
 export function CouponSection({ coupons, appliedCoupon, couponBusy, disabled, editLabel, onApply }: CouponSectionProps) {
   if (!coupons.available || coupons.items.length === 0) return null;
   return (
     <section aria-label="Coupons">
       <p className={styles.sectionLabel}>Coupons</p>
-      {coupons.filter && <p className={styles.hint} style={{ textAlign: 'left', margin: '-4px 0 8px 0' }}>{coupons.filter}</p>}
+      {coupons.filter && <p className={styles.hint} style={{ textAlign: 'left', margin: '-4px 0 8px 0' }}>{filterNote(coupons.filter)}</p>}
       {appliedCoupon && (
         <p className={styles.couponApplied} role="status">
           {appliedCoupon.code} applied{appliedCoupon.savings ? ` — you save ${formatInr(appliedCoupon.savings)}` : ''}. To try a different coupon, go back with {editLabel} and rebuild the cart.
@@ -32,7 +39,11 @@ export function CouponSection({ coupons, appliedCoupon, couponBusy, disabled, ed
           return (
             <li key={c.code} className={`${styles.coupon} ${!c.applicable && !isApplied ? styles.couponOff : ''}`}>
               <div className={styles.couponBody}>
-                <p className={styles.couponTitle}>{c.title} <span className={styles.couponCode}>{c.code}</span></p>
+                <p className={styles.couponTitle}>
+                  {c.title}
+                  {/* the code is the title on Food: show the offer badge instead of repeating it */}
+                  {c.title.toLowerCase() !== c.code.toLowerCase() ? <span className={styles.couponCode}>{c.code}</span> : c.ribbon ? <span className={styles.couponCode}>{c.ribbon}</span> : null}
+                </p>
                 {c.description && <p className={styles.meta}>{c.description}</p>}
                 {!c.applicable && c.message && <p className={styles.couponWhy}>{c.message}</p>}
                 {c.terms.length > 0 && (

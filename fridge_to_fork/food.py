@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 
 from mcp import ClientSession
 
@@ -348,10 +349,24 @@ def _review(cart: dict, payment: dict, address: dict, fallback_restaurant: dict 
     }
 
 
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+_CODE = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
+
+
+def _coupon_code(item: dict) -> str:
+    """The text apply_food_coupon takes as `couponCode`. The docs give a coupon an `id` and no code field; on a real
+    account every id was a UUID (applying with one was refused with an empty body) and the code was the `title`
+    ('FLAVORFUL', 'SWIGGYIT': the same text the cart later reports as coupon_applied). So: an id that isn't a UUID is
+    the code; otherwise the title, if it is shaped like a code; otherwise there is no usable code ("")."""
+    raw_id, title = str(item.get("id") or "").strip(), str(item.get("title") or "").strip()
+    if raw_id and not _UUID.match(raw_id):
+        return raw_id
+    return title if _CODE.match(title) else ""
+
+
 def _coupon(item: dict) -> dict:
-    """One fetch_food_coupons entry. The docs give a coupon an `id` and no separate code field, while apply_food_coupon
-    takes a `couponCode`: `id` is used as the code, and apply_coupon only counts it if the cart then shows the discount."""
-    code = str(item.get("id") or "").strip()
+    """One fetch_food_coupons entry; apply_coupon only counts a coupon as applied if the cart then shows the discount."""
+    code = _coupon_code(item)
     status = str(item.get("applicabilityStatus") or "").upper()
     applied = status == "APPLIED"  # docs: "already applied to the cart": there is nothing left to apply
     applicable = not applied and item.get("applicable") is not False and (item.get("applicable") is True or status == "APPLICABLE")
@@ -364,6 +379,7 @@ def _coupon(item: dict) -> dict:
     return {
         "code": code,
         "title": item.get("title") or code,
+        "ribbon": item.get("ribbon_text") if isinstance(item.get("ribbon_text"), str) else None,  # e.g. "₹125 OFF"
         "description": None if description == message else description,  # never the same sentence twice
         "applicable": applicable,
         "applied": applied,
