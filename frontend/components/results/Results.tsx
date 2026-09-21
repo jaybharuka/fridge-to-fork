@@ -14,6 +14,7 @@ import { MealSuggestionsSection } from './MealSuggestionsSection';
 import { IngredientChecklistCard } from './IngredientChecklistCard';
 import { ChoiceCard } from './ChoiceCard';
 import { ChecklistSkeleton, ChoiceSkeleton } from './ResultsSkeleton';
+import { PlanningProgress } from '../loading/PlanningProgress';
 import { ScanStatusCard } from './ScanStatusCard';
 import { FoodOrderSheet } from './FoodOrderSheet';
 import { InstamartOrderSheet } from './InstamartOrderSheet';
@@ -132,13 +133,17 @@ export function Results({
       <div className="wrap">
         {/* Shared chrome — outside both panels, Order tab only. */}
         {tab === 'order' && dishName && (
-          <DishHeroSection
-            dishName={dishName}
-            servings={servings}
-            cookTime={cookTime}
-            fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
-          />
+          <div className={styles.revealIn}>
+            <DishHeroSection
+              dishName={dishName}
+              servings={servings}
+              cookTime={cookTime}
+              fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
+            />
+          </div>
         )}
+        {/* Until the plan names a dish there is no hero: show progress in the hero's own footprint instead of a blank gap. */}
+        {tab === 'order' && !dishName && contentPending && <PlanningProgress hasPhoto={state.hasPhoto} />}
 
         {tab === 'order' && (
           <div>

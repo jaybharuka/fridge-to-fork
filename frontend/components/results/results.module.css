@@ -536,3 +536,23 @@
 .choiceBtnOutline .spin { border-color: rgba(252,128,25,.3); border-top-color: #FC8019; }
 
 .choiceUnavailable { margin: 10px 0 0 0; font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
+
+/* Recipe-card skeleton rows (ChecklistSkeleton): shaped like the real checklist card. */
+@keyframes skelRowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.skelStat { padding: 16px 20px 8px; display: flex; flex-direction: column; gap: 10px; }
+.skelStatLine { height: 15px; width: 58%; }
+.skelHookLine { height: 12px; width: 78%; opacity: 0.7; }
+.skelRichRow { display: flex; align-items: center; gap: 12px; padding: 14px 20px; opacity: 0; animation: skelRowIn 0.4s ease forwards; }
+.skelCheck { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; }
+.skelLines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.skelName { height: 14px; }
+.skelQty { height: 11px; opacity: 0.7; }
+.skelTag { width: 52px; height: 18px; border-radius: 9px; flex-shrink: 0; }
+
+/* Real content arriving where a placeholder was: a short fade-up instead of a hard swap. */
+@keyframes revealIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.revealIn { animation: revealIn 0.45s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .skelRichRow { animation: none; opacity: 1; }
+  .revealIn { animation: none; }
+}

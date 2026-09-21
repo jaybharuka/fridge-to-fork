@@ -97,13 +97,16 @@
   border: 1.5px solid transparent; border-top-color: #FC8019;
   animation: stageSpin .8s linear infinite;
 }
-.loadingStage.active .loadingStageLabel { color: rgba(255, 255, 255, 0.95); font-weight: 600; }
+.loadingStage.active .loadingStageLabel { color: rgba(255, 255, 255, 0.95); font-weight: 600; animation: stageLabelPulse 1.8s ease-in-out infinite; }
+@keyframes stageLabelPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.68; } }
 @keyframes stageSpin { to { transform: rotate(360deg); } }
 .loadingStage.done .loadingStageIcon { border-color: #FC8019; background: #FC8019; }
 .loadingStage.done .loadingStageIcon::after {
   content: ''; position: absolute; left: 7px; top: 4px; width: 5px; height: 9px;
   border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
 }
+.loadingStage.done .loadingStageIcon { animation: stageTickPop .35s ease-out; }
+@keyframes stageTickPop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 .loadingStage.done .loadingStageLabel { color: rgba(255, 255, 255, 0.55); }
 
 /* Photo scan screen — templates/index.html:1325-1546 */
@@ -222,3 +225,11 @@
   transition: color 0.15s ease;
 }
 .photoScanRetryBtnSubtle:hover { color: rgba(255, 255, 255, 0.85); }
+
+/* Overlay progress bar (under the stage list). */
+.loadingBar { margin-top: 26px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.loadingBarFill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #FC8019, #ffb066); transition: width .5s linear; }
+@media (prefers-reduced-motion: reduce) {
+  .loadingStage.active .loadingStageLabel, .loadingStage.done .loadingStageIcon { animation: none; }
+  .loadingBarFill { transition: none; }
+}
