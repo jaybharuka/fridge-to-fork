@@ -14,6 +14,7 @@ import { ReportProblem } from './ReportProblem';
 import { InstamartOutcome } from './InstamartOutcome';
 import { estimateSubtotal, InstamartPicker } from './InstamartPicker';
 import { InstamartReview } from './InstamartReview';
+import { InstamartSearchBox } from './InstamartSearchBox';
 import { TopUpCard } from './TopUpCard';
 import { UsualItems } from './UsualItems';
 import resultsStyles from './results.module.css';
@@ -109,6 +110,9 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
   const close = () => { if (!placing) onClose(); }; // a request is in flight: the user must see its outcome
 
   const selectedTopUps = new Set(state.extras);
+  // For the search box: which variations are already in the order, and which item names are taken.
+  const chosenSpinIds = new Set(Object.values(state.choices).map(c => c.spinId).filter((id): id is string => !!id));
+  const takenLabels = new Set(state.results.map(r => r.ingredient));
   const toggleTopUp = (name: string) => {
     if (selectedTopUps.has(name)) order.removeExtra(name);
     else void order.addExtra(name);
@@ -186,6 +190,15 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
               onQuantity={order.setQuantity}
               onRemoveExtra={order.removeExtra}
             />
+            {state.address?.id && (
+              <InstamartSearchBox
+                key={state.address.id}
+                addressId={state.address.id}
+                addedSpinIds={chosenSpinIds}
+                takenLabels={takenLabels}
+                onAdd={order.addProduct}
+              />
+            )}
             {usualFresh.length > 0 && <UsualItems items={usualFresh} onAdd={order.addProduct} />}
             {showTopUps && (
               <>
