@@ -407,6 +407,18 @@ def _describe_cart(update: dict, cart: dict) -> str:
     )
 
 
+def _describe_identity(cart: dict, address_id: str) -> str:
+    """Cart-sync diagnostic: the cart's id, and whether Swiggy returned the (documented as optional) restaurant block.
+    Ids and flags only (no names, no amounts), so it is safe to log."""
+    inner = _inner(cart)
+    restaurant = inner.get("restaurant")
+    return (
+        f"cart_id={inner.get('cart_id', inner.get('cartId'))!r} restaurant_block_present={isinstance(restaurant, dict) and bool(restaurant)} "
+        f"restaurant_id_present={bool(isinstance(restaurant, dict) and restaurant.get('id'))} "
+        f"id_like_keys={sorted(k for k in inner if 'id' in k.lower())} items={len(inner.get('items') or [])} addressId={address_id!r}"
+    )
+
+
 async def _logged(session: ClientSession, name: str, **arguments) -> dict:
     """_call, but a refusal is logged with Swiggy's own message first (the route only hands it to the browser), so the
     first real attempt shows WHY a tool said no. Auth expiry is routine and not logged."""
@@ -435,6 +447,7 @@ async def build_cart(token: str, address_id: str, sel: dict) -> dict:
         update = await _logged(session, "update_food_cart", restaurantId=sel["restaurant_id"], cartItems=cart_items, addressId=address["id"], **name_arg)
         cart = await _logged(session, "get_food_cart", addressId=address["id"], **name_arg)
         log.warning("[FOOD][diag] cart: %s", _describe_cart(update, cart))
+        log.warning("[FOOD][diag] cart identity: %s", _describe_identity(cart, address["id"]))
         mismatch = _check_cart(cart, sel)
         if mismatch:
             log.warning("[FOOD] cart refused: %s requested_variants=%d requested_addons=%d format=%s", mismatch, len(sel["variants"]), len(sel["addons"]), sel.get("format"))

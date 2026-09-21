@@ -105,6 +105,17 @@ def _cart_note(cart: dict) -> str:
     )
 
 
+def _describe_identity(cart: dict, requested_address: str) -> str:
+    """Cart-sync diagnostic: does the cart Swiggy holds have an id, is it flagged absent, which address is it bound to.
+    Ids and flags only (no names, no amounts), so it is safe to log."""
+    details = cart.get("selectedAddressDetails")
+    bound = details.get("id") if isinstance(details, dict) else None  # the id only: `selectedAddress` is the street text
+    return (
+        f"cartId={cart.get('cartId')!r} cartAbsent={cart.get('cartAbsent')!r} cartAbsentReason={cart.get('cartAbsentReason')!r} "
+        f"items={len(cart.get('items') or [])} bound_address_id={bound!r} requested_address={requested_address!r}"
+    )
+
+
 async def _fetch_payment(session: ClientSession, cart: dict, stage: str = "cart") -> dict:
     return await swiggy_common._fetch_payment(session, cart.get("paymentOptions"), tag="INSTAMART", stage=stage, cart_note=_cart_note(cart))
 
@@ -274,6 +285,7 @@ async def build_cart(token: str, address_id: str, selections: list[dict]) -> dic
         await _call(session, "clear_cart")
         updated = await _call(session, "update_cart", selectedAddressId=address_id, items=items)
         cart = await _call(session, "get_cart")
+        log.warning("[INSTAMART][diag] cart identity: %s", _describe_identity(cart, address_id))
         payment = await _fetch_payment(session, cart, stage="cart")
         coupons = await _coupons_or_none(session, address_id)
         review = await _verify_cart_address(
