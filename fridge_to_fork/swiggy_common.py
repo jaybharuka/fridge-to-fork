@@ -70,6 +70,11 @@ def _translate(exc: Exception) -> SwiggyError:
     if isinstance(exc, SwiggyError):
         return exc
     leaves = list(_leaves(exc))
+    # The transport's task group wraps whatever the session body raises, so a real Swiggy answer (address not serviceable, cart
+    # changed, ...) arrives here inside an ExceptionGroup. It is not a network failure: hand it on unchanged.
+    for leaf in leaves:
+        if isinstance(leaf, SwiggyError):
+            return leaf
     for leaf in leaves:
         if isinstance(leaf, httpx.HTTPStatusError) and leaf.response.status_code == 401:
             return SwiggyError("auth_required", "Connect your Swiggy account to continue.", 401)
