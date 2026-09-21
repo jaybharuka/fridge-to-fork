@@ -38,6 +38,8 @@ class SearchRequest(BaseModel):
     items: list[Ingredient] = Field(min_length=1, max_length=25)
     # A saved address the user picked; verified server-side. Omitted = Home/first.
     address_id: Id | None = None
+    # How many options to return per item (default: 5, what the checklist uses). The search box asks for the whole first page.
+    max_options: int | None = Field(default=None, ge=1, le=60)
 
 
 class Selection(BaseModel):
@@ -182,7 +184,7 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
 
     @router.post("/search")
     async def search(body: SearchRequest, request: Request):
-        return await run(request, lambda t: instamart.search_ingredients(t, _dedupe(body.items), body.address_id))
+        return await run(request, lambda t: instamart.search_ingredients(t, _dedupe(body.items), body.address_id, max_options=body.max_options))
 
     @router.post("/cart")
     async def cart(body: CartRequest, request: Request):

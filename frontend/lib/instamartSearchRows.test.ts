@@ -16,10 +16,17 @@ describe('rowsFrom', () => {
     assert.deepEqual(rowsFrom(null, none, none), []);
   });
 
-  it('keeps at most five rows', () => {
-    const many = Array.from({ length: 9 }, (_, i) => opt(`s${i}`, { size: `${i} g` }));
-    assert.equal(MAX_SEARCH_ROWS, 5);
-    assert.equal(rowsFrom(result(many), none, none).length, 5);
+  it('keeps at most forty cards (a page is ~20 products / up to ~46 variations)', () => {
+    const many = Array.from({ length: 60 }, (_, i) => opt(`s${i}`, { size: `${i} g` }));
+    assert.equal(MAX_SEARCH_ROWS, 40);
+    assert.equal(rowsFrom(result(many), none, none).length, 40);
+    assert.equal(rowsFrom(result(many.slice(0, 46)), none, none).length, 40);
+    assert.equal(rowsFrom(result(many.slice(0, 12)), none, none).length, 12);
+  });
+
+  it('keeps variants of one product next to each other, in the order Swiggy sent', () => {
+    const rows = rowsFrom(result([opt('a1', { name: 'A', size: '100 g' }), opt('a2', { name: 'A', size: '200 g' }), opt('b1', { name: 'B' })]), none, none);
+    assert.deepEqual(rows.map(r => r.option.spinId), ['a1', 'a2', 'b1']);
   });
 
   it('sorts in-stock first and keeps Swiggy order otherwise', () => {

@@ -2,8 +2,9 @@
 // order sheet. Pure (no React, no network) so it is unit-tested in plain Node: see instamartSearchRows.test.ts.
 import type { InstamartOption, InstamartSearchResult } from './instamart';
 
-/** The backend already returns at most this many options per query (MAX_OPTIONS_PER_ITEM); kept here so the box never shows more. */
-export const MAX_SEARCH_ROWS = 5;
+/** Cards shown per search: what the box asks the backend for (`max_options`) and never exceeds. One page of Instamart search is ~20
+ *  products / up to ~46 variations, and there is no further page (offset does not return new products). */
+export const MAX_SEARCH_ROWS = 40;
 
 export interface SearchRow {
   option: InstamartOption;
