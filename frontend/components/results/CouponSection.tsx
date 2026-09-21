@@ -28,7 +28,7 @@ export function CouponSection({ coupons, appliedCoupon, couponBusy, disabled, ed
       )}
       <ul className={styles.coupons}>
         {coupons.items.map(c => {
-          const isApplied = appliedCoupon?.code.toLowerCase() === c.code.toLowerCase();
+          const isApplied = c.applied === true || appliedCoupon?.code.toLowerCase() === c.code.toLowerCase();
           return (
             <li key={c.code} className={`${styles.coupon} ${!c.applicable && !isApplied ? styles.couponOff : ''}`}>
               <div className={styles.couponBody}>

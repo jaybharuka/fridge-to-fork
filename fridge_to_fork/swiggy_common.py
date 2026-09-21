@@ -109,10 +109,28 @@ def _payload(result) -> dict:
     return {}
 
 
-def _tool_error(payload: dict) -> SwiggyError:
+GENERIC_REJECTION = "Swiggy rejected the request."
+
+
+def _error_message(payload: dict) -> str | None:
+    """The message of a failed tool call, wherever Swiggy put it: `error.message` (the documented envelope), `error` as a
+    string, a top-level `message`, or `data.statusMessage` / `data.message` (the mutating cart tools document a
+    statusCode + statusMessage inside `data`). None when the payload carries none of them."""
     err = payload.get("error")
-    message = (err.get("message") if isinstance(err, dict) else err) or payload.get("message") or "Swiggy rejected the request."
-    message = str(message)
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    candidates = [
+        err.get("message") if isinstance(err, dict) else err,
+        err.get("description") if isinstance(err, dict) else None,
+        payload.get("message"),
+        data.get("statusMessage"),
+        data.get("message"),
+    ]
+    found = next((c for c in candidates if isinstance(c, str) and c.strip()), None)
+    return found.strip() if found else None
+
+
+def _tool_error(payload: dict) -> SwiggyError:
+    message = _error_message(payload) or GENERIC_REJECTION
     if _AUTH_RE.search(message):
         return SwiggyError("auth_required", "Connect your Swiggy account to continue.", 401)
     for marker, code in _DOMAIN_CODES.items():
@@ -131,6 +149,10 @@ async def _call(session: ClientSession, name: str, **arguments) -> dict:
     if getattr(result, "isError", False) or payload.get("success") is False:
         error = _tool_error(payload)
         error.tool = name
+        if error.message == GENERIC_REJECTION:
+            # Swiggy refused without a readable message: keep the body so the reason can be read from the log (a failure
+            # payload carries no personal data). Truncated; the browser only ever sees the generic sentence.
+            log.warning("[SWIGGY][diag] %s refused with no readable message: payload=%.700s", name, json.dumps(payload, default=str, ensure_ascii=False))
         raise error
     data = payload.get("data")
     return data if isinstance(data, dict) else payload
