@@ -168,3 +168,26 @@ select.input { appearance: auto; }
 .strike { text-decoration: line-through; color: rgba(255,255,255,0.35); margin-right: 6px; }
 .progressTrack { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.1); margin: 10px 0 2px 0; overflow: hidden; }
 .progressBar { height: 100%; border-radius: 999px; background: #FC8019; transition: width .6s ease; }
+
+/* "Looking for something else?" search (picking screen). Same dark surface as the rest of the sheet. */
+.searchBox { margin-bottom: 4px; }
+.searchField { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; }
+.searchField:focus-within { border-color: #FC8019; }
+.searchIcon { width: 16px; height: 16px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+.searchInput { flex: 1; min-width: 0; background: none; border: none; outline: none; color: rgba(255,255,255,0.92); font-size: 14px; padding: 10px 0; }
+/* the field's own border shows focus (:focus-within above); the global input:focus-visible ring would draw a second box inside it */
+.searchInput:focus-visible { outline: none; }
+.searchInput::placeholder { color: rgba(255,255,255,0.35); }
+.searchInput::-webkit-search-cancel-button { display: none; }
+.searchClear { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; flex-shrink: 0; }
+.searchClear svg { width: 15px; height: 15px; }
+.searchGo { flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; background: #FC8019; border: none; border-radius: 10px; cursor: pointer; }
+.searchGo:disabled { opacity: .4; cursor: not-allowed; }
+.searchResults { list-style: none; margin: 10px 0 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.searchRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
+.searchRow .thumb, .searchRow .thumbFallback { width: 48px; height: 48px; }
+.searchRowOff { opacity: .5; }
+.searchSkel { height: 72px; border-radius: 14px; background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04)); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+.searchNote { margin: 10px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.55); }
+.searchNote p { margin: 0 0 4px 0; }
+@media (prefers-reduced-motion: reduce) { .searchSkel { animation: none; } }
