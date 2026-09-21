@@ -40,6 +40,8 @@ export interface Coupon {
   title: string;
   description: string | null;
   applicable: boolean;
+  /** Food: Swiggy says this coupon is already applied to the cart. */
+  applied?: boolean;
   /** Why it can't be applied (or extra detail), as Swiggy worded it. */
   message: string | null;
   terms: string[];

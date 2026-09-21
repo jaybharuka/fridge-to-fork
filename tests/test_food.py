@@ -8,7 +8,10 @@ confirm_order, which for Food echoes addressId/cartId/lat/lng and never uses paa
 """
 
 import copy
+import json
+import logging
 import unittest
+from types import SimpleNamespace
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
@@ -626,7 +629,7 @@ class CouponTests(FoodCase):
         self.assertTrue(c["available"])
         self.assertEqual(c["filter"], "COD-compatible offers")
         self.assertEqual([x["code"] for x in c["items"]], ["SAVE50", "BIG150"])  # the id-less one and the duplicate are dropped
-        self.assertEqual(c["items"][0], {"code": "SAVE50", "title": "₹50 off", "description": "Flat ₹50 off", "applicable": True, "message": None, "terms": ["Valid once per user"]})
+        self.assertEqual(c["items"][0], {"code": "SAVE50", "title": "₹50 off", "description": "Flat ₹50 off", "applicable": True, "applied": False, "message": None, "terms": ["Valid once per user"]})
         self.assertEqual((c["items"][1]["applicable"], c["items"][1]["message"]), (False, "Add ₹200 more to use this"))
         self.assertIsNone(c["items"][1]["description"])  # the reason is not repeated as a description
 
@@ -749,6 +752,75 @@ class CouponTests(FoodCase):
                 await food.apply_coupon("tok", "addr-home", "SAVE50")
             self.assertIn(f"[FOOD][diag] {tool} refused: code=tool_error message='{tool}: nope'", "\n".join(logs.output), tool)
 
+    # ---- a coupon the cart already carries (real account: coupon_applied 'SWIGGYIT' before the attempt)
+
+    def with_coupons(self, entries):
+        return {**FOOD_COUPONS, "coupon_sections": [{"title": "For you", "type": "offers", "coupons": entries}]}
+
+    ENTRIES = [{"id": "SWIGGYIT", "applicabilityStatus": "APPLIED", "title": "Swiggy IT", "subtitle": "Auto applied"},
+               {"id": "SAVE50", "applicable": True, "applicabilityStatus": "APPLICABLE", "title": "₹50 off"}]
+
+    def carrying(self, code="SWIGGYIT", discount=30):
+        return cart_session(
+            get_food_cart=[envelope(food_cart(to_pay=356, coupon=code, discount=discount))],
+            fetch_food_coupons=envelope(self.with_coupons(self.ENTRIES)),
+        )
+
+    async def test_an_applied_status_means_applied_not_applicable(self):
+        s = self.carrying()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+            out = await food.build_cart("tok", "addr-home", selection())
+        by_code = {c["code"]: c for c in out["coupons"]["items"]}
+        self.assertEqual((by_code["SWIGGYIT"]["applied"], by_code["SWIGGYIT"]["applicable"]), (True, False))
+        self.assertEqual((by_code["SAVE50"]["applied"], by_code["SAVE50"]["applicable"]), (False, True))
+
+    async def test_a_coupon_the_cart_already_carries_is_reported_in_the_review(self):
+        s = self.carrying()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+            out = await food.build_cart("tok", "addr-home", selection())
+        self.assertEqual(out["review"]["coupon"], {"code": "SWIGGYIT", "discount": 30.0})
+
+    async def test_asking_for_an_already_applied_coupon_is_a_no_op_success_never_a_call_to_swiggy(self):
+        for asked in ("SWIGGYIT", "swiggyit"):
+            s = self.carrying()
+            with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+                out = await food.apply_coupon("tok", "addr-home", asked, "r1", None)
+            self.assertNotIn("apply_food_coupon", s.names(), asked)
+            self.assertTrue(out["alreadyApplied"])
+            self.assertEqual(out["coupon"], {"code": "SWIGGYIT", "title": "Swiggy IT", "savings": 30.0})
+            self.assertEqual(out["review"]["total"], 356.0)  # the cart, unchanged
+            self.assertEqual(out["review"]["coupon"], {"code": "SWIGGYIT", "discount": 30.0})
+
+    async def test_a_second_coupon_is_refused_up_front_because_there_is_no_remove_tool(self):
+        s = self.carrying()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"), self.assertRaises(SwiggyError) as ctx:
+            await food.apply_coupon("tok", "addr-home", "SAVE50", "r1", None)
+        self.assertEqual(ctx.exception.code, "coupon_already_applied")
+        self.assertIn("SWIGGYIT is already applied", ctx.exception.message)
+        self.assertIn("Edit dish", ctx.exception.message)
+        self.assertNotIn("apply_food_coupon", s.names())
+
+    async def test_a_suggested_coupon_with_no_discount_is_not_an_applied_one(self):
+        # Swiggy: coupon_applied with coupon_discount 0 is only auto-suggested. Applying another coupon must still go through.
+        before = food_cart(coupon="SWIGGYIT", discount=0)
+        after = food_cart(to_pay=336, coupon="SAVE50", discount=50)
+        s = cart_session(get_food_cart=[envelope(before), envelope(after)],
+                         fetch_food_coupons=envelope(self.with_coupons([{"id": "SAVE50", "applicable": True, "title": "₹50 off"}])),
+                         apply_food_coupon=envelope({"statusCode": 0}))
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"):
+            out = await food.apply_coupon("tok", "addr-home", "SAVE50", "r1", None)
+        self.assertEqual(s.args("apply_food_coupon"), {"couponCode": "SAVE50", "addressId": "addr-home"})
+        self.assertNotIn("alreadyApplied", out)
+        self.assertEqual(out["review"]["total"], 336.0)
+
+    async def test_the_coupon_that_was_sent_and_what_the_cart_already_carried_are_logged(self):
+        s = self.session()
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            await food.apply_coupon("tok", "addr-home", "SAVE50")
+        text = "\n".join(logs.output)
+        self.assertIn("[FOOD][diag] apply_food_coupon requested: couponCode='SAVE50' listed=[('SAVE50', 'applicable'), ('BIG150', 'not_applicable')]", text)
+        self.assertIn("offers_before={coupon_applied: None, coupon_discount: 0}", text)
+
     async def test_a_blocked_cart_is_never_offered_a_coupon(self):
         s = cart_session(get_food_cart=envelope(food_cart(items=[])))
         exc = await self.refuse(s)
@@ -799,6 +871,59 @@ class CouponTests(FoodCase):
         with using(s), self.assertLogs("uvicorn.error", level="WARNING"), self.assertRaises(SwiggyError) as ctx:
             await place(total=386.0, key="idem-key-0002")  # the pre-discount total the user no longer sees
         self.assertEqual(ctx.exception.code, "cart_changed")
+
+
+class RefusalMessageTests(FoodCase):
+    """`Swiggy rejected the request.` is OUR fallback for a failure with no readable message. Read every documented place
+    a message can live first, and keep the raw body in the log when there is none."""
+
+    @staticmethod
+    def raw(body: dict):
+        """A tool result whose text is exactly `body` (envelope() only builds the standard shapes)."""
+        return SimpleNamespace(structuredContent=None, isError=False, content=[SimpleNamespace(text=json.dumps(body))])
+
+    async def refuse(self, payload):
+        payload = self.raw(payload) if isinstance(payload, dict) else payload
+        s = cart_session(apply_food_coupon=payload)
+        with using(s), self.assertLogs("uvicorn.error", level="INFO") as logs:
+            logging.getLogger("uvicorn.error").info("-")  # assertLogs needs at least one record, even when nothing is logged
+            async with food._session("tok") as session:
+                with self.assertRaises(SwiggyError) as ctx:
+                    await food._call(session, "apply_food_coupon", couponCode="X", addressId="a")
+        return ctx.exception, "\n".join(logs.output)
+
+    async def test_the_documented_error_envelope_is_read_as_before(self):
+        exc, _ = await self.refuse(envelope(success=False, error="Coupon expired"))
+        self.assertEqual(exc.message, "Coupon expired")
+
+    async def test_a_message_in_data_status_message_is_found(self):
+        exc, text = await self.refuse({"success": False, "data": {"statusCode": 400, "statusMessage": "Coupon already applied"}})
+        self.assertEqual((exc.code, exc.message, exc.tool), ("tool_error", "Coupon already applied", "apply_food_coupon"))
+        self.assertNotIn("no readable message", text)
+
+    async def test_the_other_places_a_message_can_live(self):
+        for payload, expected in (
+            ({"success": False, "message": "Top-level message"}, "Top-level message"),
+            ({"success": False, "error": {"description": "In description"}}, "In description"),
+            ({"success": False, "data": {"message": "In data.message"}}, "In data.message"),
+            ({"success": False, "error": {"message": "  "}, "message": "Falls through blanks"}, "Falls through blanks"),
+        ):
+            exc, _ = await self.refuse(payload)
+            self.assertEqual(exc.message, expected, payload)
+
+    async def test_with_no_message_anywhere_the_raw_body_is_logged_and_the_browser_gets_only_the_generic_sentence(self):
+        exc, text = await self.refuse({"success": False, "error": {"code": "COUPON_NOT_APPLICABLE", "details": {"reason": 7}}})
+        self.assertEqual(exc.message, "Swiggy rejected the request.")
+        self.assertIn("[SWIGGY][diag] apply_food_coupon refused with no readable message: payload=", text)
+        self.assertIn("COUPON_NOT_APPLICABLE", text)  # the code Swiggy sent is now visible
+
+    async def test_an_auth_failure_is_still_an_auth_failure(self):
+        exc, _ = await self.refuse(envelope(success=False, error="401 Unauthorized"))
+        self.assertEqual(exc.code, "auth_required")
+
+    async def test_domain_codes_are_still_mapped(self):
+        exc, _ = await self.refuse(envelope(success=False, error="ITEM_OUT_OF_STOCK: sold out"))
+        self.assertEqual(exc.code, "out_of_stock")
 
 
 class UpiCheckoutTests(FoodCase):

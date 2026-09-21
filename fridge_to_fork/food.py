@@ -353,7 +353,8 @@ def _coupon(item: dict) -> dict:
     takes a `couponCode`: `id` is used as the code, and apply_coupon only counts it if the cart then shows the discount."""
     code = str(item.get("id") or "").strip()
     status = str(item.get("applicabilityStatus") or "").upper()
-    applicable = item.get("applicable") is not False and (item.get("applicable") is True or status in {"APPLICABLE", "APPLIED"})
+    applied = status == "APPLIED"  # docs: "already applied to the cart": there is nothing left to apply
+    applicable = not applied and item.get("applicable") is not False and (item.get("applicable") is True or status == "APPLICABLE")
     if status == "NOT_APPLICABLE":
         applicable = False
     terms = item.get("terms_and_conditions") or {}
@@ -365,6 +366,7 @@ def _coupon(item: dict) -> dict:
         "title": item.get("title") or code,
         "description": None if description == message else description,  # never the same sentence twice
         "applicable": applicable,
+        "applied": applied,
         "message": message,
         "terms": [t for t in terms.get("bullet_texts") or [] if isinstance(t, str)],
     }
@@ -496,8 +498,34 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str, restaurant
 
         listed = (await _list_coupons(session, str(coupon_restaurant_id), address["id"]))["items"]
         match = next((c for c in listed if c["code"].lower() == coupon_code.strip().lower()), None)
+        offers_before = _inner(before_cart).get("offers") or {}
+        discount_before = _num(offers_before.get("coupon_discount")) or 0
+        applied_before = str(offers_before.get("coupon_applied") or "").strip()
+        log.warning(
+            "[FOOD][diag] apply_food_coupon requested: couponCode=%r listed=%s offers_before={coupon_applied: %r, coupon_discount: %r}",
+            coupon_code, [(c["code"], "applicable" if c["applicable"] else "applied" if c["applied"] else "not_applicable") for c in listed],
+            applied_before or None, discount_before,
+        )
         if match is None:
             raise SwiggyError("coupon_not_found", "That coupon isn't available for this cart anymore.")
+        # Swiggy: coupon_applied with a discount of 0 is only a suggestion; only a positive discount is an applied coupon.
+        already_applied = discount_before > 0 and applied_before != ""
+        if match["applied"] or (already_applied and applied_before.lower() == match["code"].lower()):
+            # Applying it again would only be rejected (or leave the total unchanged and read as a failure): it is already
+            # on the cart, so report that, unchanged.
+            return {
+                "review": before,
+                "coupon": {"code": match["code"], "title": match["title"], "savings": discount_before or None},
+                "coupons": await _coupons_or_none(session, str(coupon_restaurant_id), address["id"]),
+                "alreadyApplied": True,
+            }
+        if already_applied:
+            # There is no remove-coupon tool, so a second coupon can't replace the first: say so instead of sending a call
+            # Swiggy has no way to honour (rebuilding the cart is the only way to start without a coupon).
+            raise SwiggyError(
+                "coupon_already_applied",
+                f"{applied_before} is already applied to this cart, and Swiggy doesn't let us swap it. Use Edit dish to rebuild the cart if you want a different coupon.",
+            )
         if not match["applicable"]:
             raise SwiggyError("coupon_not_applicable", match["message"] or "That coupon can't be applied to this cart.")
 

@@ -75,6 +75,12 @@ const initial: FoodState = {
   idempotencyKey: null, outcome: null, notice: null, noticeTool: null, error: null, errorTool: null, authNeeded: false,
 };
 
+/** A coupon the cart already carries (server-verified: a positive discount) is an applied coupon, even though the user
+ *  didn't apply it here: Swiggy can add one itself, and there is no remove-coupon tool. */
+function appliedFrom(review: FoodReview): AppliedCoupon | null {
+  return review.coupon?.code ? { code: review.coupon.code, title: review.coupon.code, savings: review.coupon.discount } : null;
+}
+
 /** Keep the user's payment choice if Swiggy still offers it, else prefer cash on delivery, else the first option. */
 function pickPayment(review: FoodReview, current: string | null): string | null {
   const options = review.payment.options;
@@ -102,7 +108,7 @@ function reducer(state: FoodState, action: Action): FoodState {
       return { ...state, stage: 'building', notice: null, noticeTool: null, error: null, errorTool: null };
     case 'BUILD_OK':
       // a rebuilt cart starts without a coupon (the cart is flushed first)
-      return { ...state, stage: 'reviewing', review: action.review, coupons: action.coupons, appliedCoupon: null, couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null, noticeTool: null };
+      return { ...state, stage: 'reviewing', review: action.review, coupons: action.coupons, appliedCoupon: appliedFrom(action.review), couponBusy: null, paymentKey: pickPayment(action.review, state.paymentKey), idempotencyKey: action.key, notice: null, noticeTool: null };
     case 'COUPON_START':
       return { ...state, couponBusy: action.code, notice: null, noticeTool: null };
     case 'COUPON_OK':
