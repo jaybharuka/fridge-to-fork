@@ -41,11 +41,12 @@ def plan(decision: Decision) -> MealPlan:
 
 
 class SwitchTests(unittest.TestCase):
-    def test_the_flow_is_switched_off_and_the_old_agent_switch_no_longer_exists(self):
+    def test_the_flow_is_switched_on_and_the_old_agent_switch_no_longer_exists(self):
         # Pinned on purpose: switching the flow on or off is a deliberate step (a real order), so it must be a visible
-        # change to this test, never something that rides along with another deploy. It is OFF until it is established
-        # that place_food_order places a real, charged order against the connected account.
-        self.assertFalse(features.FOOD_ORDERING_ENABLED)
+        # change to this test, never something that rides along with another deploy. It was switched ON deliberately
+        # (2026-09-21) before any real Food order had been placed end to end; to use the kill switch, set it back to
+        # False here and in features.py / frontend/lib/features.ts.
+        self.assertTrue(features.FOOD_ORDERING_ENABLED)
         self.assertFalse(hasattr(features, "FOOD_AGENT_ENABLED"))
 
     def test_the_kill_switch_refuses_every_food_route_before_auth_and_before_touching_swiggy(self):
