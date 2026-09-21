@@ -42,6 +42,8 @@ export interface Coupon {
   applicable: boolean;
   /** Food: Swiggy says this coupon is already applied to the cart. */
   applied?: boolean;
+  /** Food: Swiggy's badge for the offer (e.g. "₹125 OFF"). */
+  ribbon?: string | null;
   /** Why it can't be applied (or extra detail), as Swiggy worded it. */
   message: string | null;
   terms: string[];

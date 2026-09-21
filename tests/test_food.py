@@ -629,7 +629,7 @@ class CouponTests(FoodCase):
         self.assertTrue(c["available"])
         self.assertEqual(c["filter"], "COD-compatible offers")
         self.assertEqual([x["code"] for x in c["items"]], ["SAVE50", "BIG150"])  # the id-less one and the duplicate are dropped
-        self.assertEqual(c["items"][0], {"code": "SAVE50", "title": "₹50 off", "description": "Flat ₹50 off", "applicable": True, "applied": False, "message": None, "terms": ["Valid once per user"]})
+        self.assertEqual(c["items"][0], {"code": "SAVE50", "title": "₹50 off", "description": "Flat ₹50 off", "applicable": True, "applied": False, "message": None, "ribbon": None, "terms": ["Valid once per user"]})
         self.assertEqual((c["items"][1]["applicable"], c["items"][1]["message"]), (False, "Add ₹200 more to use this"))
         self.assertIsNone(c["items"][1]["description"])  # the reason is not repeated as a description
 
