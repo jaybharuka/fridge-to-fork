@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Search, X } from 'lucide-react';
 import { formatInr, type InstamartSearchResult } from '@/lib/instamart';
-import { productCacheFor } from '@/lib/instamartSearch';
+import { searchBoxCacheFor } from '@/lib/instamartSearch';
 import { keyOf } from '@/lib/searchCache';
 import { rowsFrom, toCartResult } from '@/lib/instamartSearchRows';
 import { ProductThumb } from './ProductThumb';
@@ -48,7 +48,7 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
     const id = ++run.current;
     setStatus('loading');
     setSearched(text);
-    const { entries, error } = await productCacheFor(addressId).ensure([text]);
+    const { entries, error } = await searchBoxCacheFor(addressId).ensure([text]);
     if (run.current !== id) return; // superseded by a newer search, a clear, or an address change
     const entry = entries.get(keyOf(text));
     if (entry?.status === 'ready' && entry.result) {
@@ -99,8 +99,8 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
       </form>
 
       {status === 'loading' && (
-        <div className={styles.searchResults} aria-busy="true" aria-label={`Searching for ${searched}`}>
-          {[0, 1, 2].map(i => <div key={i} className={styles.searchSkel} />)}
+        <div className={`${styles.usualRow} ${styles.searchCards}`} aria-busy="true" aria-label={`Searching for ${searched}`}>
+          {[0, 1, 2].map(i => <div key={i} className={styles.searchSkelCard} />)}
         </div>
       )}
 
@@ -118,24 +118,21 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
       )}
 
       {status === 'ready' && rows.length > 0 && (
-        <ul className={styles.searchResults} aria-label={`Results for ${searched}`}>
+        <ul className={`${styles.usualRow} ${styles.searchCards}`} aria-label={`Results for ${searched}`}>
           {rows.map(row => {
             const { option } = row;
-            const meta = [option.brand, option.size].filter(Boolean).join(' · ');
             const discounted = option.price !== null && option.mrp !== null && option.mrp > option.price;
             return (
-              <li key={option.spinId} className={`${styles.searchRow} ${!option.available ? styles.searchRowOff : ''}`}>
-                <ProductThumb url={option.imageUrl} className={styles.thumb} fallbackClassName={styles.thumbFallback} />
-                <div className={styles.info}>
-                  <p className={styles.name}>{option.name}</p>
-                  {meta && <p className={styles.meta}>{meta}</p>}
-                  {option.price !== null && (
-                    <p className={styles.price}>
-                      {formatInr(option.price)}
-                      {discounted && <span className={styles.mrp}>{formatInr(option.mrp)}</span>}
-                    </p>
-                  )}
-                </div>
+              <li key={option.spinId} className={`${styles.usualCard} ${!option.available ? styles.searchCardOff : ''}`}>
+                <ProductThumb url={option.imageUrl} className={styles.usualThumb} fallbackClassName={styles.usualThumbFallback} />
+                <p className={styles.usualName}>{option.name}</p>
+                {option.size && <p className={styles.meta}>{option.size}</p>}
+                {option.price !== null && (
+                  <p className={styles.price}>
+                    {formatInr(option.price)}
+                    {discounted && <span className={styles.mrp}>{formatInr(option.mrp)}</span>}
+                  </p>
+                )}
                 {!option.available ? (
                   <span className={styles.oos}>Out of stock</span>
                 ) : (
@@ -144,7 +141,7 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
                     className={styles.couponBtn}
                     disabled={!row.canAdd}
                     onClick={() => onAdd(toCartResult(row))}
-                    aria-label={row.added ? `${option.name} added` : `Add ${option.name}`}
+                    aria-label={`${row.added ? 'Added' : 'Add'} ${[option.name, option.size].filter(Boolean).join(' ')}`}
                   >
                     {row.added ? '✓ Added' : '+ Add'}
                   </button>

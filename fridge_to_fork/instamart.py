@@ -68,12 +68,14 @@ def _options(product: dict) -> list[dict]:
     return options
 
 
-async def _search_one(session: ClientSession, address_id: str, ingredient: str) -> dict:
+async def _search_one(session: ClientSession, address_id: str, ingredient: str, limit: int = MAX_OPTIONS_PER_ITEM) -> dict:
+    # One call, first page only. (Live probe, 2026-09-22: a page is ~20 products / up to ~46 variations, and `offset` does not
+    # return new products, so there is nothing further to page through: `limit` just decides how much of this page is kept.)
     data = await _call(session, "search_products", addressId=address_id, query=ingredient)
     products = data.get("products") or []
     options = [o for p in products for o in _options(p)]
-    options.sort(key=lambda o: not o["available"])  # stable: in-stock first, Swiggy's ranking kept
-    shown = options[:MAX_OPTIONS_PER_ITEM]
+    options.sort(key=lambda o: not o["available"])  # stable: in-stock first, Swiggy's ranking (variants side by side) kept
+    shown = options[:limit]
     if not products:
         note = "No match on Instamart"
     elif not any(o["available"] for o in options):
@@ -167,7 +169,10 @@ def _review(cart: dict, payment: dict) -> dict:
 # Stage 1 — search (read-only)
 # ---------------------------------------------------------------------------
 
-async def search_ingredients(token: str, ingredients: list[str], address_id: str | None = None) -> dict:
+async def search_ingredients(token: str, ingredients: list[str], address_id: str | None = None, max_options: int | None = None) -> dict:
+    """`max_options`: how many options to keep per item (default MAX_OPTIONS_PER_ITEM, which the checklist's batch searches
+    use). The search box asks for more."""
+    limit = max_options or MAX_OPTIONS_PER_ITEM
     async with _session(token) as session:
         address = await _resolve_address(session, address_id)
         gate = asyncio.Semaphore(SEARCH_CONCURRENCY)
@@ -175,7 +180,7 @@ async def search_ingredients(token: str, ingredients: list[str], address_id: str
         async def one(name: str) -> dict:
             async with gate:
                 try:
-                    return await _search_one(session, address["id"], name)
+                    return await _search_one(session, address["id"], name, limit)
                 except InstamartError as exc:
                     if exc.code == "auth_required":
                         raise

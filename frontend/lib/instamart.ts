@@ -123,8 +123,12 @@ export async function postJson<T>(prefix: string, path: string, body: unknown): 
 
 const post = <T>(path: string, body: unknown) => postJson<T>('instamart', path, body);
 
-export const instamartSearch = (items: string[], addressId: string | null = null) =>
-  post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', { items, ...(addressId ? { address_id: addressId } : {}) });
+export const instamartSearch = (items: string[], addressId: string | null = null, maxOptions: number | null = null) =>
+  post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', {
+    items,
+    ...(addressId ? { address_id: addressId } : {}),
+    ...(maxOptions ? { max_options: maxOptions } : {}),
+  });
 
 export const instamartCart = (addressId: string, selections: CartSelection[]) =>
   post<{ review: InstamartReview; adjustments: string[]; coupons: CouponList }>('cart', { address_id: addressId, selections });

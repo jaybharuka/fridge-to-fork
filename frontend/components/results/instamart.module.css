@@ -183,11 +183,11 @@ select.input { appearance: auto; }
 .searchClear svg { width: 15px; height: 15px; }
 .searchGo { flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; background: #FC8019; border: none; border-radius: 10px; cursor: pointer; }
 .searchGo:disabled { opacity: .4; cursor: not-allowed; }
-.searchResults { list-style: none; margin: 10px 0 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.searchRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
-.searchRow .thumb, .searchRow .thumbFallback { width: 48px; height: 48px; }
-.searchRowOff { opacity: .5; }
-.searchSkel { height: 72px; border-radius: 14px; background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04)); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
 .searchNote { margin: 10px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.55); }
 .searchNote p { margin: 0 0 4px 0; }
-@media (prefers-reduced-motion: reduce) { .searchSkel { animation: none; } }
+/* Results are a horizontal row of the same cards as "Your usual items" (.usualRow / .usualCard); these only adjust the list element,
+   dim an out-of-stock card, and shape the loading placeholders. */
+.searchCards { list-style: none; margin: 10px 0 8px 0; padding-left: 0; padding-right: 0; }
+.searchCardOff { opacity: .5; }
+.searchSkelCard { width: 132px; height: 212px; flex-shrink: 0; border-radius: 14px; background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04)); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .searchSkelCard { animation: none; } }
