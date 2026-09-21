@@ -37,6 +37,9 @@ log = logging.getLogger("uvicorn.error")
 FOOD_MCP_URL = os.environ.get("SWIGGY_FOOD_MCP_URL", "https://mcp.swiggy.com/food")
 MAX_RESULTS = 8
 MAX_QUANTITY = 20
+# Swiggy: "hard ₹1000 cap on Builders Club orders" (docs: order-food recipe, changelog). The recipe checks `cart.data.total`, which is
+# not a cart-level field; the cart schema says to use the payable total for checkout decisions, so the cap is on `to_pay`.
+FOOD_CART_CAP = 1000
 # Every payment type get_payment_options can list that this app can complete: cash, UPI via the bridge page (QR or an app).
 OFFERED_PAYMENT_TYPES = {"cod", "upi_qr", "upi_intent"}
 
@@ -300,6 +303,16 @@ async def _fetch_payment(session: ClientSession, cart: dict, address_id: str, st
     return {**payment, "options": [o for o in payment["options"] if o["type"] in OFFERED_PAYMENT_TYPES]}
 
 
+def _cap_blocker(to_pay: float | None) -> str | None:
+    if to_pay is None or to_pay <= FOOD_CART_CAP:
+        return None
+    shown = f"₹{to_pay:,.0f}" if to_pay == int(to_pay) else f"₹{to_pay:,.2f}"
+    return (
+        f"Swiggy limits Food orders placed through apps like this one to ₹{FOOD_CART_CAP:,}, and this one comes to {shown}. "
+        "Use Edit dish to order less, or apply a coupon that brings the total to ₹1,000 or less."
+    )
+
+
 def _review(cart: dict, payment: dict, address: dict, fallback_restaurant: dict | None = None) -> dict:
     """`fallback_restaurant` ({id, name}) fills in what the cart doesn't say: the docs type the cart's `restaurant` as
     optional ("the cart API does not always return it"). It only ever comes from the request that built or reviewed
@@ -322,6 +335,13 @@ def _review(cart: dict, payment: dict, address: dict, fallback_restaurant: dict 
         blockers.append("Swiggy didn't return a total for this cart.")
     if not payment["options"]:
         blockers.append("No payment method is available for this cart.")
+    cap = _cap_blocker(to_pay)
+    if cap:
+        blockers.append(cap)
+    item_total = _num(pricing.get("item_total"))
+    if not cap and item_total is not None and item_total > FOOD_CART_CAP:
+        # the docs are ambiguous about which amount the cap is on; this records the case where the two readings differ
+        log.warning("[FOOD][diag] cap: item_total is over the cap but to_pay is not (item_total=%s to_pay=%s)", item_total, to_pay)
 
     lines = [{"label": "Item total", "value": _num(pricing.get("item_total"))}]
     if pricing.get("delivery_charge") is not None:
@@ -520,8 +540,10 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str, restaurant
             raise SwiggyError("cart_changed", "Your cart is now for a different restaurant. Please review it again.")
         fallback = {"id": restaurant_id, "name": restaurant_name}
         before = _review(before_cart, await _fetch_payment(session, before_cart, address["id"], stage="coupon-before"), address, fallback)
-        if before["blockers"]:
-            raise SwiggyError("cart_blocked", before["blockers"][0])
+        # An over-cap cart may still take a coupon (that can bring it back under the cap); every other blocker stops it.
+        hard = [b for b in before["blockers"] if b != _cap_blocker(before["total"])]
+        if hard:
+            raise SwiggyError("cart_blocked", hard[0])
         coupon_restaurant_id = before["restaurant"]["id"]
         if not coupon_restaurant_id:
             raise SwiggyError("cart_blocked", "Swiggy didn't say which restaurant this cart is for. Please review it again.")
