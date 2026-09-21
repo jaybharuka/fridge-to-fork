@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, type CSSProperties } from 'react';
+import { easedProgress, useElapsed } from './usePlanningProgress';
 import styles from './loading.module.css';
 
 interface LoadingOverlayProps {
@@ -63,6 +64,9 @@ export function LoadingOverlay({ visible, hasPhoto, headlineText }: LoadingOverl
   const [particles] = useState<Particle[]>(makeParticles);
 
   const stages = hasPhoto ? LOADING_STAGES.photo : LOADING_STAGES.recipe;
+  // Bar only: eases toward ~90% while shown and jumps to full as the overlay fades (a clock, not a scan signal).
+  const elapsed = useElapsed(visible);
+  const barPercent = visible ? easedProgress(elapsed, 90, 4000) : 100;
 
   // Mount immediately on becoming visible; on hide, mirror
   // hideLoadingOverlay()'s 300ms fade-then-unmount (line 2402-2409): the
@@ -175,6 +179,9 @@ export function LoadingOverlay({ visible, hasPhoto, headlineText }: LoadingOverl
               <span className={styles.loadingStageLabel}>{stage.label}</span>
             </div>
           ))}
+        </div>
+        <div className={styles.loadingBar} aria-hidden="true">
+          <div className={styles.loadingBarFill} style={{ width: `${barPercent}%` }} />
         </div>
       </div>
     </div>

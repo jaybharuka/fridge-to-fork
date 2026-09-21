@@ -114,3 +114,15 @@
 @keyframes matchShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .row:has(.match, .matchLoading) { align-items: flex-start; }
 .row:has(.match, .matchLoading) .rowCheckbox { margin-top: 1px; }
+
+/* Rows fill in one after another when the plan lands (they mount once; ticking a row never replays it). */
+@keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.rows > .row { animation: rowIn 0.4s ease-out both; }
+.rows > .row:nth-child(2) { animation-delay: 0.05s; }
+.rows > .row:nth-child(3) { animation-delay: 0.1s; }
+.rows > .row:nth-child(4) { animation-delay: 0.15s; }
+.rows > .row:nth-child(5) { animation-delay: 0.2s; }
+.rows > .row:nth-child(6) { animation-delay: 0.25s; }
+.rows > .row:nth-child(7) { animation-delay: 0.3s; }
+.rows > .row:nth-child(n+8) { animation-delay: 0.35s; }
+@media (prefers-reduced-motion: reduce) { .rows > .row { animation: none; } }
