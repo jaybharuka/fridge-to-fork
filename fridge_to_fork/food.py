@@ -372,8 +372,22 @@ def _coupon(item: dict) -> dict:
     }
 
 
+def _describe_coupons(data: dict) -> str:
+    """Diagnostic: the fields Swiggy sends per coupon entry, to tell a real coupon code from an internal id (the documented
+    schema has an `id` and no code field, yet some ids are UUIDs). Offer text only, nothing personal; truncated."""
+    def cut(v):
+        return None if v is None else str(v)[:60]
+    entries = [
+        {"id": cut(c.get("id")), "title": cut(c.get("title")), "ribbon": cut(c.get("ribbon_text")), "status": c.get("applicabilityStatus"),
+         "keys": sorted(c)}
+        for section in data.get("coupon_sections") or [] for c in (section or {}).get("coupons") or [] if isinstance(c, dict)
+    ][:12]
+    return f"filter_applied={(data.get('summary') or {}).get('filter_applied')!r} n={len(entries)} entries={entries}"
+
+
 async def _list_coupons(session: ClientSession, restaurant_id: str, address_id: str) -> dict:
     data = await _logged(session, "fetch_food_coupons", restaurantId=restaurant_id, addressId=address_id)
+    log.warning("[FOOD][diag] coupons listed: %s", _describe_coupons(data))
     seen: dict[str, dict] = {}
     for section in data.get("coupon_sections") or []:
         for raw in (section or {}).get("coupons") or []:
