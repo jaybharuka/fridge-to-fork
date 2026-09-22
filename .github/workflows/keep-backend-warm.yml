@@ -1,0 +1,29 @@
+name: Keep Render backend warm
+
+# Pings the backend's /health every ~10 minutes so the Render free-tier instance never fully
+# sleeps, so a real user never lands on the "instance waking up" rate-limit window (see the
+# 2026-09-22 incident: a woken-but-still-spinning-up instance returned 429 on /auth/login).
+#
+# Runs on GitHub's own scheduler: independent of Render (doesn't rely on the instance being awake
+# to trigger itself) and independent of any Claude session. GitHub only fires `schedule` triggers
+# from the default branch, so this file must live on main.
+#
+# GitHub's scheduler can delay a run by several minutes under load; that's still comfortably inside
+# Render's ~15-minute sleep timeout at a 10-minute cadence. workflow_dispatch below allows a manual
+# run to check that it's working without waiting for the schedule.
+
+on:
+  schedule:
+    # every 10 minutes, offset from :00/:10/:20... so this doesn't land on the exact minute mark
+    # every scheduled job on GitHub tends to request
+    - cron: "3,13,23,33,43,53 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend /health
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 20 --retry 2 --retry-delay 5 \
+            "https://fridge-to-fork-j584.onrender.com/health"
