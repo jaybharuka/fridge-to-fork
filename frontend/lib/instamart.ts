@@ -100,12 +100,13 @@ export class InstamartApiError extends Error {
 }
 
 /** POST to `/api/<prefix>/<path>` with the caller's auth. Shared by the Instamart and Food clients (same envelope and errors). */
-export async function postJson<T>(prefix: string, path: string, body: unknown): Promise<T> {
+export async function postJson<T>(prefix: string, path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BACKEND_URL}/api/${prefix}/${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(body),
     credentials: 'include',
+    signal,
   });
   let data: { ok?: boolean; error?: { code?: string; message?: string; tool?: string } } | null = null;
   try {
@@ -121,7 +122,7 @@ export async function postJson<T>(prefix: string, path: string, body: unknown): 
   return data as T;
 }
 
-const post = <T>(path: string, body: unknown) => postJson<T>('instamart', path, body);
+const post = <T>(path: string, body: unknown, signal?: AbortSignal) => postJson<T>('instamart', path, body, signal);
 
 export const instamartSearch = (items: string[], addressId: string | null = null, maxOptions: number | null = null) =>
   post<{ address: InstamartAddress; results: InstamartSearchResult[] }>('search', {
@@ -223,8 +224,8 @@ export type OrderDetails =
     }
   | { available: false; message: string };
 
-export const instamartOrders = (activeOnly = false) =>
-  post<{ orders: OrderSummary[]; hasMore: boolean }>('orders', { active_only: activeOnly });
+export const instamartOrders = (activeOnly = false, signal?: AbortSignal) =>
+  post<{ orders: OrderSummary[]; hasMore: boolean }>('orders', { active_only: activeOnly }, signal);
 
 export const instamartOrderStatus = (orderId: string, addressId: string | null, coords: { lat: number; lng: number } | null = null) =>
   post<OrderStatusResult>('order-status', {

@@ -25,8 +25,13 @@ function set(next: OrdersUiState) {
   listeners.forEach(l => l());
 }
 
-export const openOrders = (orderId: string | null = null, kind: OrdersKind = 'instamart', addressId: string | null = null) =>
+/** A repeat call for the exact view already open is a no-op: remounting the sheet would abandon its in-flight
+ *  request and fire a fresh one for the same data. This is what let a quick double-tap on a header button send
+ *  two get_food_orders calls ~2s apart and trip Swiggy's rate limit (2026-09-22). */
+export const openOrders = (orderId: string | null = null, kind: OrdersKind = 'instamart', addressId: string | null = null) => {
+  if (state.open && state.kind === kind && state.orderId === orderId && state.addressId === addressId) return;
   set({ open: true, orderId, kind, addressId, session: state.session + 1 });
+};
 export const closeOrders = () => set({ ...state, open: false });
 
 const subscribe = (listener: () => void) => {
@@ -37,3 +42,6 @@ const subscribe = (listener: () => void) => {
 export function useOrdersUi(): OrdersUiState {
   return useSyncExternalStore(subscribe, () => state, () => CLOSED);
 }
+
+/** Plain (non-hook) read, for code/tests outside React — mirrors addressStore.ts's getSelectedAddressId. */
+export const getOrdersUiState = (): OrdersUiState => state;
