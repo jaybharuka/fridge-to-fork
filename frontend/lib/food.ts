@@ -115,7 +115,7 @@ export interface FoodSelection {
   addons: { group_id: string; addon_id: string; quantity: number }[];
 }
 
-const post = <T>(path: string, body: unknown) => postJson<T>('food', path, body);
+const post = <T>(path: string, body: unknown, signal?: AbortSignal) => postJson<T>('food', path, body, signal);
 
 export const foodSearch = (dish: string, addressId: string | null = null) =>
   post<{ address: InstamartAddress; dish: string; results: FoodResult[]; hasMore: boolean }>('search', {
@@ -197,8 +197,8 @@ export type FoodOrderDetails =
   | { available: false; message: string };
 
 /** get_food_orders needs an address (the docs don't say whether it scopes the list): the one used comes back with it. */
-export const foodOrders = (addressId: string | null, activeOnly = false) =>
-  post<{ address: InstamartAddress; orders: FoodOrderRow[] }>('orders', { active_only: activeOnly, ...(addressId ? { address_id: addressId } : {}) });
+export const foodOrders = (addressId: string | null, activeOnly = false, signal?: AbortSignal) =>
+  post<{ address: InstamartAddress; orders: FoodOrderRow[] }>('orders', { active_only: activeOnly, ...(addressId ? { address_id: addressId } : {}) }, signal);
 
 export const foodOrderStatus = (orderId: string) => post<FoodOrderStatus>('order-status', { order_id: orderId });
 

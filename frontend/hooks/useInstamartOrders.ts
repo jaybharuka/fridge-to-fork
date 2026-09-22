@@ -31,18 +31,22 @@ export function useOrderList(open: boolean, waitFor: string | null) {
     let alive = true;
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Cancels the in-flight request on cleanup, so a quick re-open (or a request superseded by a newer one)
+    // doesn't keep running in the background and doesn't count as a second call against Swiggy's rate limit.
+    const controller = new AbortController();
     const load = async () => {
       try {
-        const { orders } = await instamartOrders(false);
+        const { orders } = await instamartOrders(false, controller.signal);
         if (!alive) return;
         setLoaded({ key, data: orders, error: null });
         if (waitFor && !orders.some(o => o.orderId === waitFor) && ++attempts < 4) timer = setTimeout(load, 4000);
       } catch (e) {
+        if ((e as { name?: string })?.name === 'AbortError') return;
         if (alive) setLoaded({ key, data: null, error: message(e) });
       }
     };
     void load();
-    return () => { alive = false; if (timer) clearTimeout(timer); };
+    return () => { alive = false; controller.abort(); if (timer) clearTimeout(timer); };
   }, [open, waitFor, key]);
 
   const reload = useCallback(() => setNonce(n => n + 1), []);
