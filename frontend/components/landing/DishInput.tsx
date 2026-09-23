@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Search, X } from 'lucide-react';
 import { useAutocomplete } from '@/hooks/useAutocomplete';
 import styles from './landing.module.css';
 
@@ -105,15 +106,35 @@ export function DishInput({ value, onChange }: DishInputProps) {
 
   return (
     <div className={styles.inputSection} ref={wrapperRef}>
-      <input
-        ref={inputRef}
-        type="text"
-        className={styles.dishInput}
-        placeholder='Try "Paneer Tikka" or "Matar Pulao"'
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      {/* Phase 2 (2026-09): a leading search icon so "type here" reads at a glance — the audit found the bare input
+          had no visual cue beyond its placeholder text. A trailing clear button appears once there's something to
+          clear (same idiom as InstamartSearchBox's own clear button). */}
+      <div className={styles.dishInputField}>
+        <Search className={styles.dishInputIcon} aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="text"
+          className={styles.dishInput}
+          placeholder='Try "Paneer Tikka" or "Matar Pulao"'
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        {value && (
+          <button
+            type="button"
+            className={styles.dishInputClear}
+            aria-label="Clear"
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+              inputRef.current?.focus();
+            }}
+          >
+            <X />
+          </button>
+        )}
+      </div>
       {open && suggestions.length > 0 && (
         <div className={styles.suggestionBox}>
           {suggestions.map((s, i) => (
