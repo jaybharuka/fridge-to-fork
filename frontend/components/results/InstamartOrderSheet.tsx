@@ -1,7 +1,7 @@
 'use client';
 
 import { Link2, LoaderCircle } from 'lucide-react';
-import { useEffect, useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChecklistItem, TopUpSuggestion } from '@/lib/types';
 import { selectionsFrom, useInstamartOrder, type Stage } from '@/hooks/useInstamartOrder';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,6 +9,7 @@ import { useGoToItems } from '@/hooks/useInstamartAddresses';
 import { useSelectedAddressId } from '@/lib/addressStore';
 import { formatInr } from '@/lib/instamart';
 import { openOrders } from '@/lib/ordersUi';
+import { Sheet } from '@/components/ui/Sheet';
 import { AddressPicker } from './AddressPicker';
 import { ReportProblem } from './ReportProblem';
 import { InstamartOutcome } from './InstamartOutcome';
@@ -53,23 +54,9 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
   const { state } = order;
   const connected = auth.status === 'connected';
 
-  const [mounted, setMounted] = useState(open);
-  const [visible, setVisible] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const selectedAddressId = useSelectedAddressId();
-  const touchStartY = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
-    }
-    setVisible(false);
-    const timer = setTimeout(() => setMounted(false), 400);
-    return () => clearTimeout(timer);
-  }, [open]);
 
   // Start (or restart after connecting) the search each time the sheet opens.
   useEffect(() => {
@@ -86,16 +73,8 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
     Array.from(rows).find(el => el.dataset.ingredient === focusIngredient)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [state.stage, focusIngredient]);
 
-  // Drop all flow state once the closing animation has finished.
-  useEffect(() => {
-    if (!mounted) order.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted]);
-
   // Your usual items at this address; the recipe-based suggestions are only the fallback when there are none.
   const usual = useGoToItems(state.address?.id ?? null, open && state.stage === 'picking');
-
-  if (!mounted) return null;
 
   const placing = state.stage === 'placing';
   const usualFresh = usual.items.filter(r => !state.results.some(x => x.ingredient === r.ingredient));
@@ -118,28 +97,20 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
     else void order.addExtra(name);
   };
 
-  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => { touchStartY.current = e.touches[0].clientY; };
-  const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => { if (e.changedTouches[0].clientY - touchStartY.current > 80) close(); };
-
   const { count, amount } = estimateSubtotal(state.results, state.choices);
   const addOnsSearching = state.extras.some(n => !state.results.some(r => r.ingredient === n));
   const needsConnect = auth.status === 'disconnected' || state.authNeeded;
 
   return (
-    <div className={resultsStyles.orderBottomSheet}>
-      <div className={`${resultsStyles.orderSheetBackdrop} ${visible ? resultsStyles.visible : ''}`} onClick={close} />
-      <div
-        ref={panelRef}
-        className={`${resultsStyles.orderSheetPanel} ${visible ? resultsStyles.visible : ''}`}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className={resultsStyles.orderSheetHandle} />
-
-        <div className={resultsStyles.orderSheetHeader}>
-          <h3 className={resultsStyles.orderSheetTitle}>Your Instamart order</h3>
-          <p className={resultsStyles.orderSheetSubtitle}>{needsConnect ? 'Connect Swiggy to continue' : SUBTITLES[state.stage]}</p>
-        </div>
+    <Sheet
+      ref={panelRef}
+      open={open}
+      onClose={close}
+      onClosed={() => order.reset()}
+      ariaLabel="Your Instamart order"
+      title="Your Instamart order"
+      subtitle={needsConnect ? 'Connect Swiggy to continue' : SUBTITLES[state.stage]}
+    >
         <p className={resultsStyles.orderSheetSwiggy}>Powered by <strong>Swiggy</strong></p>
 
         {needsConnect ? (
@@ -250,7 +221,6 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             {placing && <p className={styles.hint}>Please keep this open until it finishes.</p>}
           </>
         ) : null}
-      </div>
-    </div>
+    </Sheet>
   );
 }

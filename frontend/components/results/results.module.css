@@ -299,63 +299,34 @@
 .choiceAttribution { font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--text-muted); text-align: center; margin: var(--space-4) 0 0; letter-spacing: .02em; }
 .choiceAttribution strong { color: var(--orange); font-weight: var(--weight-semibold); }
 
-/* Order preview + Top Up upsell bottom sheet — templates/index.html:2079-2098
-   (markup), 841-936 (CSS). Always dark, independent of site theme — same
-   reasoning as the dish hero. */
-.orderBottomSheet { position: fixed; inset: 0; z-index: 500; }
-.orderSheetBackdrop {
-  position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-  opacity: 0; transition: opacity 0.3s ease;
-}
-.orderSheetBackdrop.visible { opacity: 1; }
-.orderSheetPanel {
-  position: absolute; bottom: 0; left: 50%; width: 100%; max-width: 480px; margin: 0 auto;
-  background: #111111; border-radius: 24px 24px 0 0; padding: 8px 20px 40px 20px;
-  max-height: 85vh; overflow-y: auto;
-  transform: translateX(-50%) translateY(100%);
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.orderSheetPanel.visible { transform: translateX(-50%) translateY(0); }
-.orderSheetHandle { width: 36px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.2); margin: 14px auto 20px auto; }
-.orderSheetHeader { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.orderSheetTitle { font-size: 18px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 0 0 4px 0; }
-.orderSheetSubtitle { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.4); margin: 0; }
-.orderSheetSwiggy { text-align: center; margin: -4px 0 16px 0; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.35); letter-spacing: .02em; }
-.orderSheetSwiggy strong { color: #FC8019; font-weight: 600; }
-.orderSheetItems { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
-.orderSheetItem {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
-  font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85);
-}
-.orderSheetItemQty { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.35); }
-.orderSheetTopUpLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin: 0 0 12px 0; }
+/* Order preview + Top Up upsell bottom sheet — templates/index.html:2079-2098 (markup), 841-936 (CSS). Phase 3
+   (2026-09): the chrome itself (backdrop/panel/handle/header, previously "always dark, independent of site theme")
+   is now components/ui/Sheet — all four sheets (Food/InstamartOrderSheet, Food/InstamartOrdersSheet) have migrated,
+   confirmed unreferenced before removing. What's left here is body content the sheets still render as children. */
+/* Phase 3 (2026-09): these sheets now follow the light/dark toggle via components/ui/Sheet, so body-content text that
+   used to assume an always-dark backdrop (rgba(255,255,255,N) etc.) is retoned onto theme-aware tokens below —
+   otherwise it renders near-invisible in light mode. .orderSheetItems/.orderSheetItem/.orderSheetItemQty/
+   .orderSheetTopUpLabel/.orderSheetConfirm removed here: confirmed zero references after the checkout sheets moved
+   their cart/confirm UI onto InstamartReview/FoodReview + the shared Button. */
+.orderSheetSwiggy { text-align: center; margin: -4px 0 16px 0; font-size: 11px; font-weight: 500; color: var(--text-3); letter-spacing: .02em; }
+.orderSheetSwiggy strong { color: var(--orange); font-weight: 600; }
 .orderSheetTopUpCards { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; margin-bottom: 8px; }
 .orderSheetTopUpCards::-webkit-scrollbar { display: none; }
-.orderSheetConfirm {
-  width: 100%; padding: 16px; background: #FC8019; color: white;
-  font-size: 16px; font-weight: 700; border: none; border-radius: 14px;
-  cursor: pointer; margin-top: 24px;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.orderSheetConfirm:hover { background: #E8700A; }
-.orderSheetConfirm:active { transform: scale(0.98); }
-.orderSheetConfirm:disabled { opacity: .6; cursor: not-allowed; }
 
 /* Inline auth/error notices — shown in place of (rather than instead of
    closing) the sheet when a confirm attempt can't complete, so the sheet
    never just vanishes with no explanation and top-up selections survive. */
 .orderSheetAuthNotice {
-  margin-top: 20px; padding: 14px 16px; background: rgba(252,128,25,0.1);
-  border: 1px solid rgba(252,128,25,0.3); border-radius: 14px; text-align: center;
+  margin-top: 20px; padding: 14px 16px; background: var(--orange-light);
+  border: 1px solid var(--orange-border); border-radius: 14px; text-align: center;
 }
-.orderSheetAuthNotice p { font-size: 13px; color: rgba(255,255,255,0.75); margin: 0 0 12px 0; }
+.orderSheetAuthNotice p { font-size: 13px; color: var(--text-2); margin: 0 0 12px 0; }
 .orderSheetAuthCta {
   display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
-  background: #FC8019; color: #fff; font-weight: 600; font-size: 14px;
+  background: var(--orange); color: #fff; font-weight: 600; font-size: 14px;
   border-radius: 10px; text-decoration: none; transition: background 0.15s ease;
 }
-.orderSheetAuthCta:hover { background: #E8700A; }
+.orderSheetAuthCta:hover { background: var(--orange-dark); }
 .orderSheetAuthCta svg { width: 16px; height: 16px; }
 .orderSheetErrorNotice { margin-top: 16px; font-size: 13px; color: #ff6b6b; text-align: center; }
 
