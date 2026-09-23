@@ -1,7 +1,7 @@
 'use client';
 
 import { Link2, LoaderCircle } from 'lucide-react';
-import { useEffect, useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFoodOrder, type Stage } from '@/hooks/useFoodOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useSelectedAddressId } from '@/lib/addressStore';
@@ -9,6 +9,7 @@ import { pickProblem } from '@/lib/foodSelection';
 import { openOrders } from '@/lib/ordersUi';
 import { formatInr } from '@/lib/food';
 import type { ReportContext } from '@/lib/instamart';
+import { Sheet } from '@/components/ui/Sheet';
 import { AddressPicker } from './AddressPicker';
 import { FoodOutcome } from './FoodOutcome';
 import { FoodPicker } from './FoodPicker';
@@ -57,22 +58,8 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
     }
   }, [state.results, dish, onDishImageFound]);
 
-  const [mounted, setMounted] = useState(open);
-  const [visible, setVisible] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const selectedAddressId = useSelectedAddressId();
-  const touchStartY = useRef(0);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
-    }
-    setVisible(false);
-    const timer = setTimeout(() => setMounted(false), 400);
-    return () => clearTimeout(timer);
-  }, [open]);
 
   // Start the search each time the sheet opens (or once the account is connected).
   useEffect(() => {
@@ -81,18 +68,8 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, connected]);
 
-  // Drop all flow state once the closing animation has finished.
-  useEffect(() => {
-    if (!mounted) order.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted]);
-
-  if (!mounted) return null;
-
   const placing = state.stage === 'placing';
   const close = () => { if (!placing) onClose(); }; // a request is in flight: the user must see its outcome
-  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => { touchStartY.current = e.touches[0].clientY; };
-  const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => { if (e.changedTouches[0].clientY - touchStartY.current > 80) close(); };
 
   const openResult = state.results.find(r => r.menuItemId === state.openId) ?? null;
   const problem = openResult && state.picks ? pickProblem(openResult, state.picks) : null;
@@ -117,15 +94,14 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
   const busy = auth.status === 'loading' || state.stage === 'searching' || state.stage === 'building';
 
   return (
-    <div className={resultsStyles.orderBottomSheet}>
-      <div className={`${resultsStyles.orderSheetBackdrop} ${visible ? resultsStyles.visible : ''}`} onClick={close} />
-      <div className={`${resultsStyles.orderSheetPanel} ${visible ? resultsStyles.visible : ''}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        <div className={resultsStyles.orderSheetHandle} />
-
-        <div className={resultsStyles.orderSheetHeader}>
-          <h3 className={resultsStyles.orderSheetTitle}>Order {dish} from Swiggy</h3>
-          <p className={resultsStyles.orderSheetSubtitle}>{needsConnect ? 'Connect Swiggy to continue' : SUBTITLES[state.stage]}</p>
-        </div>
+    <Sheet
+      open={open}
+      onClose={close}
+      onClosed={() => order.reset()}
+      ariaLabel={`Order ${dish} from Swiggy`}
+      title={`Order ${dish} from Swiggy`}
+      subtitle={needsConnect ? 'Connect Swiggy to continue' : SUBTITLES[state.stage]}
+    >
         <p className={resultsStyles.orderSheetSwiggy}>Powered by <strong>Swiggy</strong></p>
 
         {needsConnect ? (
@@ -223,7 +199,6 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
             {placing && <p className={styles.hint}>Please keep this open until it finishes.</p>}
           </>
         ) : null}
-      </div>
-    </div>
+    </Sheet>
   );
 }
