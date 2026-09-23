@@ -22,6 +22,9 @@ interface FoodOrderSheetProps {
   /** The recipe's dish, used as the search query. */
   dish: string;
   onClose: () => void;
+  /** Fired once a real Swiggy photo turns up for this dish (the first search result that has one) — lets the hero
+   *  upgrade from its stock photo. Best-effort: never blocks or changes anything else in this sheet. */
+  onDishImageFound?: (url: string) => void;
 }
 
 const SUBTITLES: Record<Stage, string> = {
@@ -36,11 +39,23 @@ const SUBTITLES: Record<Stage, string> = {
 
 // Nothing is added to a cart or ordered until the user has seen real dishes from real restaurants (picker), then
 // the real cart Swiggy will bill (review), and taps a separate "Place order". Always dark, like the Instamart sheet.
-export function FoodOrderSheet({ open, dish, onClose }: FoodOrderSheetProps) {
+export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOrderSheetProps) {
   const auth = useAuth();
   const order = useFoodOrder();
   const { state } = order;
   const connected = auth.status === 'connected';
+
+  // Reports the first result that actually has a photo — once per dish, so reopening the sheet or a later
+  // rebuild doesn't keep re-reporting the same (or a different) url once the hero has already upgraded.
+  const reportedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!onDishImageFound || reportedFor.current === dish) return;
+    const found = state.results.find(r => r.imageUrl)?.imageUrl;
+    if (found) {
+      reportedFor.current = dish;
+      onDishImageFound(found);
+    }
+  }, [state.results, dish, onDishImageFound]);
 
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);

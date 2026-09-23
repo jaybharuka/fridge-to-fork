@@ -94,6 +94,9 @@ export function Results({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
+  // A real Swiggy dish photo, once the Food order sheet's search turns one up — free (no new Swiggy call), and
+  // only an upgrade for the dish it was found for, so a later different recipe doesn't inherit a stale photo.
+  const [swiggyHeroImage, setSwiggyHeroImage] = useState<{ dish: string; url: string } | null>(null);
   const closeDropdown = useCallback(() => setDropdownOpen(false), []);
 
   const dishName = state.recommendedMeal ?? '';
@@ -139,6 +142,7 @@ export function Results({
               servings={servings}
               cookTime={cookTime}
               fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
+              swiggyImageUrl={swiggyHeroImage?.dish === dishName ? swiggyHeroImage.url : null}
             />
           </div>
         )}
@@ -227,7 +231,7 @@ export function Results({
       </div>
 
       <FridgeLightbox open={lightboxOpen} imageUrl={heroPhotoUrl} onClose={() => setLightboxOpen(false)} />
-      <FoodOrderSheet open={foodSheetOpen} dish={dishName} onClose={() => setFoodSheetOpen(false)} />
+      <FoodOrderSheet open={foodSheetOpen} dish={dishName} onClose={() => setFoodSheetOpen(false)} onDishImageFound={url => setSwiggyHeroImage({ dish: dishName, url })} />
       <InstamartOrderSheet
         open={orderSheetOpen}
         itemsToOrder={itemsToOrder}
