@@ -79,7 +79,7 @@ export function YoutubeCarousel({ dishName, fetchVideos }: YoutubeCarouselProps)
                     onClick={() => switchVideo(v, i)}
                   >
                     <div className={styles.ytThumbImgWrap}>
-                      <img src={v.thumbnail} alt={v.title || ''} />
+                      <img src={v.thumbnail} alt={v.title || 'Recipe video thumbnail'} />
                       {i === activeIndex && <span className={styles.ytPlayingBadge}>PLAYING</span>}
                     </div>
                     <div className={styles.ytThumbTitle}>{v.title || ''}</div>

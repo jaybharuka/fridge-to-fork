@@ -214,6 +214,10 @@
 .dishHeroImageWrap { position: relative; width: 100%; height: 220px; background: #1a1a1a; overflow: hidden; }
 .dishHeroImg { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s ease; }
 .dishHeroImg.loaded { opacity: 1; }
+/* Layered over the base photo/placeholder, real Swiggy photo fading in as an upgrade once decoded. z-index:1 (not
+   0): the placeholder is also z:0 but declared later in the DOM, so at equal z-index it would otherwise paint on
+   top and hide this layer whenever the waterfall photo never loaded — still below the text gradient/overlay. */
+.dishHeroSwiggyImg { position: absolute; inset: 0; z-index: 1; }
 .dishHeroGradient {
   position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(to bottom, transparent 20%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.85) 100%);
