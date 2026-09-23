@@ -15,31 +15,38 @@
 :global([data-theme='light']) .heroTitle { color: rgba(0, 0, 0, 0.9); }
 :global([data-theme='light']) .heroSub { color: rgba(0, 0, 0, 0.5); }
 
-/* Dish input — templates/index.html:219-242 */
+/* Dish input — templates/index.html:219-242. Phase 2 (2026-09): rebuilt on tokens (var(--bg-secondary)/var(--border)/
+   var(--text-primary), all theme-aware already) instead of a separate hardcoded-dark + :global([data-theme='light'])
+   override pair — the audit found this exact duplicate-theming pattern (one CSS variable system used everywhere else,
+   a second hand-rolled one here) across the landing page. A leading search icon and trailing clear button replace the
+   bare, cue-less input. */
 .inputSection { padding: 0 0 8px; position: relative; }
 .inputLabel {
-  display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35); margin-top: 20px; margin-bottom: 8px;
+  display: block; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted); margin-top: var(--space-5); margin-bottom: var(--space-2);
 }
-:global([data-theme='light']) .inputLabel { color: var(--swiggy-text-3, var(--text-3)); }
-.dishInput {
-  width: 100%; padding: 16px 20px; font-size: 16px; font-family: inherit; font-weight: 500;
-  border-radius: 14px; border: 1.5px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9); outline: none;
+.dishInputField {
+  display: flex; align-items: center; gap: var(--space-2);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--bg-secondary);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
-.dishInput:focus { border-color: rgba(252, 128, 25, 0.5); background: rgba(255, 255, 255, 0.07); outline: none; }
-.dishInput::placeholder { color: rgba(255, 255, 255, 0.3); }
-:global([data-theme='light']) .dishInput {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.9);
+.dishInputField:focus-within { border-color: var(--orange-border, rgba(252,128,25,0.5)); }
+.dishInputIcon { width: 18px; height: 18px; margin-left: var(--space-4); color: var(--text-muted); flex-shrink: 0; }
+.dishInput {
+  flex: 1; min-width: 0; width: 100%; padding: var(--space-4) var(--space-4) var(--space-4) 0;
+  font-size: var(--text-lg); font-family: inherit; font-weight: var(--weight-medium);
+  border: none; background: transparent; color: var(--text-primary); outline: none;
 }
-:global([data-theme='light']) .dishInput:focus {
-  border-color: rgba(252, 128, 25, 0.5);
-  background: rgba(0, 0, 0, 0.05);
+.dishInput::placeholder { color: var(--text-muted); }
+.dishInputClear {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 32px; height: 32px; margin-right: var(--space-2); border-radius: 50%;
+  border: none; background: transparent; color: var(--text-muted); cursor: pointer;
 }
-:global([data-theme='light']) .dishInput::placeholder { color: rgba(0, 0, 0, 0.3); }
+.dishInputClear:hover { background: var(--bg-card); color: var(--text-primary); }
+.dishInputClear svg { width: 16px; height: 16px; }
 
 /* Suggestion dropdown — templates/index.html:4345-4384 (was inline style.cssText) */
 .suggestionBox {
@@ -49,16 +56,16 @@
   right: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-3);
   z-index: 999;
   overflow: hidden;
-  margin-top: 6px;
+  margin-top: var(--space-2);
 }
 .suggestionRow {
-  padding: 14px 16px;
+  padding: var(--space-4);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-md);
   font-family: 'Plus Jakarta Sans', sans-serif;
   border-bottom: 1px solid var(--border);
   transition: background 0.1s ease, color 0.1s ease;
@@ -72,37 +79,30 @@
 }
 .suggestionMatch { color: var(--orange); font-weight: 700; }
 
-/* Servings selector — templates/index.html:279-296 */
-.servingsSection { margin: 20px 0 20px; }
+/* Servings selector — templates/index.html:279-296. Phase 2 (2026-09): grouped in a Card (the audit found these 8
+   pills competing visually with the primary CTA right below them) and sized down slightly, so the button stays the
+   loudest thing on the screen. */
+.servingsCard { margin: var(--space-5) 0; }
+.servingsCard .inputLabel { margin-top: 0; }
 .servingsPills {
-  display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  display: flex; gap: var(--space-2); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
 }
 .servingsPills::-webkit-scrollbar { display: none; }
 .servingsPill {
-  flex-shrink: 0; width: 36px; height: 36px; padding: 0; border-radius: 50%;
+  flex-shrink: 0; width: 32px; height: 32px; padding: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--grey-200); background: transparent; color: var(--swiggy-text-2);
-  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
+  font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.servingsPill:hover { background: var(--bg-secondary); border-color: var(--text-secondary); color: var(--text-primary); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-.servingsPill:active { transform: translateY(0) scale(0.98); }
-.servingsPill.active { background: var(--swiggy-orange); border-color: var(--swiggy-orange); color: #fff; }
+.servingsPill:hover { background: var(--bg-card); border-color: var(--text-secondary); color: var(--text-primary); }
+.servingsPill:active { transform: scale(0.94); }
+.servingsPill.active { background: var(--orange); border-color: var(--orange); color: #fff; box-shadow: var(--shadow-1); }
 
-/* Get Recipe primary button — templates/index.html:299-324 */
-.analyseBtn {
-  position: relative; overflow: hidden;
-  width: 100%; height: 58px; border-radius: 14px; margin-top: 0;
-  background: var(--bg-3); color: var(--text-3); border: none; cursor: not-allowed;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  font-size: 16px; font-weight: 600; font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
-}
-.analyseBtn.ready { background: var(--orange); color: #fff; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15); }
-.analyseBtn.ready:hover:not(:disabled) { background: #E8700A; transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15); }
-.analyseBtn.loading { background: var(--orange); color: #fff; opacity: 0.85; cursor: not-allowed; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15); }
-.analyseBtn:active:not(:disabled) { transform: translateY(0) scale(0.98); background: #D4640A; }
-.analyseBtn.ready::after {
+/* Get Recipe primary button — Phase 2 (2026-09) now uses components/ui/Button; only the shimmer-sweep flourish (a
+   detail specific to this one CTA, not worth folding into the already-shipped shared component) stays local here. */
+.shimmer { position: relative; overflow: hidden; }
+.shimmer::after {
   content: ''; position: absolute; top: 0; left: 0; width: 40%; height: 100%;
   background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.2), transparent);
   transform: translateX(-250%);
@@ -113,64 +113,48 @@
   0% { transform: translateX(-250%); }
   60%, 100% { transform: translateX(350%); }
 }
-.analyseBtn:disabled:not(.ready):not(.loading) { cursor: not-allowed; opacity: 0.45; }
-
-/* Loading spinner inside the button — templates/index.html:1648-1649 */
-.spin {
-  display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after { animation: none; }
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 
-/* Popular dishes — templates/index.html:245-276 */
-.popularDishesSection { margin-top: 36px; }
+/* Popular dishes — templates/index.html:245-276. Phase 2 (2026-09): real photography (fetchUnsplashDishImage) instead
+   of a generic icon-in-a-grey-box — the audit's single biggest first-impression finding, no appetite appeal at all
+   above the fold. Photo-on-top layout, same shape as the "usual items" cards elsewhere in the app (.usualCard);
+   the icon is now only the loading/not-found fallback, same idiom as TopUpCard's photo swap. Built on Card (padding
+   "none": the button wrapper + inner elements supply their own spacing so the photo can go edge-to-edge at the top). */
+.popularDishesSection { margin-top: var(--space-8); }
 .popularDishesLabel {
-  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35); margin-bottom: 14px;
+  font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: var(--space-4);
 }
-:global([data-theme='light']) .popularDishesLabel { color: rgba(0, 0, 0, 0.35); }
-.popularDishesGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.popularDishCard {
-  display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-  text-align: left;
-  width: 100%;
-  font-family: inherit;
+.popularDishesGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.popularDishBtn {
+  display: block; width: 100%; padding: 0; border: none; background: transparent; cursor: pointer;
+  text-align: left; font-family: inherit; -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
 }
-.popularDishCard:hover { background: rgba(252, 128, 25, 0.08); border-color: rgba(252, 128, 25, 0.2); transform: translateY(-1px); }
-.popularDishCard:active { transform: scale(0.98); }
-.popularDishIcon {
-  width: 42px; height: 42px; border-radius: 10px; background: rgba(255, 255, 255, 0.06);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+.popularDishBtn:hover { transform: translateY(-1px); }
+.popularDishBtn:hover .popularDishCard { border-color: var(--orange-border, rgba(252,128,25,0.3)); }
+.popularDishBtn:active { transform: scale(0.98); }
+.popularDishCard { display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.2s ease; }
+.popularDishThumb {
+  width: 100%; height: 84px; flex-shrink: 0;
+  background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;
 }
-.popularDishIcon svg { width: 18px; height: 18px; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.5; }
-.popularDishInfo { min-width: 0; }
+.popularDishImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.popularDishIcon { width: 22px; height: 22px; stroke-width: 1.5; color: var(--text-muted); }
+.popularDishInfo { min-width: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
 .popularDishName {
-  display: block; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.88); line-height: 1.2;
+  display: block; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-primary); line-height: 1.2;
   overflow-wrap: break-word; word-break: normal;
 }
-.popularDishTag { display: block; font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.35); margin-top: 2px; }
-:global([data-theme='light']) .popularDishCard { background: rgba(0, 0, 0, 0.03); border-color: rgba(0, 0, 0, 0.08); }
-:global([data-theme='light']) .popularDishCard:hover { background: rgba(252, 128, 25, 0.06); border-color: rgba(252, 128, 25, 0.2); }
-:global([data-theme='light']) .popularDishIcon { background: rgba(0, 0, 0, 0.05); }
-:global([data-theme='light']) .popularDishIcon svg { stroke: rgba(0, 0, 0, 0.5); }
-:global([data-theme='light']) .popularDishName { color: rgba(0, 0, 0, 0.85); }
+.popularDishTag { display: block; font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--text-muted); margin-top: var(--space-1); }
 
 /* Multi-photo fridge upload (up to 3) — templates/index.html:342-383,
    1818-1824. Single "Scan Fridge" button until the first photo lands, then
    thumbnails + an inline "+" (up to 3) take its place. */
 .photoUploadArea { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .photoThumbnailRow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.addPhotoBtn {
-  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
-  padding: 14px 20px; border-radius: 14px; background: transparent; border: 1.5px solid rgba(252, 128, 25, 0.5);
-  color: #FC8019; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-.addPhotoBtn:hover { background: rgba(252, 128, 25, 0.08); border-color: rgba(252, 128, 25, 0.7); }
-.addPhotoBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 .addPhotoPlus {
   width: 80px; height: 80px; border-radius: 12px; border: 1.5px dashed rgba(252, 128, 25, 0.4);
   background: rgba(252, 128, 25, 0.05); display: flex; align-items: center; justify-content: center;

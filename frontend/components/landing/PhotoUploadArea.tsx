@@ -2,6 +2,7 @@
 import { useRef } from 'react';
 import { Camera, Plus, X } from 'lucide-react';
 import type { UsePhotoUpload } from '@/hooks/usePhotoUpload';
+import { Button } from '@/components/ui/Button';
 import styles from './landing.module.css';
 
 const MAX_PHOTOS = 3;
@@ -39,10 +40,9 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
         onChange={e => handleFiles(e.target.files)}
       />
       {photos.length === 0 ? (
-        <button type="button" className={styles.addPhotoBtn} onClick={() => inputRef.current?.click()}>
-          <Camera size={18} />
-          <span>Scan Fridge</span>
-        </button>
+        <Button variant="secondary" icon={<Camera size={18} />} onClick={() => inputRef.current?.click()}>
+          Scan Fridge
+        </Button>
       ) : (
         <div className={styles.photoThumbnailRow}>
           {thumbnailUrls.map((url, i) => (

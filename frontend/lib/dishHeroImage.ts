@@ -52,6 +52,23 @@ const dishImageCache = new Map<string, string | null>();
  * old code's cachedYoutubeDish/cachedYoutubeData sharing between
  * loadDishHeroImage() and fetchYoutubeVideos().
  */
+/** Just the Unsplash leg, verified-loadable — shared by resolveDishHeroImage's waterfall below and by the landing
+ *  page's "Popular right now" cards (Phase 2), which don't need the TheMealDB/YouTube fallbacks: Unsplash alone is
+ *  reliably enough for well-known, commonly-photographed dishes. Not cached here — callers that want caching (both
+ *  do) use their own cache keyed the way they need. */
+export async function fetchUnsplashDishImage(dishName: string): Promise<string | null> {
+  try {
+    const uRes = await fetch(`/api/dish-image?dish=${encodeURIComponent(dishName)}`);
+    const uData: DishImageResponse = await uRes.json();
+    if (uData.found && uData.image_url && (await tryLoadImage(uData.image_url))) {
+      return uData.image_url;
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
 export async function resolveDishHeroImage(
   dishName: string,
   fetchYoutubeFirstThumbnail: () => Promise<string>
@@ -59,15 +76,10 @@ export async function resolveDishHeroImage(
   if (dishImageCache.has(dishName)) return dishImageCache.get(dishName)!;
 
   // Source 1 — Unsplash
-  try {
-    const uRes = await fetch(`/api/dish-image?dish=${encodeURIComponent(dishName)}`);
-    const uData: DishImageResponse = await uRes.json();
-    if (uData.found && uData.image_url && (await tryLoadImage(uData.image_url))) {
-      dishImageCache.set(dishName, uData.image_url);
-      return uData.image_url;
-    }
-  } catch {
-    /* fall through */
+  const unsplash = await fetchUnsplashDishImage(dishName);
+  if (unsplash) {
+    dishImageCache.set(dishName, unsplash);
+    return unsplash;
   }
 
   // Source 2 — TheMealDB
