@@ -1,14 +1,15 @@
 'use client';
 
 import { ChevronLeft, CircleAlert, CircleCheck, RefreshCw, Truck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useFoodLiveStatus, useFoodOrderDetails, useFoodOrderList } from '@/hooks/useFoodOrders';
 import { formatInr, type FoodOrderRow } from '@/lib/food';
 import { closeOrders, useOrdersUi } from '@/lib/ordersUi';
 import { useSelectedAddressId } from '@/lib/addressStore';
+import { Sheet } from '@/components/ui/Sheet';
+import sheetStyles from '@/components/ui/Sheet.module.css';
 import { AddressPicker } from './AddressPicker';
 import { ReportProblem } from './ReportProblem';
-import resultsStyles from './results.module.css';
 import styles from './instamart.module.css';
 
 const BAD = /cancel|reject|fail/i; // display colour only; whether an order is live comes from Swiggy's isActiveOrder
@@ -149,10 +150,12 @@ function Panel({ initialOrderId, initialAddressId, onClose }: { initialOrderId: 
 
   return (
     <>
-      <div className={resultsStyles.orderSheetHeader}>
+      {/* Dynamic (toggles with viewId), so rendered as plain content reusing Sheet's header classes — see the same
+          note in InstamartOrdersSheet.tsx. */}
+      <div className={sheetStyles.header}>
         {viewId && <button type="button" className={styles.backBtn} onClick={() => setViewId(null)}><ChevronLeft aria-hidden /> All orders</button>}
-        <h3 className={resultsStyles.orderSheetTitle}>{viewId ? `Order ${viewId}` : 'Your Food orders'}</h3>
-        <p className={resultsStyles.orderSheetSubtitle}>{viewId ? 'Live status and details' : 'Track an order or look back at past ones'}</p>
+        <h3 className={sheetStyles.title}>{viewId ? `Order ${viewId}` : 'Your Food orders'}</h3>
+        <p className={sheetStyles.subtitle}>{viewId ? 'Live status and details' : 'Track an order or look back at past ones'}</p>
       </div>
 
       {list.error && !list.orders ? (
@@ -209,33 +212,15 @@ function Panel({ initialOrderId, initialAddressId, onClose }: { initialOrderId: 
 }
 
 // Food order history + live tracking + details, reachable from the order-placed screen (and the header once the
-// flow is on). Same always-dark sheet as the order flow.
+// flow is on). Phase 3 (2026-09): now components/ui/Sheet — follows the light/dark toggle instead of the old
+// hardcoded-dark styling, and picks up swipe-to-close/Escape-to-close for free (this sheet never had either before).
 export function FoodOrdersSheet() {
   const ui = useOrdersUi();
   const isOpen = ui.open && ui.kind === 'food';
-  const [mounted, setMounted] = useState(isOpen);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setMounted(true);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
-    }
-    setVisible(false);
-    const timer = setTimeout(() => setMounted(false), 400);
-    return () => clearTimeout(timer);
-  }, [isOpen]);
-
-  if (!mounted) return null;
   return (
-    <div className={resultsStyles.orderBottomSheet}>
-      <div className={`${resultsStyles.orderSheetBackdrop} ${visible ? resultsStyles.visible : ''}`} onClick={closeOrders} />
-      <div className={`${resultsStyles.orderSheetPanel} ${visible ? resultsStyles.visible : ''}`} role="dialog" aria-label="Your Food orders">
-        <div className={resultsStyles.orderSheetHandle} />
-        {/* keyed by session: every open starts from a fresh list/order view */}
-        <Panel key={ui.session} initialOrderId={ui.orderId} initialAddressId={ui.addressId} onClose={closeOrders} />
-      </div>
-    </div>
+    <Sheet open={isOpen} onClose={closeOrders} ariaLabel="Your Food orders">
+      {/* keyed by session: every open starts from a fresh list/order view */}
+      <Panel key={ui.session} initialOrderId={ui.orderId} initialAddressId={ui.addressId} onClose={closeOrders} />
+    </Sheet>
   );
 }
