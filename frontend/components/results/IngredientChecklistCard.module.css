@@ -1,23 +1,17 @@
-/* Recipe checklist card — the hero result section.
-   Ported from templates/index.html:582-664. */
-.card {
-  padding: 0;
-  margin-bottom: 32px;
-  border-radius: 0;
-  overflow: hidden;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-}
+/* Recipe checklist card — the hero result section. Ported from templates/index.html:582-664; Phase 3 (2026-09) wraps
+   it in components/ui/Card (padding="none": the stat/hook/hint text and each row keep their own established padding
+   rather than a uniform Card padding). Card supplies the actual border/background/radius now — this file only adds
+   what Card doesn't: bottom margin, and overflow:hidden so each row's square corners clip to Card's rounded ones. */
+.card { margin-bottom: var(--space-8); overflow: hidden; }
 .statsRow { padding: 0; }
-.statLine { font-size: 15px; font-weight: 500; color: var(--text-secondary); padding: 16px 20px; }
-.statZ { color: var(--orange); font-weight: 700; }
+.statLine { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text-secondary); padding: var(--space-4) var(--space-5); }
+.statZ { color: var(--orange); font-weight: var(--weight-bold); }
 
-.hookLine { font-size: 13px; font-style: italic; font-weight: 400; color: var(--grey-400); padding: 16px 20px; }
+.hookLine { font-size: var(--text-base); font-style: italic; font-weight: var(--weight-regular); color: var(--grey-400); padding: var(--space-4) var(--space-5); }
 
 /* Explains what tapping a row does — plain, not italic, so it doesn't
    read as more of the encouragement copy above it. */
-.hintLine { font-size: 12px; font-weight: 400; color: var(--text-muted); padding: 0 20px 12px; }
+.hintLine { font-size: var(--text-sm); font-weight: var(--weight-regular); color: var(--text-muted); padding: 0 var(--space-5) var(--space-3); }
 
 /* Ingredient checklist scrolls within itself once it's long enough (e.g. a
    20-item Dal Makhani list) instead of pushing the choice cards below it
@@ -56,58 +50,62 @@
 .hasMoreBelow .rowsFade { opacity: 1; }
 
 .row {
-  display: flex; align-items: center; gap: 10px; padding: 16px 20px; cursor: pointer;
+  display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); cursor: pointer;
   border-bottom: 1px solid var(--border); background: var(--bg-card); transition: opacity .12s ease, background .1s ease;
 }
 .rows .row:hover { background: var(--bg-secondary); }
 .rows .row:last-child { border-bottom: none; }
 .rowCheckbox {
-  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 1.5px solid var(--grey-200);
-  display: flex; align-items: center; justify-content: center; font-size: 20px; transition: border-color .12s ease;
+  width: 20px; height: 20px; border-radius: var(--radius-xs); flex-shrink: 0; border: 1.5px solid var(--grey-200);
+  display: flex; align-items: center; justify-content: center; font-size: var(--text-2xl); transition: border-color .12s ease;
 }
 .rowCheckbox svg { color: var(--success); width: 16px; height: 16px; }
 /* Staple rows still get a pre-checked circle, but muted grey rather than
    green — it's an assumption, not something the vision scan actually saw. */
 .row.isStaple .rowCheckbox svg { color: var(--text-muted); }
 .rowInfo { flex: 1; min-width: 0; }
-.rowName { font-size: 15px; font-weight: 500; color: var(--grey-900); overflow-wrap: break-word; word-break: normal; }
-.rowQty { font-size: 13px; font-weight: 400; color: var(--grey-400); margin-top: 6px; overflow-wrap: break-word; word-break: normal; }
+.rowName { font-size: var(--text-lg); font-weight: var(--weight-medium); color: var(--grey-900); overflow-wrap: break-word; word-break: normal; }
+.rowQty { font-size: var(--text-base); font-weight: var(--weight-regular); color: var(--grey-400); margin-top: var(--space-2); overflow-wrap: break-word; word-break: normal; }
 
 @keyframes checkPop { 0% { transform: scale(.9); } 100% { transform: scale(1); } }
 .row.checked .rowCheckbox { border-color: transparent; animation: checkPop .15s ease; }
 .row.checked .rowName,
 .row.checked .rowQty { text-decoration: line-through; color: var(--grey-400); }
 
-.rowRight { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.rowRight { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
 .rowTag {
-  flex-shrink: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey-400); background: var(--grey-100);
-  padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  flex-shrink: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: .06em; text-transform: uppercase; color: var(--grey-400); background: var(--grey-100);
+  padding: 3px var(--space-3); border-radius: var(--radius-pill); white-space: nowrap;
   display: inline-flex; align-items: center; gap: 3px;
 }
 .rowTag svg { width: 12px; height: 12px; }
 .rowTagStaple { color: var(--text-muted); background: var(--bg-secondary); }
 .rowTagFridge { color: #2E7D32; background: #E8F5E9; }
 :global([data-theme="dark"]) .rowTagFridge { color: #81C784; background: rgba(46,125,50,0.2); }
-.rowTagWillOrder { font-size: 12px; font-style: italic; color: var(--text-muted); white-space: nowrap; }
+.rowTagWillOrder { font-size: var(--text-sm); font-style: italic; color: var(--text-muted); white-space: nowrap; }
 
-/* Real Instamart match under a missing ingredient (see ProductMatch). */
+/* Real Instamart match under a missing ingredient (see ProductMatch). Phase 3 (2026-09): dropped its own border —
+   the audit's "card nested in a row nested in a card" finding. A background tint + radius is enough to read as a
+   distinct, tappable sub-area without a third bordered box shape stacked inside the row inside the (now real) Card. */
 .match {
-  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 8px 10px;
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; margin-top: var(--space-2); padding: var(--space-2);
   text-align: left; font: inherit; color: inherit; cursor: pointer;
-  background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px;
-  transition: border-color .12s ease;
+  background: var(--bg-secondary); border: none; border-radius: var(--radius-sm);
+  transition: background .12s ease;
 }
-.match:hover { border-color: var(--orange); }
-.matchThumb, .matchThumbFallback { width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0; }
+.match:hover { background: var(--border); }
+.matchThumb, .matchThumbFallback { width: 40px; height: 40px; border-radius: var(--radius-xs); flex-shrink: 0; }
 .matchThumb { object-fit: contain; background: #fff; }
-.matchThumbFallback { display: flex; align-items: center; justify-content: center; background: var(--border); font-size: 16px; }
-.matchBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.matchName { font-size: 13px; font-weight: 600; color: var(--grey-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.matchSub { font-size: 11px; color: var(--grey-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.matchPrice { flex-shrink: 0; font-size: 14px; font-weight: 700; color: var(--grey-900); }
-.matchMrp { margin-left: 5px; font-size: 11px; font-weight: 400; color: var(--grey-400); text-decoration: line-through; }
+.matchThumbFallback { display: flex; align-items: center; justify-content: center; background: var(--border); font-size: var(--text-lg); }
+.matchBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.matchName { font-size: var(--text-base); font-weight: var(--weight-semibold); color: var(--grey-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matchSub { font-size: var(--text-xs); color: var(--grey-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The price hierarchy fix: noticeably larger and bolder than matchName/matchSub, not the near-equal 14px/13px it
+   was before — this is the thing a scanning eye should land on first. */
+.matchPrice { flex-shrink: 0; font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--text-primary); }
+.matchMrp { margin-left: 5px; font-size: var(--text-xs); font-weight: var(--weight-regular); color: var(--grey-400); text-decoration: line-through; }
 .matchLoading {
-  height: 56px; margin-top: 10px; border-radius: 12px;
+  height: 56px; margin-top: var(--space-2); border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--bg-secondary), var(--border), var(--bg-secondary)); background-size: 200% 100%;
   animation: matchShimmer 1.4s infinite;
 }

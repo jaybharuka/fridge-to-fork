@@ -252,19 +252,24 @@
    (markup), 787-839 (CSS), including the ::before spotlight-glow that
    follows the cursor (805-816, driven here per-button via --spot-x/-y set
    through React state instead of a global document listener). */
-.choiceHeaderRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.choiceLabel { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
-.choiceSubtitle { font-size: 13px; font-weight: 400; color: var(--grey-400); font-style: italic; line-height: 1.5; margin: 10px 0 12px; overflow-wrap: break-word; word-break: normal; }
-.choiceButtons { display: flex; flex-direction: column; gap: 14px; }
+/* Phase 3 (2026-09): retoned onto the Phase 1 scale (space/text/radius/shadow) rather than one-off px/rgba values.
+   Kept as its own component rather than wrapped in Button — the spotlight-follows-cursor glow, the icon-badge, the
+   two-line title+subtitle and the trailing "30 min" meta are richer than the shared Button primitive is meant to
+   support (same reasoning as leaving the servings pills alone: force-fitting a shape this different into Button
+   would either bloat the shared primitive or produce a worse result than a purpose-built component). */
+.choiceHeaderRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.choiceLabel { font-size: var(--text-xs); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.choiceSubtitle { font-size: var(--text-base); font-weight: var(--weight-regular); color: var(--grey-400); font-style: italic; line-height: 1.5; margin: var(--space-3) 0 var(--space-3); overflow-wrap: break-word; word-break: normal; }
+.choiceButtons { display: flex; flex-direction: column; gap: var(--space-4); }
 .choiceBtn {
   position: relative; overflow: hidden;
-  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
-  border-radius: var(--radius); padding: 16px;
+  display: flex; align-items: center; gap: var(--space-4); width: 100%; text-align: left;
+  border-radius: var(--radius); padding: var(--space-4);
   cursor: pointer; font-family: inherit;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
   --spot-x: 50%; --spot-y: 50%;
 }
-.choiceBtn:hover:not(:disabled):not(.loading) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.choiceBtn:hover:not(:disabled):not(.loading) { transform: translateY(-1px); box-shadow: var(--shadow-2); }
 .choiceBtn:active:not(:disabled):not(.loading) { transform: translateY(0) scale(.98); }
 .choiceBtn::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
 .choiceBtn.spotlightActive::before { opacity: 1; }
@@ -273,26 +278,26 @@
 .choiceBtn:disabled:not(.loading) { opacity: .45; cursor: not-allowed; }
 .choiceBtn.loading { opacity: .7; cursor: not-allowed; }
 .choiceBtnPrimary { background: var(--orange); border: none; color: #fff; }
-.choiceBtnPrimary:hover:not(:disabled) { background: #E8700A; }
-.choiceBtnPrimary:active:not(:disabled) { background: #D4640A; }
-.choiceBtnOutline { background: transparent; border: 1.5px solid rgba(252,128,25,0.4); color: #FC8019; }
+.choiceBtnPrimary:hover:not(:disabled) { background: var(--orange-dark); }
+.choiceBtnPrimary:active:not(:disabled) { background: #D4640A; } /* one shade past --orange-dark for the press state; no token for it */
+.choiceBtnOutline { background: transparent; border: 1.5px solid var(--orange-border, rgba(252,128,25,0.4)); color: var(--orange); }
 .choiceBtnOutline:hover:not(:disabled) { background: var(--orange-light); }
-.choiceIconCircle { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; }
+.choiceIconCircle { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: var(--text-2xl); }
 .choiceIconCircle svg { width: 20px; height: 20px; }
 .choiceBtnPrimary .choiceIconCircle { background: var(--orange-dark); color: #fff; }
-.choiceBtnOutline .choiceIconCircle { background: var(--orange-light); color: #FC8019; }
+.choiceBtnOutline .choiceIconCircle { background: var(--orange-light); color: var(--orange); }
 .choiceText { flex: 1; min-width: 0; }
-.choiceBtnTitle { font-size: 16px; font-weight: 600; overflow-wrap: break-word; word-break: normal; }
+.choiceBtnTitle { font-size: var(--text-lg); font-weight: var(--weight-semibold); overflow-wrap: break-word; word-break: normal; }
 .choiceBtnPrimary .choiceBtnTitle { color: #fff; }
-.choiceBtnOutline .choiceBtnTitle { color: #FC8019; }
-.choiceBtnSub { font-size: 13px; margin-top: 6px; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal; }
+.choiceBtnOutline .choiceBtnTitle { color: var(--orange); }
+.choiceBtnSub { font-size: var(--text-base); margin-top: var(--space-2); white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal; }
 .choiceBtnPrimary .choiceBtnSub { color: rgba(255,255,255,.85); }
-.choiceBtnOutline .choiceBtnSub { color: #FC8019; }
-.choiceMeta { flex-shrink: 0; white-space: nowrap; font-size: 13px; font-weight: 700; text-align: right; }
+.choiceBtnOutline .choiceBtnSub { color: var(--orange); }
+.choiceMeta { flex-shrink: 0; white-space: nowrap; font-size: var(--text-base); font-weight: var(--weight-bold); text-align: right; }
 .choiceBtnPrimary .choiceMeta { color: #fff; }
-.choiceBtnOutline .choiceMeta { color: #FC8019; }
-.choiceAttribution { font-size: 11px; font-weight: 500; color: var(--text-muted); text-align: center; margin: 14px 0 0; letter-spacing: .02em; }
-.choiceAttribution strong { color: var(--orange); font-weight: 600; }
+.choiceBtnOutline .choiceMeta { color: var(--orange); }
+.choiceAttribution { font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--text-muted); text-align: center; margin: var(--space-4) 0 0; letter-spacing: .02em; }
+.choiceAttribution strong { color: var(--orange); font-weight: var(--weight-semibold); }
 
 /* Order preview + Top Up upsell bottom sheet — templates/index.html:2079-2098
    (markup), 841-936 (CSS). Always dark, independent of site theme — same
@@ -539,7 +544,7 @@
 }
 .choiceBtnOutline .spin { border-color: rgba(252,128,25,.3); border-top-color: #FC8019; }
 
-.choiceUnavailable { margin: 10px 0 0 0; font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
+.choiceUnavailable { margin: var(--space-3) 0 0 0; font-size: var(--text-sm); line-height: 1.45; color: var(--text-secondary); }
 
 /* Recipe-card skeleton rows (ChecklistSkeleton): shaped like the real checklist card. */
 @keyframes skelRowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }

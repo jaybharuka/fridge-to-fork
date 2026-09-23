@@ -8,6 +8,7 @@ import { useProductMatches } from '@/hooks/useInstamartProducts';
 import { useSelectedAddressId } from '@/lib/addressStore';
 import { formatInr, topAvailable } from '@/lib/instamart';
 import { keyOf, type CacheEntry } from '@/lib/searchCache';
+import { Card } from '@/components/ui/Card';
 import { ProductThumb } from './ProductThumb';
 import styles from './IngredientChecklistCard.module.css';
 
@@ -21,6 +22,12 @@ interface IngredientChecklistCardProps {
 // The real Instamart product Swiggy ranks first for a missing ingredient. Any
 // non-answer (search failed, no match, all out of stock, still unknown) renders
 // nothing, so that row is exactly the plain name + quantity it always was.
+//
+// Phase 3 (2026-09): dropped its own border/radius/background-card treatment — the audit flagged a card nested
+// inside a row nested inside a card as visual noise. It's now a flat, tinted band within the row (still clearly a
+// distinct, clickable sub-area via background + a top divider) rather than a second nested card shape. Price is
+// now the loudest thing in it (var(--text-lg) bold vs. the name's smaller, lighter type) — the audit's price-
+// hierarchy finding: price should stand out from surrounding metadata, not sit at the same weight/size tier.
 function ProductMatch({ ingredient, entry, onOpen }: { ingredient: string; entry: CacheEntry | undefined; onOpen: () => void }) {
   if (!entry || entry.status === 'failed') return null;
   if (entry.status === 'loading') return <div className={styles.matchLoading} aria-label={`Finding ${ingredient} on Instamart`} />;
@@ -109,7 +116,7 @@ export function IngredientChecklistCard({ checklist, toggleChecklistItem, onOpen
   const toOrderCount = total - haveCount;
 
   return (
-    <div className={styles.card}>
+    <Card padding="none" className={styles.card}>
       <div className={styles.statsRow}>
         <p className={styles.statLine}>
           You already have <StatNumber target={haveCount} /> of <StatNumber target={total} /> ingredient{total === 1 ? '' : 's'}. Just{' '}
@@ -159,6 +166,6 @@ export function IngredientChecklistCard({ checklist, toggleChecklistItem, onOpen
         </div>
         <div className={styles.rowsFade} />
       </div>
-    </div>
+    </Card>
   );
 }
