@@ -1,12 +1,13 @@
 'use client';
 
 import { ChevronLeft, CircleAlert, CircleCheck, RefreshCw, Truck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { closeOrders, useOrdersUi } from '@/lib/ordersUi';
 import { formatInr, isPastOrder, type OrderDetails, type OrderSummary } from '@/lib/instamart';
 import { useLiveStatus, useOrderDetails, useOrderList } from '@/hooks/useInstamartOrders';
+import { Sheet } from '@/components/ui/Sheet';
+import sheetStyles from '@/components/ui/Sheet.module.css';
 import { ReportProblem } from './ReportProblem';
-import resultsStyles from './results.module.css';
 import styles from './instamart.module.css';
 
 function when(iso: string | null): string {
@@ -152,12 +153,15 @@ function Panel({ initialOrderId, onClose }: { initialOrderId: string | null; onC
 
   return (
     <>
-      <div className={resultsStyles.orderSheetHeader}>
+      {/* The title/back-button toggle with viewId (internal navigation state), so it's rendered as plain content
+          reusing Sheet's own header classes, rather than via Sheet's title/subtitle props (which are for a header
+          that's fixed for the sheet's whole open lifetime, e.g. FoodOrderSheet's). */}
+      <div className={sheetStyles.header}>
         {viewId && (
           <button type="button" className={styles.backBtn} onClick={() => setViewId(null)}><ChevronLeft aria-hidden /> All orders</button>
         )}
-        <h3 className={resultsStyles.orderSheetTitle}>{viewId ? `Order ${viewId}` : 'Your Instamart orders'}</h3>
-        <p className={resultsStyles.orderSheetSubtitle}>{viewId ? 'Live status and details' : 'Track an order or look back at past ones'}</p>
+        <h3 className={sheetStyles.title}>{viewId ? `Order ${viewId}` : 'Your Instamart orders'}</h3>
+        <p className={sheetStyles.subtitle}>{viewId ? 'Live status and details' : 'Track an order or look back at past ones'}</p>
       </div>
 
       {list.error && !list.orders ? (
@@ -204,33 +208,16 @@ function Panel({ initialOrderId, onClose }: { initialOrderId: string | null; onC
 }
 
 // Order history + live tracking + itemized details, reachable from the header at any time and from the
-// order-placed screen. Same always-dark sheet as the order flow.
+// order-placed screen. Phase 3 (2026-09): now components/ui/Sheet — follows the light/dark toggle like the rest of
+// the app instead of the old hardcoded-dark styling, and picks up Sheet's swipe-to-close and Escape-to-close for
+// free (this sheet never had either before; a straightforward improvement, not a behavior change to preserve).
 export function InstamartOrdersSheet() {
   const ui = useOrdersUi();
   const isOpen = ui.open && ui.kind === 'instamart';
-  const [mounted, setMounted] = useState(isOpen);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setMounted(true);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
-    }
-    setVisible(false);
-    const timer = setTimeout(() => setMounted(false), 400);
-    return () => clearTimeout(timer);
-  }, [isOpen]);
-
-  if (!mounted) return null;
   return (
-    <div className={resultsStyles.orderBottomSheet}>
-      <div className={`${resultsStyles.orderSheetBackdrop} ${visible ? resultsStyles.visible : ''}`} onClick={closeOrders} />
-      <div className={`${resultsStyles.orderSheetPanel} ${visible ? resultsStyles.visible : ''}`} role="dialog" aria-label="Your Instamart orders">
-        <div className={resultsStyles.orderSheetHandle} />
-        {/* keyed by session: every open starts from a fresh list/order view */}
-        <Panel key={ui.session} initialOrderId={ui.orderId} onClose={closeOrders} />
-      </div>
-    </div>
+    <Sheet open={isOpen} onClose={closeOrders} ariaLabel="Your Instamart orders">
+      {/* keyed by session: every open starts from a fresh list/order view */}
+      <Panel key={ui.session} initialOrderId={ui.orderId} onClose={closeOrders} />
+    </Sheet>
   );
 }
