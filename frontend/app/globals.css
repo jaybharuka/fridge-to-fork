@@ -13,6 +13,30 @@
   --bg-rgb: 255,255,255;
   --success: #2ECC71;
 
+  /* ---- Design-system tokens (Phase 1, 2026-09). Additive: nothing existing is removed or repointed here — these
+     are the canonical scale for new/rebuilt components (components/ui/*) to use going forward. The audit found the
+     app actually using 12 border-radius values, ~19 font sizes, ~30 padding combinations and ~17 one-off box-shadows
+     with no shared scale; these tokens are that scale. Existing --swiggy-..., --grey-... and --bg-1/2/3 aliases below
+     are left alone — they're still load-bearing for every existing screen and are migrated off screen by screen (Phases 2-4),
+     not deleted in one pass. */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  --text-xs: 11px; --text-sm: 12px; --text-base: 13px; --text-md: 14px; --text-lg: 16px;
+  --text-xl: 18px; --text-2xl: 20px; --text-3xl: 24px; --text-4xl: 32px;
+  --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600; --weight-bold: 700; --weight-extrabold: 800;
+
+  /* --radius/--radius-sm/--radius-pill (declared below, unchanged) stay the canonical small/pill sizes; these fill
+     in the rest of the scale found in use. */
+  --radius-xs: 6px; --radius-lg: 20px; --radius-xl: 24px;
+
+  /* Elevation: replaces the ~17 bespoke box-shadow values found with 4 levels. Alpha is deliberately higher in dark
+     mode (redeclared below) — a shadow this faint is invisible against a dark surface. */
+  --shadow-1: 0 2px 8px rgba(0,0,0,0.06);   /* resting card */
+  --shadow-2: 0 4px 12px rgba(0,0,0,0.10);  /* raised: dropdown, popover, hovered card */
+  --shadow-3: 0 16px 40px rgba(0,0,0,0.12); /* sheet / modal */
+  --shadow-4: 0 24px 60px rgba(0,0,0,0.20); /* hero / lightbox-level overlay */
+
   --grey-50: var(--bg-secondary);
   --grey-100: #F0F0F0;
   --grey-200: var(--border);
@@ -84,6 +108,13 @@
   --orange: #FC8019;
   --orange-light: rgba(252,128,25,0.12);
   --orange-dark: #E8700A;
+
+  /* Elevation, dark: a shadow this faint reads as invisible against a dark surface, so alpha is higher throughout —
+     same reasoning as --shadow's own light/dark split above. */
+  --shadow-1: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-2: 0 4px 14px rgba(0,0,0,0.4);
+  --shadow-3: 0 16px 40px rgba(0,0,0,0.5);
+  --shadow-4: 0 24px 60px rgba(0,0,0,0.6);
   --bg-rgb: 15,15,15;
 
   --grey-50: var(--bg-secondary);

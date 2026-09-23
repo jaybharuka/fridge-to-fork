@@ -1,0 +1,35 @@
+/* One button, three variants — replaces three independently-evolved button systems found in the audit. Uses only
+   the Phase 1 tokens (space/text/weight/radius), no bespoke values. */
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius);
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: var(--text-lg); font-weight: var(--weight-semibold);
+  border: none; cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.button:active:not(:disabled) { transform: scale(0.98); }
+.button:disabled { cursor: not-allowed; opacity: 0.5; }
+.fullWidth { width: 100%; }
+
+.sm { padding: var(--space-2) var(--space-4); font-size: var(--text-md); border-radius: var(--radius-sm); gap: var(--space-1); }
+
+.primary { background: var(--orange); color: #fff; }
+.primary:hover:not(:disabled) { background: var(--orange-dark); }
+.primary:disabled { opacity: 0.5; }
+
+.secondary { background: transparent; color: var(--orange); border: 1.5px solid var(--orange-border, rgba(252,128,25,0.4)); }
+.secondary:hover:not(:disabled) { background: var(--orange-light); }
+
+.ghost { background: transparent; color: var(--text-secondary); padding: var(--space-1) 0; font-weight: var(--weight-semibold); font-size: var(--text-base); }
+.ghost:hover:not(:disabled) { color: var(--text-primary); }
+
+.loading { cursor: default; }
+.spinner { width: 16px; height: 16px; animation: btnSpin 0.9s linear infinite; flex-shrink: 0; }
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+.label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+  .button { transition: none; }
+}
