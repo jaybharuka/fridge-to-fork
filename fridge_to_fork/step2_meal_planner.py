@@ -65,18 +65,45 @@ _SPELLING_VARIANTS = {
     "yogurt": "yoghurt", "curd": "yoghurt",
 }
 
+# Whole-word/phrase synonyms, applied to the raw name BEFORE word-splitting
+# (not a single-word canonicalization like _SPELLING_VARIANTS above) —
+# vision-accuracy audit (2026-09) found a real "clearly visible item
+# reported missing" case: Gemini reporting "capsicum" for a recipe that
+# calls it "bell pepper" shared no words at all after normalization, so the
+# subset-containment match in _fuzzy_ingredient_match() below never fired
+# despite both naming the same vegetable. Deliberately a phrase-level
+# substitution rather than mapping the single word "capsicum" -> "pepper":
+# that coarser fix would make capsicum/bell-pepper falsely match "black
+# pepper" or "pepper powder" (both contain the word "pepper" too) — an
+# unrelated spice, not the vegetable. Substituting the whole phrase first
+# means "capsicum" only ever contributes the word set {"bell", "pepper"},
+# which correctly subset-matches "bell pepper" / "red bell pepper" and
+# never touches anything that was never named "capsicum" to begin with.
+_PHRASE_SYNONYMS = {
+    "capsicum": "bell pepper",
+}
+
 
 def _normalize_ingredient_words(name: str) -> set[str]:
-    """Lowercase, strip descriptive words, and naively singularize each
-    word so "Fresh Tomatoes" and "tomato" both reduce to {"tomato"}."""
-    words = re.findall(r"[a-z]+", name.lower())
+    """Lowercase, apply phrase-level synonyms, strip descriptive words, and
+    naively singularize each word so "Fresh Tomatoes" and "tomato" both
+    reduce to {"tomato"}."""
+    lowered = name.lower()
+    for phrase, replacement in _PHRASE_SYNONYMS.items():
+        lowered = re.sub(rf"\b{re.escape(phrase)}\b", replacement, lowered)
+    words = re.findall(r"[a-z]+", lowered)
     result = set()
     for word in words:
         if word in _DESCRIPTIVE_WORDS:
             continue
         if word.endswith("ies") and len(word) > 4:
             word = word[:-3] + "y"
-        elif word.endswith("es") and len(word) > 3:
+        elif word.endswith("oes") and len(word) > 4:
+            # "-oes" plurals only (tomato/tomatoes, potato/potatoes, mango/mangoes) — a
+            # narrower rule than the old blanket "any -es" strip, which also caught
+            # regular -s plurals of words already ending in "e" (grape+s, apple+s,
+            # olive+s) and mis-stemmed them ("grapes" -> "grap" instead of "grape"),
+            # silently breaking the match against a plain "grape" from the fridge scan.
             word = word[:-2]
         elif word.endswith("s") and len(word) > 3:
             word = word[:-1]
@@ -302,12 +329,25 @@ def _dedupe(models: list[str | None]) -> list[str]:
 # Models tried in order until one succeeds. Each Gemini model has its own
 # separate free-tier daily quota, so exhausting one doesn't mean they're
 # all exhausted.
+#
+# Vision-accuracy audit (2026-09): this chain's fourth entry
+# (gemini-2.0-flash-lite) is the same dead-model bug found and fixed in
+# VISION_MODEL_FALLBACK_CHAIN (step1_fridge_vision.py) — a hard 404 "no
+# longer available" from the live API. Removed outright and replaced with
+# gemini-3.1-pro-preview appended at the end (same reasoning as the vision
+# chain: fast/light options stay first, the slower pro-tier model is a
+# last resort). Reachability verified with this project's actual API key,
+# not just client.models.list() — the vision-chain fix also caught
+# gemini-2.5-pro being list-visible but 404ing as "no longer available to
+# new users" for this key specifically, so list membership alone isn't
+# proof of access. The other four entries here already had confirmed real
+# (non-404) traffic against this key during that same audit.
 TEXT_MODEL_FALLBACK_CHAIN = _dedupe([
     os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash"),
     "gemini-2.5-flash-lite",
     "gemini-flash-latest",
-    "gemini-2.0-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-3.1-pro-preview",
 ])
 
 # ---------------------------------------------------------------------------

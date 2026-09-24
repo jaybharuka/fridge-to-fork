@@ -8,7 +8,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan
-from fridge_to_fork.step2_meal_planner import plan_meals
+from fridge_to_fork.step2_meal_planner import (
+    _fuzzy_ingredient_match,
+    _normalize_ingredient_words,
+    plan_meals,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -190,3 +194,63 @@ def test_plan_meals_with_target_dish():
     prompt_text = kwargs["contents"]
     assert "Mushroom Risotto" in prompt_text
     assert "eggs" in prompt_text
+
+
+# ---------------------------------------------------------------------------
+# _fuzzy_ingredient_match / _normalize_ingredient_words
+# Vision-accuracy audit (2026-09) found two real bugs here: "capsicum"
+# (a plausible Gemini vision output) never matched "bell pepper" (a
+# plausible recipe ingredient name) despite naming the same vegetable —
+# a genuinely-detected item silently reported as "missing" — and the
+# plural-stripping heuristic mangled "grapes" into "grap" instead of
+# "grape", breaking that match too. Both fixed together since they're the
+# same bug family (matching logic, not vision accuracy).
+# ---------------------------------------------------------------------------
+
+def test_capsicum_matches_bell_pepper():
+    assert _fuzzy_ingredient_match("capsicum", ["bell pepper"])
+    assert _fuzzy_ingredient_match("bell pepper", ["capsicum"])
+    assert _fuzzy_ingredient_match("red bell pepper", ["capsicum"])
+
+
+def test_capsicum_does_not_match_unrelated_pepper_items():
+    """Guards against the coarser fix (mapping the single word "capsicum" -> "pepper")
+    that would have falsely matched the spice, not just the vegetable."""
+    assert not _fuzzy_ingredient_match("capsicum", ["black pepper"])
+    assert not _fuzzy_ingredient_match("capsicum", ["pepper powder"])
+
+
+@pytest.mark.parametrize("singular,plural", [
+    ("grape", "grapes"),
+    ("apple", "apples"),
+    ("olive", "olives"),
+    ("lime", "limes"),
+])
+def test_plural_of_word_ending_in_e_matches_singular(singular, plural):
+    assert _fuzzy_ingredient_match(singular, [plural])
+    assert _fuzzy_ingredient_match(plural, [singular])
+
+
+@pytest.mark.parametrize("singular,plural", [
+    ("tomato", "tomatoes"),
+    ("potato", "potatoes"),
+    ("mango", "mangoes"),
+])
+def test_oes_plural_still_matches_singular(singular, plural):
+    """The -oes case (tomato/potato/mango) must keep working after narrowing the old
+    blanket "any -es" stripping rule down to just this pattern."""
+    assert _fuzzy_ingredient_match(singular, [plural])
+
+
+def test_grapes_normalizes_to_grape_not_grap():
+    assert _normalize_ingredient_words("grapes") == {"grape"}
+
+
+def test_coriander_leaves_still_does_not_match_coriander_powder():
+    """Pre-existing behavior this fix must not regress."""
+    assert not _fuzzy_ingredient_match("coriander leaves", ["coriander powder"])
+
+
+def test_subset_match_still_works():
+    """Pre-existing behavior this fix must not regress."""
+    assert _fuzzy_ingredient_match("ginger-garlic paste", ["ginger"])
