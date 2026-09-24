@@ -1,15 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import type { Choice } from '@/hooks/useInstamartOrder';
 import { formatInr, topAvailable, type InstamartOption, type InstamartSearchResult } from '@/lib/instamart';
+import { Icon, type IconSize } from '@/components/ui/Icon';
 import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
 
 const MAX_QTY = 20;
 
-const Thumb = ({ url }: { url: string | null }) => (
-  <ProductThumb url={url} className={styles.thumb} fallbackClassName={styles.thumbFallback} />
+// Reused at two different box sizes: the picked row's .thumb (56px, via base .thumbFallback) and each option-list
+// entry's .thumb (40px, via the .option .thumbFallback CSS override) — size threaded through per call site to match.
+const Thumb = ({ url, size = 'sm' }: { url: string | null; size?: IconSize }) => (
+  <ProductThumb url={url} className={styles.thumb} fallbackClassName={styles.thumbFallback} size={size} />
 );
 
 function Price({ option }: { option: InstamartOption }) {
@@ -59,12 +63,12 @@ function IngredientRow({ focused, result, choice, removable, onPick, onQuantity,
 
       {selected ? (
         <div className={styles.picked}>
-          <Thumb url={selected.imageUrl} />
+          <Thumb url={selected.imageUrl} size="md" />
           <OptionSummary option={selected} />
           <div className={styles.stepper}>
-            <button type="button" aria-label="Decrease quantity" disabled={choice.quantity <= 1} onClick={() => onQuantity(choice.quantity - 1)}>−</button>
+            <button type="button" aria-label="Decrease quantity" disabled={choice.quantity <= 1} onClick={() => onQuantity(choice.quantity - 1)}><Icon icon={Minus} size="xs" /></button>
             <span aria-live="polite">{choice.quantity}</span>
-            <button type="button" aria-label="Increase quantity" disabled={choice.quantity >= maxQty} onClick={() => onQuantity(choice.quantity + 1)}>+</button>
+            <button type="button" aria-label="Increase quantity" disabled={choice.quantity >= maxQty} onClick={() => onQuantity(choice.quantity + 1)}><Icon icon={Plus} size="xs" /></button>
           </div>
         </div>
       ) : (
