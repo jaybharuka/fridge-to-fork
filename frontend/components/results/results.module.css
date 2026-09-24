@@ -336,24 +336,25 @@
 .topupSheetCard {
   /* button reset — this is a real <button> now (click-to-add), not a div */
   display: block; font: inherit; text-align: left; padding: 0; margin: 0;
-  flex-shrink: 0; width: 130px; background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+  flex-shrink: 0; width: 130px; background: var(--swiggy-surface-2);
+  border: 1px solid var(--swiggy-border); border-radius: 14px;
   overflow: hidden; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .topupSheetCard:active { transform: scale(0.97); }
-.topupSheetCard.selected { border-color: #FC8019; background: rgba(252,128,25,0.12); }
-.topupSheetImgWrap { width: 100%; height: 90px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
+.topupSheetCard.selected { border-color: #FC8019; background: var(--orange-light); }
+.topupSheetImgWrap { width: 100%; height: 90px; background: var(--swiggy-surface-2); overflow: hidden; position: relative; }
 .topupSheetImg { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; }
 .topupSheetImg.loaded { opacity: 1; }
 .topupSheetEmojiFallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 32px; }
 .topupSheetCheckBadge {
   position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
   background: #FC8019; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4); animation: topupCheckPop .25s ease-out;
 }
 .topupSheetCheckBadge svg { width: 15px; height: 15px; stroke: #fff; color: #fff; }
+@keyframes topupCheckPop { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
 .topupSheetInfo { padding: 10px 10px 12px 10px; }
-.topupSheetName { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topupSheetName { font-size: 12px; font-weight: 600; color: var(--swiggy-text); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topupSheetPrice { font-size: 13px; font-weight: 700; color: #FC8019; margin: 0; }
 
 /* Section label + generic empty-state — templates/index.html:403-405, 1696.
@@ -535,4 +536,5 @@
 @media (prefers-reduced-motion: reduce) {
   .skelRichRow { animation: none; opacity: 1; }
   .revealIn { animation: none; }
+  .topupSheetCheckBadge { animation: none; }
 }

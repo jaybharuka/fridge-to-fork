@@ -55,7 +55,7 @@ export function CouponSection({ coupons, appliedCoupon, couponBusy, disabled, ed
               </div>
               <button
                 type="button"
-                className={styles.couponBtn}
+                className={`${styles.couponBtn} ${isApplied ? styles.applied : ''} ${couponBusy === c.code ? styles.busy : ''}`}
                 disabled={disabled || !c.applicable || !!appliedCoupon || couponBusy !== null}
                 onClick={() => onApply(c.code)}
               >
