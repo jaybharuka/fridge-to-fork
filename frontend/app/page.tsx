@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useScanStream } from '@/hooks/useScanStream';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useYoutubeVideos } from '@/hooks/useYoutubeVideos';
@@ -10,6 +10,7 @@ import { usePrefetchProducts } from '@/hooks/useInstamartProducts';
 import { useSelectedAddressId } from '@/lib/addressStore';
 import { getItemsToOrder } from '@/hooks/useRecipeChecklist';
 import { consumePendingOrder, savePendingOrder } from '@/lib/pendingOrder';
+import { clearResultsSnapshot, consumeResultsSnapshot, saveResultsSnapshot, type ResultsSnapshot } from '@/lib/resultsPersistence';
 import { ConnectGate } from '@/components/auth/ConnectGate';
 import { FoodOrdersSheet } from '@/components/results/FoodOrdersSheet';
 import { InstamartOrdersSheet } from '@/components/results/InstamartOrdersSheet';
@@ -24,9 +25,23 @@ import { Toast } from '@/components/results/Toast';
 // (templates/index.html:4033-4041, 4543-4549, 4614-4624) with phase-driven
 // rendering: useScanStream owns the phase, this owns what each phase shows.
 export default function Home() {
-  const [targetDish, setTargetDish] = useState('');
-  const [servings, setServings] = useState(2);
-  const [tab, setTab] = useState<'order' | 'recipe'>('order');
+  // Resumes state stashed right before a "Connect with Swiggy" click sent the
+  // user through the full-page OAuth redirect (/auth/login -> Swiggy ->
+  // /auth/callback -> back here) — see lib/pendingOrder.ts. Read once,
+  // synchronously, before anything else can: consumePendingOrder() is
+  // one-shot, so it must not be called a second time on the same mount.
+  const [restoredOrder] = useState(() => consumePendingOrder());
+  // Resumes results lost to an ordinary in-app navigation (the About/FAQ/
+  // Contact footer links, or a hard reload/tab close) — see
+  // lib/resultsPersistence.ts. restoredOrder, when present, is the more
+  // specific/recent stash (written for an explicit action a moment ago), so
+  // it always wins; the results snapshot is only consumed when there's
+  // nothing more specific to restore instead.
+  const [restoredResults] = useState<ResultsSnapshot | null>(() => (restoredOrder ? null : consumeResultsSnapshot()));
+
+  const [targetDish, setTargetDish] = useState(() => restoredResults?.targetDish ?? '');
+  const [servings, setServings] = useState(() => restoredResults?.servings ?? 2);
+  const [tab, setTab] = useState<'order' | 'recipe'>(() => restoredResults?.tab ?? 'order');
   // Gates the handoff from PhotoScanScreen to Results. Deliberately NOT
   // derived from `phase`: the photo-scan screen goes up the instant Get
   // Recipe is tapped and stays up through its own reveal animation, which
@@ -67,6 +82,7 @@ export default function Home() {
 
   const handleResetToLanding = useCallback(() => {
     reset();
+    clearResultsSnapshot(); // otherwise a later leave-and-return would resurrect the results just reset away
     photos.clear();
     setTab('order');
     setPhotoDetectionRevealed(false);
@@ -124,14 +140,6 @@ export default function Home() {
     });
   }, [state.recommendedMeal, state.reasoning, state.checklist, state.topUpSuggestions]);
 
-  // Resumes state stashed in lib/pendingOrder.ts right before a "Connect
-  // with Swiggy" click sent the user through the full-page OAuth redirect
-  // (/auth/login -> Swiggy -> /auth/callback -> back here). The lazy
-  // initializer reads (and clears) the stash exactly once, synchronously,
-  // before anything else can — consumePendingOrder() is one-shot, so it
-  // must not be called a second time on the same mount.
-  const [restoredOrder] = useState(() => consumePendingOrder());
-
   useEffect(() => {
     if (!restoredOrder) return;
     restore({
@@ -143,6 +151,59 @@ export default function Home() {
     setTab('order');
     if (restoredOrder.reopenOrderSheet) setOrderSheetOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Same restore as above, for an ordinary in-app navigation away and back
+  // rather than the OAuth round trip — see lib/resultsPersistence.ts.
+  // targetDish/servings/tab already got their restored values from
+  // restoredResults at initial state (above); this only needs to rehydrate
+  // useScanStream's own reducer state, same as the OAuth path does.
+  useEffect(() => {
+    if (!restoredResults) return;
+    restore({
+      recommendedMeal: restoredResults.recommendedMeal,
+      reasoning: restoredResults.reasoning,
+      checklist: restoredResults.checklist,
+      topUpSuggestions: restoredResults.topUpSuggestions,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keeps a snapshot of "what's worth restoring right now" current after
+  // every render (a deps-less effect, not a during-render assignment — refs
+  // aren't meant to be written while rendering), without re-subscribing the
+  // listeners below on every state change. null whenever there's nothing
+  // worth saving (no results reached yet, or the user has reset to landing).
+  const snapshotToSaveRef = useRef<ResultsSnapshot | null>(null);
+  useEffect(() => {
+    snapshotToSaveRef.current =
+      state.phase === 'results'
+        ? { recommendedMeal: state.recommendedMeal ?? '', reasoning: state.reasoning, checklist: state.checklist, topUpSuggestions: state.topUpSuggestions, targetDish, servings, tab }
+        : null;
+  });
+
+  // Saves right before the results are actually about to be lost. A
+  // client-side route change (the footer's About/FAQ/Contact links) never
+  // unloads the document, so pagehide/visibilitychange never fire for it —
+  // only React unmounting Home does, which the effect cleanup below catches.
+  // pagehide/visibilitychange remain necessary for the other case, an actual
+  // browser-level navigation away (hard reload, closing the tab) — where
+  // React's own unmount cleanup isn't guaranteed to run before the page is
+  // torn down.
+  useEffect(() => {
+    const save = () => {
+      if (snapshotToSaveRef.current) saveResultsSnapshot(snapshotToSaveRef.current);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') save();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', save);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', save);
+      save();
+    };
   }, []);
 
   // The gate can appear mid-session (a 5-day Swiggy token expiring): keep the recipe if there is one.
