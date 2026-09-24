@@ -1,0 +1,72 @@
+{
+  "_notes": [
+    "Phase 1 placeholder set — 7 real (non-AI-generated) fridge photos, free-licensed via the Unsplash API",
+    "(the same source app.py's /api/dish-image already uses). Hand-verified by a human looking at each photo,",
+    "not scraped/synthetic labels. These are Western/mixed fridges, not the Indian-fridge context the app's",
+    "prompt is specifically tuned for (dabbas, plastic-bagged produce, door condiments) — acceptable for",
+    "validating the harness mechanics, but the score on this set should NOT be treated as the app's real-world",
+    "accuracy number. Swap in real (ideally Indian-fridge) photos under photos/ and matching entries here",
+    "once available; nothing else about the harness needs to change.",
+    "",
+    "Per photo: `certain` = confidently, unambiguously identifiable by a human looking at the photo — this is",
+    "what recall/precision are actually scored against. `partial` = genuinely ambiguous/occluded/unreadable even",
+    "to a human (unclear jar contents, food in an opaque bag, blurry/out-of-focus) — NOT scored strictly (an",
+    "item here isn't a miss if absent, isn't a hallucination if reported), but the eval script reports whether",
+    "the model found them anyway, since partially-recovering these is a genuine bonus signal. `distractors` =",
+    "visible non-food or blacklist-category items a correct scan should NOT report — reporting one is a",
+    "hallucination event even though it's 'real' in the photo, since it isn't a cookable ingredient.",
+    "Names are written the way the app's own prompt asks the model to answer: singular, generic English, no",
+    "brand names — so matching is apples-to-apples."
+  ],
+  "photos": [
+    {
+      "file": "ZUhM8LE_HGc.jpg",
+      "description": "Cluttered, multi-shelf home fridge, decent lighting, many packaged items with readable labels",
+      "certain": ["egg", "grape", "strawberry", "garlic", "sausage"],
+      "partial": ["bell pepper", "green chilli", "onion", "cheese", "naan or flatbread", "meatball or dumpling"],
+      "distractors": []
+    },
+    {
+      "file": "3A0qRjOesX4.jpg",
+      "description": "French fridge, dense small-text label reading test (cheese/dairy brand names), a shellfish dish",
+      "certain": ["egg", "cheese", "yogurt", "pickle", "wine"],
+      "partial": ["crab", "cream", "butter", "olive", "soda"],
+      "distractors": []
+    },
+    {
+      "file": "gC-cKJebRhg.jpg",
+      "description": "Clean, well-lit produce drawer — the 'should be easy' baseline case",
+      "certain": ["bell pepper", "green chilli", "red cabbage", "tomato", "spinach", "lettuce", "orange", "lemon", "green apple", "egg"],
+      "partial": ["garlic"],
+      "distractors": []
+    },
+    {
+      "file": "XIMl4Crm1GQ.jpg",
+      "description": "Glass jars with visible contents + two produce drawers",
+      "certain": ["pea", "pickle", "pickled pepper", "tomato sauce", "carrot", "orange", "bell pepper", "tomato"],
+      "partial": ["lime", "banana"],
+      "distractors": []
+    },
+    {
+      "file": "AEU9UZstCfs.jpg",
+      "description": "Meal-prep containers with only partially visible contents (the 'opaque container' test) + varied fresh produce",
+      "certain": ["bell pepper", "tomato", "zucchini", "egg", "green onion", "mushroom", "brussels sprout", "strawberry", "kale", "lemon", "lime", "parsley", "milk"],
+      "partial": ["yogurt"],
+      "distractors": ["reusable produce bag"]
+    },
+    {
+      "file": "02ldN7R6shw.jpg",
+      "description": "Poor/colored lighting stress test — magenta ambient light",
+      "certain": ["egg", "butter", "milk"],
+      "partial": ["seltzer", "juice"],
+      "distractors": ["water bottle"]
+    },
+    {
+      "file": "zrUx-FjiuFc.jpg",
+      "description": "Warm/yellow lighting stress test, genuinely messy everyday fridge, includes a ground-meat edge case",
+      "certain": ["egg", "bread", "orange juice", "cucumber", "grape", "cabbage"],
+      "partial": ["ground meat", "leafy greens"],
+      "distractors": []
+    }
+  ]
+}
