@@ -104,6 +104,10 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
     >
         <p className={resultsStyles.orderSheetSwiggy}>Powered by <strong>Swiggy</strong></p>
 
+        {/* Phase 4 (2026-09): keying this pane on stage/addressOpen/needsConnect gives every stage swap (searching ->
+            picking -> building -> reviewing -> placing -> done, plus the address-picker sub-view) a real mount, so
+            the CSS entrance animation (styles.stagePane) actually replays instead of the content just snapping. */}
+        <div key={`${state.stage}-${addressOpen}-${needsConnect}`} className={styles.stagePane}>
         {needsConnect ? (
           <div className={resultsStyles.orderSheetAuthNotice}>
             <p>Connect your Swiggy account to see real restaurants, dishes and prices near you.</p>
@@ -199,6 +203,7 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
             {placing && <p className={styles.hint}>Please keep this open until it finishes.</p>}
           </>
         ) : null}
+        </div>
     </Sheet>
   );
 }
