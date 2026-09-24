@@ -56,5 +56,6 @@ gcp-credentials*.json
 !frontend/app/icon.png
 !frontend/app/og-logo.png
 !frontend/public/logo-mark.png
+!frontend/public/logo-source.png
 !frontend/scripts/
 !frontend/scripts/**
