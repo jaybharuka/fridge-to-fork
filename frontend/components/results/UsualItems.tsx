@@ -21,7 +21,7 @@ export function UsualItems({ items, onAdd }: UsualItemsProps) {
           if (!option) return null;
           return (
             <div className={styles.usualCard} key={item.ingredient}>
-              <ProductThumb url={option.imageUrl} className={styles.usualThumb} fallbackClassName={styles.usualThumbFallback} />
+              <ProductThumb url={option.imageUrl} className={styles.usualThumb} fallbackClassName={styles.usualThumbFallback} size="md" />
               <p className={styles.usualName}>{item.ingredient}</p>
               <p className={styles.meta}>{[option.size, formatInr(option.price)].filter(Boolean).join(' · ')}</p>
               <button type="button" className={styles.couponBtn} onClick={() => onAdd(item)} aria-label={`Add ${item.ingredient}`}>+ Add</button>

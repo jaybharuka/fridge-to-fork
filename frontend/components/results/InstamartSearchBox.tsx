@@ -1,11 +1,12 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { Search, X } from 'lucide-react';
+import { Check, Search, X } from 'lucide-react';
 import { formatInr, type InstamartSearchResult } from '@/lib/instamart';
 import { searchBoxCacheFor } from '@/lib/instamartSearch';
 import { keyOf } from '@/lib/searchCache';
 import { rowsFrom, toCartResult } from '@/lib/instamartSearchRows';
+import { Icon } from '@/components/ui/Icon';
 import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
 
@@ -124,7 +125,7 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
             const discounted = option.price !== null && option.mrp !== null && option.mrp > option.price;
             return (
               <li key={option.spinId} className={`${styles.usualCard} ${!option.available ? styles.searchCardOff : ''}`}>
-                <ProductThumb url={option.imageUrl} className={styles.usualThumb} fallbackClassName={styles.usualThumbFallback} />
+                <ProductThumb url={option.imageUrl} className={styles.usualThumb} fallbackClassName={styles.usualThumbFallback} size="md" />
                 <p className={styles.usualName}>{option.name}</p>
                 {option.size && <p className={styles.meta}>{option.size}</p>}
                 {option.price !== null && (
@@ -143,7 +144,7 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
                     onClick={() => onAdd(toCartResult(row))}
                     aria-label={`${row.added ? 'Added' : 'Add'} ${[option.name, option.size].filter(Boolean).join(' ')}`}
                   >
-                    {row.added ? '✓ Added' : '+ Add'}
+                    {row.added ? <><Icon icon={Check} size="xs" /> Added</> : '+ Add'}
                   </button>
                 )}
               </li>

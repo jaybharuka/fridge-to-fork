@@ -1,12 +1,15 @@
 'use client';
 
+import type { ReactNode } from 'react';
+import { Minus, Plus, Star } from 'lucide-react';
 import { formatInr, type FoodResult } from '@/lib/food';
 import { pickProblem, type Picks } from '@/lib/foodSelection';
+import { Icon } from '@/components/ui/Icon';
 import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
 
 const Thumb = ({ url }: { url: string | null }) => (
-  <ProductThumb url={url} className={styles.thumb} fallbackClassName={styles.thumbFallback} />
+  <ProductThumb url={url} className={styles.thumb} fallbackClassName={styles.thumbFallback} size="md" />
 );
 
 export function VegMark({ isVeg }: { isVeg: boolean | null }) {
@@ -14,10 +17,15 @@ export function VegMark({ isVeg }: { isVeg: boolean | null }) {
   return <span className={`${styles.vegDot} ${isVeg ? styles.vegOn : styles.vegOff}`} role="img" aria-label={isVeg ? 'Vegetarian' : 'Non-vegetarian'} />;
 }
 
-function restaurantMeta(r: FoodResult['restaurant']): string {
+// Was a plain `★ ${rating}` string joined with the rest — the icon audit found this duplicating the Star icon
+// already used elsewhere (MealSuggestionsSection's "Recommended"), so the rating segment is now real JSX and the
+// whole thing returns parts to render, not a string to join.
+function restaurantMeta(r: FoodResult['restaurant']): ReactNode[] {
   const eta = r.etaRange ?? (r.etaMinutes !== null ? `${r.etaMinutes} mins` : null);
   const distance = r.distanceKm !== null ? `${r.distanceKm} km` : null;
-  return [r.rating !== null ? `★ ${r.rating}` : null, eta, distance, r.costForTwo].filter(Boolean).join(' · ');
+  const rating = r.rating !== null ? <span key="rating"><Icon icon={Star} size="xs" /> {r.rating}</span> : null;
+  const parts = [rating, eta, distance, r.costForTwo].filter((p): p is NonNullable<typeof p> => p !== null);
+  return parts.flatMap((part, i) => (i === 0 ? [part] : [<span key={`sep-${i}`}> · </span>, part]));
 }
 
 interface CardProps {
@@ -45,7 +53,7 @@ function DishCard({ result, picks, onOpen, onClose, onVariant, onAddon, onQuanti
             <p className={styles.name}>{result.name}</p>
           </div>
           <p className={styles.meta}>{r.name}{r.area ? ` · ${r.area}` : ''}</p>
-          {meta && <p className={styles.meta}>{meta}</p>}
+          {meta.length > 0 && <p className={styles.meta}>{meta}</p>}
           {result.price !== null && <p className={styles.price}>{formatInr(result.price)}{c.variantGroups.length > 0 ? ' onwards' : ''}</p>}
         </div>
       </div>
@@ -106,9 +114,9 @@ function DishCard({ result, picks, onOpen, onClose, onVariant, onAddon, onQuanti
           <div className={styles.qtyRow}>
             <span className={styles.qtyLabel}>Quantity</span>
             <div className={styles.stepper}>
-              <button type="button" aria-label="Decrease quantity" disabled={picks.quantity <= 1} onClick={() => onQuantity(picks.quantity - 1)}>−</button>
+              <button type="button" aria-label="Decrease quantity" disabled={picks.quantity <= 1} onClick={() => onQuantity(picks.quantity - 1)}><Icon icon={Minus} size="xs" /></button>
               <span aria-live="polite">{picks.quantity}</span>
-              <button type="button" aria-label="Increase quantity" disabled={picks.quantity >= 20} onClick={() => onQuantity(picks.quantity + 1)}>+</button>
+              <button type="button" aria-label="Increase quantity" disabled={picks.quantity >= 20} onClick={() => onQuantity(picks.quantity + 1)}><Icon icon={Plus} size="xs" /></button>
             </div>
           </div>
           {problem && <p className={styles.notice} style={{ marginTop: 12 }}>{problem}</p>}

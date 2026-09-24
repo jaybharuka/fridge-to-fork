@@ -34,7 +34,11 @@
 .linkBtn:active:not(:disabled) { opacity: .6; }
 
 .stepper { display: flex; align-items: center; gap: 2px; background: var(--swiggy-surface-2); border-radius: 10px; flex-shrink: 0; }
-.stepper button { width: 32px; height: 32px; background: none; border: none; color: #FC8019; font-size: 18px; font-weight: 700; cursor: pointer; transition: color .15s ease, transform .1s ease; }
+.stepper button {
+  width: 32px; height: 32px; background: none; border: none; color: #FC8019; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; /* centers the Minus/Plus icon (was a lone text glyph, which didn't need this) */
+  transition: color .15s ease, transform .1s ease;
+}
 .stepper button:disabled { color: var(--swiggy-text-3); cursor: not-allowed; }
 .stepper button:active:not(:disabled) { transform: scale(.82); }
 .stepper span { min-width: 20px; text-align: center; font-size: 14px; font-weight: 600; color: var(--swiggy-text); display: inline-block; animation: qtyPop .18s ease-out; }
