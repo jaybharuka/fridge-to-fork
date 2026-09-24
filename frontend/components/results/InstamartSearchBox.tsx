@@ -138,7 +138,7 @@ export function InstamartSearchBox({ addressId, addedSpinIds, takenLabels, onAdd
                 ) : (
                   <button
                     type="button"
-                    className={styles.couponBtn}
+                    className={`${styles.couponBtn} ${row.added ? styles.added : ''}`}
                     disabled={!row.canAdd}
                     onClick={() => onAdd(toCartResult(row))}
                     aria-label={`${row.added ? 'Added' : 'Add'} ${[option.name, option.size].filter(Boolean).join(' ')}`}

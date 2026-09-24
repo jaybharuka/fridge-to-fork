@@ -8,15 +8,16 @@
 
 .notice, .warn, .blocker, .adjust {
   font-size: 13px; line-height: 1.45; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px 0;
+  animation: bannerIn .25s ease-out;
 }
 .notice, .warn, .adjust { background: var(--orange-light); border: 1px solid var(--orange-border); color: var(--swiggy-text-2); }
 .blocker { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.35); color: #ff8f8f; }
 
 .list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
-.row { background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 16px; padding: 12px; }
+.row { background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 16px; padding: 12px; transition: border-color .2s ease, box-shadow .2s ease; }
 .rowHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .ingredient { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--swiggy-text-3); }
-.picked { display: flex; align-items: center; gap: 12px; }
+.picked { display: flex; align-items: center; gap: 12px; animation: rowSwap .18s ease-out; }
 .thumb { width: 56px; height: 56px; border-radius: 12px; background: #fff; object-fit: contain; flex-shrink: 0; }
 .thumbFallback { width: 56px; height: 56px; border-radius: 12px; background: var(--swiggy-surface-2); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
 .info { flex: 1; min-width: 0; }
@@ -24,26 +25,35 @@
 .meta { font-size: 12px; color: var(--swiggy-text-3); margin: 2px 0 0 0; }
 .price { font-size: 14px; font-weight: 700; color: var(--swiggy-text); margin: 4px 0 0 0; }
 .mrp { font-size: 12px; font-weight: 400; color: var(--swiggy-text-3); text-decoration: line-through; margin-left: 6px; }
-.skipped, .none { font-size: 13px; color: var(--swiggy-text-3); margin: 0; }
+.skipped, .none { font-size: 13px; color: var(--swiggy-text-3); margin: 0; animation: rowSwap .18s ease-out; }
+@keyframes rowSwap { from { opacity: 0; } to { opacity: 1; } }
 .actions { display: flex; gap: 16px; margin-top: 10px; }
-.linkBtn { background: none; border: none; padding: 4px 0; font-size: 13px; font-weight: 600; color: #FC8019; cursor: pointer; }
+.linkBtn { background: none; border: none; padding: 4px 0; font-size: 13px; font-weight: 600; color: #FC8019; cursor: pointer; transition: opacity .15s ease, color .15s ease; }
 .linkBtn:disabled { opacity: .5; cursor: not-allowed; }
 .linkBtn.muted { color: var(--swiggy-text-3); }
+.linkBtn:active:not(:disabled) { opacity: .6; }
 
 .stepper { display: flex; align-items: center; gap: 2px; background: var(--swiggy-surface-2); border-radius: 10px; flex-shrink: 0; }
-.stepper button { width: 32px; height: 32px; background: none; border: none; color: #FC8019; font-size: 18px; font-weight: 700; cursor: pointer; }
+.stepper button { width: 32px; height: 32px; background: none; border: none; color: #FC8019; font-size: 18px; font-weight: 700; cursor: pointer; transition: color .15s ease, transform .1s ease; }
 .stepper button:disabled { color: var(--swiggy-text-3); cursor: not-allowed; }
-.stepper span { min-width: 20px; text-align: center; font-size: 14px; font-weight: 600; color: var(--swiggy-text); }
+.stepper button:active:not(:disabled) { transform: scale(.82); }
+.stepper span { min-width: 20px; text-align: center; font-size: 14px; font-weight: 600; color: var(--swiggy-text); display: inline-block; animation: qtyPop .18s ease-out; }
 
-.options { list-style: none; margin: 10px 0 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.options { list-style: none; margin: 10px 0 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; animation: optionsExpand .18s ease-out; }
 .option {
   width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px;
   background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 12px; cursor: pointer; color: inherit;
+  transition: border-color .15s ease, background-color .15s ease, transform .1s ease;
 }
-.option.on { border-color: #FC8019; background: var(--orange-light); }
+.option.on { border-color: #FC8019; background: var(--orange-light); animation: optionPick .25s ease-out; }
 .option:disabled { opacity: .45; cursor: not-allowed; }
+.option:active:not(:disabled) { transform: scale(.98); }
 .option .thumb, .option .thumbFallback { width: 40px; height: 40px; border-radius: 8px; font-size: 16px; }
 .oos { font-size: 11px; color: #ff8f8f; font-weight: 600; }
+
+@keyframes optionsExpand { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes optionPick { 0% { transform: scale(.97); } 55% { transform: scale(1.015); } 100% { transform: scale(1); } }
+@keyframes qtyPop { 0% { transform: scale(.7); opacity: .4; } 100% { transform: scale(1); opacity: 1; } }
 
 .sectionLabel { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--swiggy-text-3); margin: 16px 0 12px 0; }
 
@@ -103,9 +113,21 @@
 .couponTitle { font-size: 14px; font-weight: 600; color: var(--swiggy-text); margin: 0; }
 .couponCode { margin-left: 6px; padding: 1px 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #FC8019; border: 1px dashed rgba(252,128,25,0.6); border-radius: 6px; }
 .couponWhy { font-size: 12px; color: #ff8f8f; margin: 4px 0 0 0; }
-.couponBtn { flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #FC8019; background: transparent; border: 1px solid #FC8019; border-radius: 10px; cursor: pointer; }
+.couponBtn {
+  flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #FC8019; background: transparent;
+  border: 1px solid #FC8019; border-radius: 10px; cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background-color .15s ease, transform .1s ease;
+}
 .couponBtn:disabled { color: var(--swiggy-text-3); border-color: var(--swiggy-border); cursor: not-allowed; }
-.couponApplied { font-size: 13px; line-height: 1.45; color: #2ECC71; background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px 0; }
+.couponBtn:active:not(:disabled) { transform: scale(.94); }
+/* "+ Add" -> "✓ Added" (InstamartSearchBox) and coupon "Apply" -> "Applied" (CouponSection) both land here: a
+   quick celebratory pop + fill so the confirmation actually reads as a state change, not a silent label swap. */
+.couponBtn.added, .couponBtn.applied { background: #FC8019; color: #fff; animation: confirmPop .3s ease-out; }
+.couponBtn.busy { animation: busyPulse 1s ease-in-out infinite; }
+@keyframes confirmPop { 0% { transform: scale(1); } 45% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes busyPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.couponApplied { font-size: 13px; line-height: 1.45; color: #2ECC71; background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px 0; animation: bannerIn .25s ease-out; }
+@keyframes bannerIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .terms { margin-top: 6px; font-size: 12px; color: var(--swiggy-text-2); }
 .terms summary { cursor: pointer; }
 .terms ul { margin: 6px 0 0 16px; padding: 0; }
@@ -192,4 +214,14 @@ select.input { appearance: auto; }
 .searchCards { list-style: none; margin: 10px 0 8px 0; padding-left: 0; padding-right: 0; }
 .searchCardOff { opacity: .5; }
 .searchSkelCard { width: 132px; height: 212px; flex-shrink: 0; border-radius: 14px; background: linear-gradient(90deg, var(--swiggy-surface-2), var(--swiggy-border), var(--swiggy-surface-2)); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .searchSkelCard { animation: none; } }
+
+/* Phase 4 (2026-09): motion pass on the checkout sheets — bringing state changes (add-to-cart, option pick, coupon
+   apply, quantity step) up to the loading screen's polish level. All of it collapses under reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .searchSkelCard, .skeleton { animation: none; }
+  .options, .option.on, .stepper span, .picked, .skipped, .none,
+  .couponBtn.added, .couponBtn.applied, .couponBtn.busy, .couponApplied,
+  .notice, .warn, .blocker, .adjust {
+    animation: none;
+  }
+}
