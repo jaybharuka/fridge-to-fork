@@ -151,7 +151,7 @@ All network calls and LLM calls in the test suite are mocked, so no API key is r
 |---|---|---|
 | `GOOGLE_API_KEY` | Yes | Google Gemini API key from AI Studio |
 | `GEMINI_TEXT_MODEL` | Optional | Primary model for meal planning (default `gemini-2.5-flash`) |
-| `GEMINI_VISION_MODEL` | Optional | Primary model for fridge vision (default `gemini-2.5-flash`) |
+| `GEMINI_VISION_MODEL` | Optional | Primary model for fridge vision (default `gemini-2.5-flash`; falls back through `gemini-flash-latest` → `gemini-2.5-flash-lite` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `VISION_MODEL_FALLBACK_CHAIN`) |
 | `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default `https://mcp.swiggy.com/food`) |
 | `SWIGGY_INSTAMART_MCP_URL` | Optional | Swiggy Instamart MCP endpoint (default `https://mcp.swiggy.com/im`) |
 | `SWIGGY_DINEOUT_MCP_URL` | Optional | Swiggy Dineout MCP endpoint (default `https://mcp.swiggy.com/dineout`) |

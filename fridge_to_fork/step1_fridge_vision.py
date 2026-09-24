@@ -51,12 +51,36 @@ def _dedupe(models: list[str | None]) -> list[str]:
 # Models tried in order until one succeeds. Each Gemini model has its own
 # separate free-tier daily quota, so exhausting one doesn't mean they're
 # all exhausted.
+#
+# Vision-accuracy audit (2026-09): the previous chain's first entry
+# (gemini-2.0-flash) and fourth entry (gemini-2.0-flash-lite) both return a
+# hard 404 "no longer available" from the live API — confirmed by actually
+# calling client.models.list(), not assumed from docs, since model
+# availability has drifted out from under this chain silently before.
+# identify_ingredients() was quietly running on the third entry for every
+# scan with nobody noticing, since the fallback machinery's own resilience
+# hid the failure. Mixed pinned-version and "-latest" alias entries on
+# purpose: pinned entries (gemini-2.5-flash/-lite) are predictable; the
+# "-latest" aliases auto-repoint to whatever Google currently considers
+# current, so a future retirement degrades gracefully instead of 404ing
+# outright the way a pinned name does. Ordered strongest-and-fast first
+# (matches GEMINI_TEXT_MODEL's already-correct default, and is what most
+# scans should actually run on), fast/light fallbacks next, and the
+# slower-but-strongest pro-tier model last — worth the extra latency only
+# once four faster attempts have already failed and something is better
+# than an empty fridge. gemini-2.5-pro itself turned out to be a second,
+# subtler version of the same drift problem this audit exists to catch:
+# client.models.list() lists it as existing, but calling it with this
+# project's actual API key 404s with "no longer available to new users" —
+# listed existence isn't the same as this key having access. Verified
+# gemini-3.1-pro-preview (Google's own suggested replacement) is reachable
+# with this key (a 429 rate-limit, not a 404) before using it here.
 VISION_MODEL_FALLBACK_CHAIN = _dedupe([
-    os.environ.get("GEMINI_VISION_MODEL", "gemini-2.0-flash"),
-    "gemini-2.5-flash-lite",
+    os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash"),
     "gemini-flash-latest",
-    "gemini-2.0-flash-lite",
+    "gemini-2.5-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-3.1-pro-preview",
 ])
 
 
@@ -725,11 +749,31 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
     throughout this file) rather than hand-building a base64 inline_data
     payload — the google-genai SDK's generate_content() expects Part
     objects, not raw REST-style dicts.
+
+    http_options below caps what one model attempt can cost in time. Left
+    at its default, the SDK retries a single call up to 5 times internally
+    on 429/5xx (1s/2s/4s/8s/16s backoff, up to 60s max delay per the SDK's
+    own defaults) before ever raising — invisible to
+    _call_gemini_vision_with_fallback() below, which just sees one very
+    slow exception and only then moves to the next model. That's exactly
+    what turned two unlucky 503s into 72s for a single photo during the
+    accuracy-audit eval run. This app's own fallback chain is already the
+    resilience layer across models (each with a separate quota pool), so
+    retrying much within a single model attempt is redundant — better to
+    fail one model fast and let the chain move on, which is also just
+    more time actually spent making progress within the 60s whole-scan
+    budget app.py enforces.
     """
     response = client.models.generate_content(
         model=model,
         contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), prompt],
-        config=types.GenerateContentConfig(max_output_tokens=2048),
+        config=types.GenerateContentConfig(
+            max_output_tokens=2048,
+            http_options=types.HttpOptions(
+                timeout=15_000,  # ms — one hung request can't quietly eat the whole scan budget
+                retry_options=types.HttpRetryOptions(attempts=2, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
+            ),
+        ),
     )
 
     raw_text = response.text.strip()
