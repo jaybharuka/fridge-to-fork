@@ -4,10 +4,13 @@
 // linked from nav. A living reference while later phases adopt these into real screens; safe to delete once that's
 // done, or to keep as an ongoing style guide.
 import { useState } from 'react';
-import { Package } from 'lucide-react';
+import { Package, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Icon, type IconSize } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
+
+const ICON_SIZES: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 
 export default function DesignSystemPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -15,6 +18,20 @@ export default function DesignSystemPage() {
 
   return (
     <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 32, maxWidth: 480, margin: '0 auto' }}>
+      <section>
+        <h2 style={{ marginBottom: 12 }}>Icons</h2>
+        {/* data-icon-size on each swatch is a hook for the browser check to read getComputedStyle width/height
+            precisely per size, rather than eyeballing it — see the icon audit's sizing-bug finding. */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20 }}>
+          {ICON_SIZES.map(size => (
+            <div key={size} data-icon-size={size} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <Icon icon={ShoppingCart} size={size} aria-label={`${size} icon`} />
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{size}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section>
         <h2 style={{ marginBottom: 12 }}>Buttons</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

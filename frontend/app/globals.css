@@ -30,6 +30,15 @@
      in the rest of the scale found in use. */
   --radius-xs: 6px; --radius-lg: 20px; --radius-xl: 24px;
 
+  /* Icon scale (icon audit, 2026-09). Not consumed by CSS alone — components/ui/Icon.tsx reads these via inline
+     style, which is the one thing with enough specificity to reliably beat the global `svg.lucide { width:1em }`
+     rule below (verified: a single-class rule like `.statusIcon { width:28px }` loses to `svg.lucide` regardless
+     of source order, since tag+class beats class-only; lucide's own `size` prop loses too, since it renders as a
+     plain HTML attribute that any matching CSS rule overrides). --icon-sm (16px) is already the app's de facto
+     default — most existing "sized via CSS class" icons happened to inherit 16px already; this doesn't move that,
+     it just makes it deliberate and makes every other size actually take effect for the first time. */
+  --icon-xs: 14px; --icon-sm: 16px; --icon-md: 20px; --icon-lg: 28px; --icon-xl: 44px;
+
   /* Elevation: replaces the ~17 bespoke box-shadow values found with 4 levels. Alpha is deliberately higher in dark
      mode (redeclared below) — a shadow this faint is invisible against a dark surface. */
   --shadow-1: 0 2px 8px rgba(0,0,0,0.06);   /* resting card */
