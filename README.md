@@ -39,7 +39,7 @@ There is no separate pantry/inventory tab or database — that entire feature wa
 ## 3. The pipeline: Vision → Meal Planner → Swiggy ADK Agent
 
 **Step 1, Vision (`fridge_to_fork/step1_fridge_vision.py`)** — optional.
-Sends the fridge photo to Gemini with a strict JSON prompt and gets back a list of ingredients, each with a rough quantity and a 0–1 confidence score, plus a one-paragraph description of the fridge. Tries a chain of models (`gemini-2.5-flash` down through `gemini-2.0-flash-lite`) so one model's exhausted quota doesn't stop the request, and falls back to a small hardcoded ingredient list if every model fails. If you don't take a photo, this step is skipped entirely and the ingredient list is just empty.
+Sends the fridge photo to Gemini with a strict JSON prompt and gets back a list of ingredients, each with a rough quantity and a 0–1 confidence score, plus a one-paragraph description of the fridge. Tries a chain of models (`gemini-2.5-flash` down through `gemini-3.1-pro-preview` — see `VISION_MODEL_FALLBACK_CHAIN`) so one model's exhausted quota doesn't stop the request, and falls back to a small hardcoded ingredient list if every model fails. If you don't take a photo, this step is skipped entirely and the ingredient list is just empty.
 
 **Step 2, Meal Planner (`fridge_to_fork/step2_meal_planner.py`)**
 Given a target dish (and optionally what the fridge scan found, used only for inspiration), Gemini returns a complete recipe: description, cuisine, prep time, a fully-quantified ingredient list scaled to the requested servings, a numbered cooking method, and a price estimate per ingredient. Gemini is **not** asked to decide what you already have — that classification is done deterministically in Python afterwards:
@@ -141,7 +141,7 @@ All network calls and LLM calls in the test suite are mocked, so no API key is r
 | Variable | Required | Description |
 |---|---|---|
 | `GOOGLE_API_KEY` | Yes | Google Gemini API key from AI Studio |
-| `GEMINI_TEXT_MODEL` | Optional | Primary model for meal planning (default `gemini-2.5-flash`) |
+| `GEMINI_TEXT_MODEL` | Optional | Primary model for meal planning (default `gemini-2.5-flash`; falls back through `gemini-2.5-flash-lite` → `gemini-flash-latest` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `TEXT_MODEL_FALLBACK_CHAIN`) |
 | `GEMINI_VISION_MODEL` | Optional | Primary model for fridge vision (default `gemini-2.5-flash`; falls back through `gemini-flash-latest` → `gemini-2.5-flash-lite` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `VISION_MODEL_FALLBACK_CHAIN`) |
 | `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default `https://mcp.swiggy.com/food`) |
 | `SWIGGY_INSTAMART_MCP_URL` | Optional | Swiggy Instamart MCP endpoint (default `https://mcp.swiggy.com/im`) |
