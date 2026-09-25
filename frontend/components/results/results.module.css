@@ -13,9 +13,9 @@
   max-width: 480px; margin: 0 auto; height: 100%; padding: 0 16px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
-.brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; font-size: 16px; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; font-size: 16px; white-space: nowrap; flex-shrink: 0; min-width: 0; }
 .brandLogo { width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; }
-.headerActions { display: flex; align-items: center; gap: 8px; }
+.headerActions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .connectedChip {
   display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; flex-shrink: 0;
   font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--green); background: var(--green-dim);
@@ -30,6 +30,24 @@
 .themeToggle svg { width: 16px; height: 16px; transition: opacity .2s ease, transform .2s ease; }
 .themeToggle:hover { color: var(--text-primary); background: var(--border); }
 .themeToggle.spinning { transform: rotate(180deg); }
+
+/* Header overflow — up to 4 right-side elements (Connected chip, Instamart
+   orders, Food orders, theme toggle) plus the brand lockup routinely add up
+   to more than a narrow phone's viewport (this already overflows at common
+   ~390px widths once Food ordering + a connected account bring all 4
+   headerActions elements in at once, not just at extreme 320px widths).
+   Collapse the brand wordmark and the chip's "Connected" label first (the
+   icons/logo alone plus aria-label/title keep them accessible and legible)
+   before shrinking the tap targets themselves, so real content is never
+   silently pushed off-screen. */
+@media (max-width: 430px) {
+  .brandText { display: none; }
+  .connectedChipText { display: none; }
+  .connectedChip { padding: 0 8px; gap: 0; }
+  .themeToggle { width: 36px; height: 36px; }
+  .appHeaderInner { gap: 6px; }
+  .headerActions { gap: 6px; }
+}
 
 /* Sticky at-a-glance summary bar — templates/index.html:1003-1035 */
 .resultStickyHeader { position: sticky; top: 56px; z-index: 200; }
