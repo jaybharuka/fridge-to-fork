@@ -27,14 +27,14 @@ export function AppHeader() {
   return (
     <header className={styles.appHeader}>
       <div className={styles.appHeaderInner}>
-        <div className={styles.brand}>
+        <div className={styles.brand} aria-label="Fridge to Fork">
           <img src="/logo-mark.png" alt="" className={styles.brandLogo} width={20} height={20} />
-          <span>Fridge to Fork</span>
+          <span className={styles.brandText}>Fridge to Fork</span>
         </div>
         <div className={styles.headerActions}>
           {status === 'connected' && (
             <span className={styles.connectedChip} role="status" aria-label="Swiggy account connected" title="Swiggy account connected">
-              <Check aria-hidden /> Connected
+              <Check aria-hidden /> <span className={styles.connectedChipText}>Connected</span>
             </span>
           )}
           {status === 'connected' && (
