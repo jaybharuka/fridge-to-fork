@@ -39,6 +39,12 @@
   font-size: var(--text-lg); font-family: inherit; font-weight: var(--weight-medium);
   border: none; background: transparent; color: var(--text-primary); outline: none;
 }
+/* The field's own border shows focus (:focus-within above); without this,
+   the global input:focus-visible rule (app/globals.css) still wins on
+   keyboard focus despite .dishInput's plain outline:none, since
+   `input:focus-visible` (0,1,1) beats a single class (0,1,0) on
+   specificity — same fix already applied to Instamart's .searchInput. */
+.dishInput:focus-visible { outline: none; }
 .dishInput::placeholder { color: var(--text-muted); }
 .dishInputClear {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
