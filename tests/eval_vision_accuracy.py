@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from fridge_to_fork.models import Ingredient
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import _fuzzy_ingredient_match
 
@@ -51,6 +52,24 @@ class PhotoResult:
     distractor_hits: list[str] = field(default_factory=list)
     unmatched_extra: list[str] = field(default_factory=list)
     seconds: float = 0.0
+    # Phase B (tiering) — populated by run_eval() from the real Ingredient
+    # objects identify_ingredients() returns; left at their defaults (empty)
+    # for any caller (e.g. eval_vision_accuracy_groq.py) whose detector
+    # doesn't produce tiered results, so print_scorecard() below degrades
+    # gracefully rather than requiring every caller to supply this.
+    tier_counts: dict[str, int] = field(default_factory=dict)
+    # Certain (unambiguous-to-a-human) ground-truth items that WERE
+    # correctly detected but came back tier="uncertain" — the regression
+    # signal that matters most here: the fast, no-confirmation demo path
+    # (plan §7) only works if genuinely obvious items don't get gated by
+    # tiering. A photo with entries here means the tiering prompt/rules are
+    # being over-cautious on cases a human wouldn't hesitate on.
+    over_cautious_certain: list[str] = field(default_factory=list)
+    # needs_confirmation items with their possible_matches, for manual
+    # eyeballing of whether the anti-fabrication behavior looks sane (this
+    # harness can't automatically verify "did it avoid inventing a brand
+    # name" — that still needs a human looking at the photo).
+    uncertain_detail: list[dict] = field(default_factory=list)
 
 
 def _score_photo(file: str, detected_names: list[str], gt: dict) -> PhotoResult:
@@ -82,6 +101,29 @@ def _score_photo(file: str, detected_names: list[str], gt: dict) -> PhotoResult:
     return r
 
 
+def _apply_tier_report(result: PhotoResult, ingredients: list[Ingredient], gt: dict) -> None:
+    """Fills in result's tier fields from the real Ingredient objects
+    (which carry .tier/.needs_confirmation/.possible_matches — _score_photo
+    above only ever sees bare name strings, by design, so this is separate
+    rather than folded into it). Uses its own small bidirectional fuzzy
+    match against gt["certain"] — same matcher, independent pass, so a
+    change here can't accidentally affect the recall/precision scoring
+    _score_photo already does."""
+    for ing in ingredients:
+        result.tier_counts[ing.tier] = result.tier_counts.get(ing.tier, 0) + 1
+        if ing.needs_confirmation:
+            result.uncertain_detail.append({"name": ing.name, "possible_matches": ing.possible_matches})
+
+    for certain_name in gt["certain"]:
+        match = next(
+            (ing for ing in ingredients
+             if _fuzzy_ingredient_match(certain_name, [ing.name]) or _fuzzy_ingredient_match(ing.name, [certain_name])),
+            None,
+        )
+        if match is not None and match.tier == "uncertain":
+            result.over_cautious_certain.append(certain_name)
+
+
 def run_eval(model: str | None = None) -> list[PhotoResult]:
     ground_truth = json.loads(GROUND_TRUTH_PATH.read_text())
     results = []
@@ -100,6 +142,7 @@ def run_eval(model: str | None = None) -> list[PhotoResult]:
         detected = [i.name for i in fridge.ingredients]
         result = _score_photo(entry["file"], detected, entry)
         result.seconds = elapsed
+        _apply_tier_report(result, fridge.ingredients, entry)
         results.append(result)
 
         print(f"  {elapsed:.1f}s — detected: {detected}")
@@ -109,6 +152,12 @@ def run_eval(model: str | None = None) -> list[PhotoResult]:
             print(f"  [!] hallucinated distractor(s): {result.distractor_hits}")
         if result.unmatched_extra:
             print(f"  unmatched/extra (review — could be real or a hallucination): {result.unmatched_extra}")
+        if result.tier_counts:
+            print(f"  tiers: {result.tier_counts}")
+        if result.over_cautious_certain:
+            print(f"  [!] over-cautious: certain items gated as uncertain: {result.over_cautious_certain}")
+        if result.uncertain_detail:
+            print(f"  needs_confirmation items: {result.uncertain_detail}")
         print()
 
     return results
@@ -144,6 +193,37 @@ def print_scorecard(results: list[PhotoResult], model_label: str) -> None:
     for r in results:
         if r.missed_certain:
             print(f"  {r.file}: {r.missed_certain}")
+
+    # Tier section — only prints when there's real tier data (a caller
+    # without tiered results, e.g. eval_vision_accuracy_groq.py, leaves
+    # every PhotoResult's tier fields at their empty defaults, so this
+    # degrades to printing nothing rather than a wall of zeros).
+    combined_tier_counts: dict[str, int] = {}
+    for r in results:
+        for tier, count in r.tier_counts.items():
+            combined_tier_counts[tier] = combined_tier_counts.get(tier, 0) + count
+    total_over_cautious = sum(len(r.over_cautious_certain) for r in results)
+
+    if combined_tier_counts:
+        print()
+        print("-" * 70)
+        print("TIER REPORT (Phase B)")
+        print("-" * 70)
+        print(f"Tier distribution across all detections: {combined_tier_counts}")
+        print(f"Over-cautious (certain items correctly found but gated as uncertain): {total_over_cautious}")
+        if total_over_cautious:
+            print("  [!] regression risk for the fast/no-confirmation demo path (plan §7) — review:")
+            for r in results:
+                if r.over_cautious_certain:
+                    print(f"    {r.file}: {r.over_cautious_certain}")
+        print("needs_confirmation items this run (eyeball for real fabrication risk, not auto-scored):")
+        any_uncertain = False
+        for r in results:
+            if r.uncertain_detail:
+                any_uncertain = True
+                print(f"  {r.file}: {r.uncertain_detail}")
+        if not any_uncertain:
+            print("  (none)")
 
 
 def _parse_args() -> argparse.Namespace:

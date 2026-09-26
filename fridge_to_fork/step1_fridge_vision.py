@@ -181,6 +181,36 @@ If truly nothing is identifiable, return: []
 # identify_ingredients(); superseded by these two.
 # ---------------------------------------------------------------------------
 
+# Shared across both passes — vision-accuracy overhaul, Phase B. Kept as one
+# constant, not copy-pasted into each prompt, so the schema can't silently
+# drift between wide/deep scans the way VISION_MODEL_FALLBACK_CHAIN and
+# GEMINI_VISION_MODEL drifted out of sync before the audit caught it.
+#
+# The "NEVER FABRICATE" rule directly targets the failure mode the overhaul
+# was scoped around: a model reporting "Tata Sampann Moong Dal 500g" at high
+# confidence off an unreadable label isn't detection, it's a guess dressed
+# up as one. needs_confirmation is the model's own admission it's guessing;
+# _assign_tier() below backstops it for a response that gets the confidence
+# number right but forgets to set the flag (or vice versa) — see its
+# docstring for why the number and the flag are each other's check, not
+# either one used alone.
+_EXTENDED_FIELDS_BLOCK = """EXTENDED FIELDS — include these on every item too:
+- "category": one of "produce", "dairy", "grain_legume", "condiment_sauce", "cooked_food", "packaged_other"
+- "estimated_quantity": for discrete/countable items, {"type": "count", "value": <integer>, "unit": "<piece/packet/carton/etc>"};
+  for liquids, bulk, or anything in an opaque container, {"type": "level", "value": "<full/half/low/unknown>", "unit": null}.
+  Always approximate — never invent a precise weight or volume (never "247g", never "1.5L") you could not actually measure from a photo.
+- "state": one of "fresh", "packaged", "cooked", "opened", "unknown"
+- "needs_confirmation": true if you cannot confidently identify the EXACT product/variety, false otherwise
+- "possible_matches": if needs_confirmation is true and a small number of specific identities are plausible, list 2-3 (e.g. ["moong dal", "toor dal", "masoor dal"]); otherwise []
+
+CRITICAL — NEVER FABRICATE WHAT YOU CANNOT READ:
+If a packaged item's brand or exact product/variety is not clearly legible, report ONLY the generic category term
+you CAN actually see (e.g. "dal", not "Tata Sampann Moong Dal 500g"; "cooking oil", not a specific brand or variety),
+set needs_confirmation: true, and list possible_matches if a few specific candidates are plausible. Guessing a
+specific brand, variety, or size you cannot actually read is worse than reporting the generic term — never do it,
+even if a specific-sounding guess would otherwise score higher on your own confidence scale."""
+
+
 def _build_wide_scan_prompt(dish_name: str = "") -> str:
     """Pass 1 — broad, zone-by-zone scan for everything visible, primed
     with Indian-fridge-specific context (dabbas, plastic-bagged produce,
@@ -239,11 +269,12 @@ NAMING RULES:
 - Indian food items by their common English name: "curd" not "yogurt" if it looks like Indian curd
 - Never brand names, never Hindi names
 
+{_EXTENDED_FIELDS_BLOCK}
+
 Return ONLY a JSON array, no explanation:
 [
-  {{"name": "tomato", "confidence": 88}},
-  {{"name": "green chilli", "confidence": 82}},
-  {{"name": "curd", "confidence": 90}}
+  {{"name": "tomato", "confidence": 88, "category": "produce", "estimated_quantity": {{"type": "count", "value": 3, "unit": "piece"}}, "state": "fresh", "needs_confirmation": false, "possible_matches": []}},
+  {{"name": "dal", "confidence": 60, "category": "grain_legume", "estimated_quantity": {{"type": "count", "value": 1, "unit": "packet"}}, "state": "packaged", "needs_confirmation": true, "possible_matches": ["moong dal", "toor dal", "masoor dal"]}}
 ]
 
 If nothing identifiable: []"""
@@ -285,8 +316,11 @@ Indian fridge items commonly missed in first pass:
 - Juice cartons or milk pouches on door
 
 Same confidence scoring as before. Same naming rules.
+
+{_EXTENDED_FIELDS_BLOCK}
+
 Return ONLY a JSON array of NEW items:
-[{{"name": "lemon", "confidence": 78}}]
+[{{"name": "lemon", "confidence": 78, "category": "produce", "estimated_quantity": {{"type": "count", "value": 2, "unit": "piece"}}, "state": "fresh", "needs_confirmation": false, "possible_matches": []}}]
 
 If nothing new found: []"""
 
@@ -413,6 +447,53 @@ def _deduplicate_items(items: list[dict]) -> list[dict]:
             kept.append(item)
 
     return kept
+
+
+# ---------------------------------------------------------------------------
+# Confidence -> tier — vision-accuracy overhaul, Phase B. Application-side
+# rules layered over Gemini's own raw confidence number AND its own
+# self-reported needs_confirmation flag — neither trusted alone (the whole
+# point of tiering: a model that's told to self-police "am I sure enough to
+# skip confirmation" is exactly the kind of self-report that proved
+# unreliable for have/missing status in step2_meal_planner.py, hence that
+# staying deterministic Python-side too). CONFIRMED items are the ones the
+# frontend can auto-advance past without a review step; PROBABLE/UNCERTAIN
+# gate it. See _build_wide_scan_prompt's "NEVER FABRICATE" instruction for
+# what needs_confirmation is meant to catch at the source; this is the
+# backstop for a response that gets the number right but forgets to set the
+# flag, or vice versa.
+# ---------------------------------------------------------------------------
+
+TIER_CONFIRMED = "confirmed"
+TIER_PROBABLE = "probable"
+TIER_UNCERTAIN = "uncertain"
+
+CONFIRMED_CONFIDENCE_FLOOR = 80
+PROBABLE_CONFIDENCE_FLOOR = 60
+
+
+def _assign_tier(item: dict) -> str:
+    """Assumes `item` already cleared the existing >=50 confidence filter
+    upstream (identify_ingredients()) — this only decides which of the
+    three tiers a surviving item lands in, never whether to drop it."""
+    if item.get("needs_confirmation") is True:
+        return TIER_UNCERTAIN
+
+    confidence = item.get("confidence", 0)
+
+    # Backstop for a packaged item Gemini scored confidently but didn't
+    # flag: state=="packaged" plus a non-empty possible_matches is the same
+    # "I'm not sure of the exact product" signal needs_confirmation is
+    # meant to carry, just via a different field the model filled in
+    # instead. Treat it the same way rather than trusting the bare number.
+    if item.get("state") == "packaged" and item.get("possible_matches"):
+        return TIER_UNCERTAIN
+
+    if confidence >= CONFIRMED_CONFIDENCE_FLOOR:
+        return TIER_CONFIRMED
+    if confidence >= PROBABLE_CONFIDENCE_FLOOR:
+        return TIER_PROBABLE
+    return TIER_UNCERTAIN
 
 
 def _preprocess_for_gemini(image_bytes: bytes) -> bytes:
@@ -875,7 +956,11 @@ def identify_ingredients(
         console.print(f"[yellow][WARNING] Could not init Gemini client: {type(e).__name__}: {e}[/yellow]")
         return _fallback_fridge_contents()
 
-    all_items: dict[str, int] = {}  # name -> highest confidence across all photos/passes
+    # name -> the winning full item dict (highest confidence across all
+    # photos/passes) — keeps the extended schema fields (category, state,
+    # estimated_quantity, needs_confirmation, possible_matches) alongside
+    # confidence, not just the bare number the old dict[str, int] held.
+    all_items: dict[str, dict] = {}
 
     for source in sources:
         try:
@@ -892,8 +977,8 @@ def identify_ingredients(
             if not name:
                 continue
             confidence = item.get("confidence", 0)
-            if name not in all_items or confidence > all_items[name]:
-                all_items[name] = confidence
+            if name not in all_items or confidence > all_items[name].get("confidence", 0):
+                all_items[name] = item
 
         # Pass 2 sees what THIS photo's Pass 1 found so far, not items
         # found in a previous photo in a multi-photo scan — it's hunting
@@ -905,22 +990,34 @@ def identify_ingredients(
             name = item.get("name", "").lower().strip()
             if not name or name in all_items:
                 continue
-            all_items[name] = item.get("confidence", 0)
+            all_items[name] = item
 
     if not all_items:
         console.print("[yellow][WARNING] Gemini found nothing across both passes[/yellow]")
         return FridgeContents(ingredients=[])
 
-    items = [{"name": name, "confidence": confidence} for name, confidence in all_items.items()]
+    # Re-key each dict's own "name" onto the (already lowercased/stripped)
+    # merge key — _deduplicate_items() and _is_blacklisted() below both
+    # read item["name"], and the extended fields ride along unchanged.
+    items = [{**item, "name": name} for name, item in all_items.items()]
     items = [item for item in items if not _is_blacklisted(item["name"])]
-    items = [item for item in items if item["confidence"] >= 50]
+    items = [item for item in items if item.get("confidence", 0) >= 50]
     items = _deduplicate_items(items)
-    items = sorted(items, key=lambda x: x["confidence"], reverse=True)
+    items = sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
 
     console.print(f"[green][OK] Vision succeeded: {len(items)} item(s) after filtering[/green]")
 
     ingredients = [
-        Ingredient(name=item["name"], confidence=item["confidence"] / 100.0)
+        Ingredient(
+            name=item["name"],
+            confidence=item.get("confidence", 0) / 100.0,
+            category=item.get("category"),
+            estimated_quantity=item.get("estimated_quantity"),
+            state=item.get("state"),
+            tier=_assign_tier(item),
+            needs_confirmation=bool(item.get("needs_confirmation")),
+            possible_matches=[m for m in (item.get("possible_matches") or []) if isinstance(m, str)],
+        )
         for item in items
     ]
 
