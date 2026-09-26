@@ -239,7 +239,7 @@ export default function Home() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader onLogoClick={handleResetToLanding} />
 
       <main id="main-content">
       {!connected ? (
