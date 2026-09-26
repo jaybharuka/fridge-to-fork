@@ -16,6 +16,17 @@ class Ingredient:
     name: str
     quantity: Optional[str] = None   # e.g. "2", "half block", "plenty"
     confidence: float = 1.0          # 0–1 from vision model
+    # Vision-accuracy overhaul, Phase B (step1_fridge_vision.py's extended
+    # scan schema) — all optional/defaulted so every existing construction
+    # site (the fallback inventory, tests, step2's synthetic FridgeContents)
+    # stays valid unchanged; only identify_ingredients() actually populates
+    # these today.
+    category: Optional[str] = None          # "produce" | "dairy" | "grain_legume" | "condiment_sauce" | "cooked_food" | "packaged_other"
+    estimated_quantity: Optional[dict] = None  # {"type": "count", "value": int, "unit": str} or {"type": "level", "value": str, "unit": None} — always approximate, see step1_fridge_vision.py's prompt
+    state: Optional[str] = None             # "fresh" | "packaged" | "cooked" | "opened" | "unknown"
+    tier: str = "confirmed"                 # "confirmed" | "probable" | "uncertain" — see step1_fridge_vision._assign_tier(); defaults to "confirmed" so anything constructed without vision data (fallback inventory, tests) doesn't spuriously need review
+    needs_confirmation: bool = False        # the model's own admission it's guessing at an exact product/variety — see step1_fridge_vision.py's "NEVER FABRICATE" prompt rule
+    possible_matches: list[str] = field(default_factory=list)  # candidate identities when needs_confirmation is true
 
 
 @dataclass
