@@ -48,6 +48,7 @@ from fridge_to_fork.features import FOOD_MOVED_MESSAGE
 from fridge_to_fork.food_routes import make_router as make_food_router
 from fridge_to_fork.instamart_routes import make_router as make_instamart_router
 from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
+from fridge_to_fork.scan_routes import make_router as make_scan_router
 
 app = FastAPI(title="Fridge to Fork", version="0.1.0")
 
@@ -918,6 +919,15 @@ async def scan_vision_only(file: UploadFile = File(...)):
 
 app.include_router(make_instamart_router(_access_token))
 app.include_router(make_food_router(_access_token))
+
+# ---------------------------------------------------------------------------
+# Fridge-scan persistence — vision-accuracy overhaul, Phase C
+# (fridge_to_fork/db.py, fridge_to_fork/scan_routes.py). New endpoints only
+# — the /api/scan handler above is unchanged and doesn't call any of this;
+# nothing in the current frontend calls these routes yet either.
+# ---------------------------------------------------------------------------
+
+app.include_router(make_scan_router())
 
 
 # ---------------------------------------------------------------------------

@@ -145,6 +145,48 @@ async def list_items(conn: aiosqlite.Connection, scan_id: int, *, include_remove
     return items
 
 
+# Columns a caller (Phase C's PATCH route) may edit on an existing item —
+# an explicit allowlist, not "whatever keys the request body happened to
+# have," so a request can never touch id/scan_id/canonical_id/tier/
+# confidence/needs_confirmation/possible_matches through this path (those
+# are vision-assigned or system-assigned, not user-editable fields).
+EDITABLE_ITEM_FIELDS = {"name", "category", "quantity_type", "quantity_value", "quantity_unit", "state", "removed"}
+
+
+async def get_item(conn: aiosqlite.Connection, item_id: int) -> Optional[dict]:
+    cursor = await conn.execute("SELECT * FROM fridge_items WHERE id = ?", (item_id,))
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["possible_matches"] = json.loads(item["possible_matches"] or "[]")
+    return item
+
+
+async def update_item(conn: aiosqlite.Connection, item_id: int, **fields: Any) -> Optional[dict]:
+    """Returns the updated item, or None if item_id doesn't exist. Raises
+    ValueError for any field not in EDITABLE_ITEM_FIELDS — fails fast on a
+    caller mistake rather than silently ignoring it (or worse, silently
+    accepting it if the allowlist is ever loosened carelessly later)."""
+    unknown = set(fields) - EDITABLE_ITEM_FIELDS
+    if unknown:
+        raise ValueError(f"not editable: {unknown}")
+    if not fields:
+        return await get_item(conn, item_id)
+    assignments = ", ".join(f"{col} = ?" for col in fields)
+    await conn.execute(
+        f"UPDATE fridge_items SET {assignments} WHERE id = ?", [*fields.values(), item_id]
+    )
+    await conn.commit()
+    return await get_item(conn, item_id)
+
+
+async def confirm_scan(conn: aiosqlite.Connection, scan_id: int) -> Optional[dict]:
+    await conn.execute("UPDATE fridge_scans SET status = 'confirmed' WHERE id = ?", (scan_id,))
+    await conn.commit()
+    return await get_scan(conn, scan_id)
+
+
 async def upsert_canonical_ingredient(
     conn: aiosqlite.Connection, canonical_name: str, aliases: list[str], category: str
 ) -> int:
