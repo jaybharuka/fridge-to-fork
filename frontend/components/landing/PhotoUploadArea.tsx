@@ -30,11 +30,19 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
 
   return (
     <div className={styles.photoUploadArea}>
+      {/* No `capture` attribute, deliberately: on iOS Safari and Android
+          Chrome its mere presence (regardless of value) skips the native
+          file/photo picker and launches the camera app directly, with no
+          way back to the gallery — a well-documented mobile-web gotcha.
+          accept="image/*" alone still lets the OS offer its own camera
+          option inside that picker (e.g. iOS's "Take Photo or Video"),
+          it's just no longer the only option. Desktop is unaffected either
+          way — `capture` has no meaning there; it already just opens the
+          OS file picker. */}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         style={{ display: 'none' }}
         onChange={e => handleFiles(e.target.files)}
