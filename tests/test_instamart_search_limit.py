@@ -11,11 +11,14 @@ from fridge_to_fork import instamart
 from tests.test_instamart import ADDRESSES, FakeSession, InstamartCase, envelope, signed_bearer, using
 
 
-def product(n: int, sizes: int = 2, in_stock: bool = True) -> dict:
+def product(n: int, sizes: int = 2, in_stock: bool = True, name: str = "Butter") -> dict:
+    # `name` defaults to matching search()'s hardcoded "butter" query — these tests are about
+    # limit/pagination/ordering, not product-name relevance, so the fixture just needs to clear
+    # instamart._is_relevant()'s bar, same as any real product would.
     return {
-        "displayName": f"Product {n}", "brand": f"Brand {n}", "productId": f"P{n}", "inStock": in_stock, "isAvail": in_stock,
+        "displayName": f"{name} {n}", "brand": f"Brand {n}", "productId": f"P{n}", "inStock": in_stock, "isAvail": in_stock,
         "variations": [
-            {"spinId": f"spin-{n}-{s}", "skuId": f"sku-{n}-{s}", "quantityDescription": f"{(s + 1) * 100} g", "displayName": f"Product {n}",
+            {"spinId": f"spin-{n}-{s}", "skuId": f"sku-{n}-{s}", "quantityDescription": f"{(s + 1) * 100} g", "displayName": f"{name} {n}",
              "price": {"mrp": 60 + s, "offerPrice": 50 + s}, "isInStockAndAvailable": in_stock}
             for s in range(sizes)
         ],
@@ -67,9 +70,14 @@ class LimitTests(InstamartCase):
         self.assertEqual(out["results"][0]["note"], "No match on Instamart")
 
     async def test_the_limit_applies_to_every_item_in_the_request(self):
-        s = FakeSession({"get_addresses": envelope(ADDRESSES), "search_products": [envelope(page([product(i) for i in range(6)])), envelope(page([product(i) for i in range(6)]))]})
+        # "a"/"b" would normalize to nothing to match against (single letters, one of them a
+        # stripped descriptive word) - real ingredient names instead, with fixtures named to match.
+        s = FakeSession({"get_addresses": envelope(ADDRESSES), "search_products": [
+            envelope(page([product(i, name="Apple") for i in range(6)])),
+            envelope(page([product(i, name="Banana") for i in range(6)])),
+        ]})
         with using(s):
-            out = await instamart.search_ingredients("tok", ["a", "b"], max_options=8)
+            out = await instamart.search_ingredients("tok", ["apple", "banana"], max_options=8)
         self.assertEqual([len(r["options"]) for r in out["results"]], [8, 8])
 
 
