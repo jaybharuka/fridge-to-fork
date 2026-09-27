@@ -150,6 +150,8 @@ All network calls and LLM calls in the test suite are mocked, so no API key is r
 | Variable | Required | Description |
 |---|---|---|
 | `GOOGLE_API_KEY` | Yes | Google Gemini API key from AI Studio |
+| `GOOGLE_API_KEY_2`, `GOOGLE_API_KEY_3` | Optional | Extra production keys — vision and text calls try every configured key for a given model before falling to a weaker model (`VISION_API_KEYS`/`TEXT_API_KEYS`, 2026-09). Only adds real headroom if these are on separate Google Cloud projects from `GOOGLE_API_KEY` — Gemini's free-tier quota is scoped per project, not per key |
+| `GOOGLE_API_KEY_EVAL` | Only for `tests/eval_vision_accuracy.py` | Dedicated key for the eval harness, deliberately separate from the production pool above — a real scan hit "0 items detected" once because the harness sharing production's key had exhausted its shared daily quota |
 | `GEMINI_TEXT_MODEL` | Optional | Primary model for meal planning (default `gemini-2.5-flash`; falls back through `gemini-2.5-flash-lite` → `gemini-flash-latest` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `TEXT_MODEL_FALLBACK_CHAIN`) |
 | `GEMINI_VISION_MODEL` | Optional | Primary model for fridge vision (default `gemini-2.5-flash`; falls back through `gemini-flash-latest` → `gemini-2.5-flash-lite` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `VISION_MODEL_FALLBACK_CHAIN`) |
 | `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default `https://mcp.swiggy.com/food`) |
