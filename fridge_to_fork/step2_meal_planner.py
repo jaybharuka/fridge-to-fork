@@ -20,6 +20,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -29,6 +30,28 @@ from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggesti
 load_dotenv()
 
 console = Console()
+
+# Both raw Gemini text calls below (_call_text_model_with_retry_stream,
+# generate_top_up_suggestions) were bare generate_content()/
+# generate_content_stream() calls with no http_options at all — the exact
+# same gap that caused the vision path's 72.6s single-photo anomaly
+# (step1_fridge_vision.py's _call_gemini_vision), just never propagated
+# here. Left at the SDK's own default (up to 5 internal attempts, backoff
+# up to 60s max delay EACH), a single call in either function could
+# legitimately take minutes once quota/latency issues hit multiple models
+# in TEXT_MODEL_FALLBACK_CHAIN — found live: a real scan got stuck on
+# "Still working on it" at the top-up-suggestions stage with no overall
+# timeout wrapping app.py's `await top_up_task` to cut it short.
+# attempts=1 (no SDK-level retry) rather than raising it: both call sites
+# already have their own app-level resilience (the cross-model fallback
+# chain in both functions, plus _call_text_model_with_retry_stream's own
+# outer retry loop) - an SDK-level retry on an identical slow/loaded model
+# rarely helps and only compounds the wait, same reasoning already applied
+# to vision.
+_TEXT_CALL_HTTP_OPTIONS = types.HttpOptions(
+    timeout=25_000,
+    retry_options=types.HttpRetryOptions(attempts=1, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -653,7 +676,10 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
     for attempt in range(1, max_retries + 1):
         try:
             full_text = ""
-            for chunk in client.models.generate_content_stream(model=model, contents=prompt):
+            for chunk in client.models.generate_content_stream(
+                model=model, contents=prompt,
+                config=types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS),
+            ):
                 if chunk.text:
                     full_text += chunk.text
                     yield ("partial", chunk.text)
@@ -907,7 +933,10 @@ def generate_top_up_suggestions(
     for chain_model in chain:
         print(f"[TOP_UP] Attempting with model: {chain_model}")
         try:
-            response = client.models.generate_content(model=chain_model, contents=prompt)
+            response = client.models.generate_content(
+                model=chain_model, contents=prompt,
+                config=types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS),
+            )
             suggestions = _parse_top_up_response(response.text)
             suggestions = [
                 s for s in suggestions
