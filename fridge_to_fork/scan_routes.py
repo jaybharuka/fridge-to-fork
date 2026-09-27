@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from . import db
+from .step2_meal_planner import _normalize_ingredient_words
 
 
 class EstimatedQuantity(BaseModel):
@@ -87,6 +88,33 @@ def _ingredient_to_item_fields(ing: IngredientIn) -> dict:
     }
 
 
+async def _resolve_canonical_ids(conn, names: list[str]) -> list[Optional[int]]:
+    """Best-effort canonical_id resolution for a batch of item names against
+    the same canonical_ingredients table _fuzzy_ingredient_match's own
+    in-memory cache resolves against (step2_meal_planner.py, Phase D) — a
+    separate lookup built fresh from this request's own already-open async
+    connection, not a shared cache: this route has no real traffic yet (see
+    the module docstring), so a per-request rebuild is simpler than adding a
+    second cache-invalidation story for a cold path. Exact normalized-word-
+    set equality against a canonical name/alias, not the looser subset-
+    containment _fuzzy_ingredient_match uses for comparing two arbitrary
+    ingredient phrases — this is "does this name correspond to exactly this
+    known concept," not "are these two phrases related." Any failure
+    (corrupt table, etc.) just leaves every name unresolved (None) rather
+    than blocking scan creation."""
+    try:
+        rows = await db.list_canonical_ingredients(conn)
+    except Exception:
+        return [None] * len(names)
+    lookup: dict[frozenset, int] = {}
+    for row in rows:
+        for candidate_name in [row["canonical_name"], *row["aliases"]]:
+            words = frozenset(_normalize_ingredient_words(candidate_name))
+            if words:
+                lookup[words] = row["id"]
+    return [lookup.get(frozenset(_normalize_ingredient_words(name))) for name in names]
+
+
 def make_router() -> APIRouter:
     router = APIRouter(prefix="/api/fridge-scans")
 
@@ -95,8 +123,12 @@ def make_router() -> APIRouter:
         async with db.get_connection() as conn:
             await db.init_db(conn)
             scan_id = await db.create_scan(conn, user_session_id=body.user_session_id)
-            for ing in body.ingredients:
-                await db.add_item(conn, scan_id, **_ingredient_to_item_fields(ing))
+            canonical_ids = await _resolve_canonical_ids(conn, [ing.name for ing in body.ingredients])
+            for ing, canonical_id in zip(body.ingredients, canonical_ids):
+                fields = _ingredient_to_item_fields(ing)
+                if canonical_id is not None:
+                    fields["canonical_id"] = canonical_id
+                await db.add_item(conn, scan_id, **fields)
             scan = await db.get_scan(conn, scan_id)
             items = await db.list_items(conn, scan_id)
         return {"scan": scan, "items": items}

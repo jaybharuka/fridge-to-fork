@@ -115,5 +115,56 @@ class TestScanRoutes(unittest.TestCase):
         self.assertEqual(client.get("/auth/status").json(), {"authenticated": False, "expires_at": None})
 
 
+class TestCanonicalIdResolution(unittest.TestCase):
+    """Phase D — create_scan() resolves canonical_id against the seeded
+    canonical_ingredients table. Separate class: needs a seeded DB, not the
+    empty one TestScanRoutes' setUp gives every test (which already covers,
+    implicitly, that an unseeded table degrades to canonical_id staying
+    unset — every one of those tests passes with an empty table)."""
+
+    def setUp(self):
+        fd, path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        self._db_path_patch = patch.object(db, "DEFAULT_DB_PATH", path)
+        self._db_path_patch.start()
+        self.db_path = path
+
+        import asyncio
+        from fridge_to_fork.seed_canonical_ingredients import seed
+
+        async def _seed():
+            async with db.get_connection(path) as conn:
+                await seed(conn)
+
+        asyncio.run(_seed())
+
+    def tearDown(self):
+        self._db_path_patch.stop()
+        os.unlink(self.db_path)
+
+    def test_matching_item_gets_a_canonical_id(self):
+        r = client.post("/api/fridge-scans", json={"ingredients": [
+            {"name": "pyaz", "confidence": 0.9, "category": "produce", "tier": "confirmed"},
+        ]})
+        item = r.json()["items"][0]
+        self.assertIsNotNone(item["canonical_id"])
+
+    def test_two_aliases_of_the_same_concept_share_one_canonical_id(self):
+        r = client.post("/api/fridge-scans", json={"ingredients": [
+            {"name": "onion", "confidence": 0.9, "category": "produce", "tier": "confirmed"},
+            {"name": "pyaz", "confidence": 0.9, "category": "produce", "tier": "confirmed"},
+        ]})
+        items = r.json()["items"]
+        self.assertIsNotNone(items[0]["canonical_id"])
+        self.assertEqual(items[0]["canonical_id"], items[1]["canonical_id"])
+
+    def test_unrecognized_item_gets_no_canonical_id(self):
+        r = client.post("/api/fridge-scans", json={"ingredients": [
+            {"name": "dragon fruit smoothie mix", "confidence": 0.9, "category": "specialty", "tier": "confirmed"},
+        ]})
+        item = r.json()["items"][0]
+        self.assertIsNone(item["canonical_id"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -42,6 +43,7 @@ def _ascii_safe(value) -> str:
     return str(value).encode("ascii", errors="backslashreplace").decode("ascii")
 
 
+from fridge_to_fork import db
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
 from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals_stream
 from fridge_to_fork.features import FOOD_MOVED_MESSAGE
@@ -49,8 +51,32 @@ from fridge_to_fork.food_routes import make_router as make_food_router
 from fridge_to_fork.instamart_routes import make_router as make_instamart_router
 from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
 from fridge_to_fork.scan_routes import make_router as make_scan_router
+from fridge_to_fork.seed_canonical_ingredients import seed as _seed_canonical_ingredients
 
-app = FastAPI(title="Fridge to Fork", version="0.1.0")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Self-healing canonical-ingredient seed (vision-accuracy overhaul,
+    # Phase D) — seed() is already idempotent (ON CONFLICT upsert), so
+    # running it unconditionally on every startup is cheap (39 rows) and
+    # safe, rather than a separate manual/admin step someone could forget
+    # or never learn exists. Also means a future change to the seed data
+    # re-applies automatically on the next deploy, permanently. Best-effort:
+    # any failure here must never prevent the app from starting — the
+    # matcher's own canonical-cache loader (step2_meal_planner.py) already
+    # degrades gracefully to string-matching-only if this table ends up
+    # empty or missing for any reason.
+    try:
+        async with db.get_connection() as conn:
+            await db.init_db(conn)
+            count = await _seed_canonical_ingredients(conn)
+            print(f"[STARTUP] Seeded {count} canonical ingredients")
+    except Exception as e:
+        print(f"[STARTUP] Canonical-ingredient seed failed (non-fatal): {type(e).__name__}: {e}")
+    yield
+
+
+app = FastAPI(title="Fridge to Fork", version="0.1.0", lifespan=_lifespan)
 
 DEFAULT_DELIVERY_ADDRESS = "Mumbai, India"
 

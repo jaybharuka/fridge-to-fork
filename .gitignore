@@ -40,6 +40,7 @@ scripts/
 
 # Runtime data
 inventory.db
+*.db
 .worktrees/
 
 # GCP service account keys — never commit these

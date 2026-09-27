@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import re
+import sqlite3
 import time
 from typing import Optional
 
@@ -25,6 +26,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from . import db
 from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 
 load_dotenv()
@@ -135,19 +137,70 @@ def _normalize_ingredient_words(name: str) -> set[str]:
     return result
 
 
+# Canonical-ingredient resolution (vision-accuracy overhaul, Phase D) — an
+# in-memory {normalized-word-set: canonical_id} cache built once per process
+# from the DB-seeded canonical_ingredients table (db.py, seeded by
+# seed_canonical_ingredients.py). Deliberately loaded via plain synchronous
+# sqlite3, not db.py's async aiosqlite connection: _fuzzy_ingredient_match is
+# a hot-path function called deep inside a background thread
+# (plan_meals_stream, invoked via app.py's threading.Thread — not an asyncio
+# task, so there's no event loop to await against there) from many call
+# sites; making it async to query the DB live would cascade that change into
+# every caller for a lookup that's better served by an in-memory cache
+# anyway. SQLite handles concurrent readers over the same file fine, so this
+# coexists safely with Phase C's async CRUD routes.
+#
+# "Never a hard dependency" (per the original plan): ANY failure loading
+# this (DB file missing, table missing, corrupt row) falls back to an empty
+# cache, silently — _fuzzy_ingredient_match's existing word-overlap
+# comparison below is completely unaffected either way, exactly as before
+# Phase D existed.
+_canonical_cache: dict[frozenset, int] | None = None
+
+
+def _load_canonical_cache() -> dict[frozenset, int]:
+    global _canonical_cache
+    if _canonical_cache is not None:
+        return _canonical_cache
+    cache: dict[frozenset, int] = {}
+    try:
+        conn = sqlite3.connect(db.DEFAULT_DB_PATH)
+        try:
+            rows = conn.execute("SELECT id, canonical_name, aliases FROM canonical_ingredients").fetchall()
+            for canonical_id, canonical_name, aliases_json in rows:
+                for name in [canonical_name, *json.loads(aliases_json or "[]")]:
+                    words = frozenset(_normalize_ingredient_words(name))
+                    if words:
+                        cache[words] = canonical_id
+        finally:
+            conn.close()
+    except Exception as e:
+        console.print(f"[yellow][WARNING] canonical-ingredient cache load failed, falling back to string matching only: {type(e).__name__}: {e}[/yellow]")
+    _canonical_cache = cache
+    return cache
+
+
 def _fuzzy_ingredient_match(recipe_name: str, candidate_names: list[str]) -> bool:
     """True if `recipe_name` fuzzy-matches any of `candidate_names` —
-    case/plural/descriptive-word insensitive. Uses subset containment
-    (not "any shared word") so e.g. "ginger-garlic paste" still matches
-    a plain "ginger", but "coriander leaves" does NOT falsely match a
-    "coriander powder" staple just because both mention coriander."""
+    case/plural/descriptive-word insensitive. Tries canonical-ID resolution
+    first (e.g. "onion" vs "pyaz" — share zero words, a gap the
+    word-overlap comparison below can't close on its own since Hindi
+    transliterations don't share letters with their English name), then
+    falls back to subset containment (not "any shared word") so e.g.
+    "ginger-garlic paste" still matches a plain "ginger", but "coriander
+    leaves" does NOT falsely match a "coriander powder" staple just because
+    both mention coriander."""
     recipe_words = _normalize_ingredient_words(recipe_name)
     if not recipe_words:
         return False
+    cache = _load_canonical_cache()
+    recipe_canonical = cache.get(frozenset(recipe_words))
     for candidate in candidate_names:
         candidate_words = _normalize_ingredient_words(candidate)
         if not candidate_words:
             continue
+        if recipe_canonical is not None and cache.get(frozenset(candidate_words)) == recipe_canonical:
+            return True
         if candidate_words <= recipe_words or recipe_words <= candidate_words:
             return True
     return False
