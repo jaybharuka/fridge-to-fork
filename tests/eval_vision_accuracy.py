@@ -15,19 +15,28 @@ per photo. Run it explicitly, before and after any pipeline change:
     python -m tests.eval_vision_accuracy
     python -m tests.eval_vision_accuracy --model gemini-2.5-flash
 
-Requires GOOGLE_API_KEY in .env, same as the app itself.
+Requires GOOGLE_API_KEY_EVAL in .env — a key dedicated to this harness,
+deliberately NOT the production GOOGLE_API_KEY/_2/_3 pool. Real bug found
+2026-09-27: this harness sharing production's key meant every eval run
+competed with real users for the same daily quota, and a real scan hit
+"0 items detected" during a window this harness had been hammering that
+quota. Uses identify_ingredients()'s existing client= DI parameter (built
+for testing) to pin the whole run to this one key — it never touches or
+depletes the production pool, in either direction.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
+from google import genai
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -125,6 +134,11 @@ def _apply_tier_report(result: PhotoResult, ingredients: list[Ingredient], gt: d
 
 
 def run_eval(model: str | None = None) -> list[PhotoResult]:
+    # Built lazily, not at module import time — this module is also
+    # imported by eval_vision_accuracy_groq.py purely for its scoring
+    # helpers, which has no reason to require GOOGLE_API_KEY_EVAL to be set.
+    eval_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY_EVAL"])
+
     ground_truth = json.loads(GROUND_TRUTH_PATH.read_text())
     results = []
 
@@ -136,7 +150,10 @@ def run_eval(model: str | None = None) -> list[PhotoResult]:
 
         print(f"Scanning {entry['file']}  ({entry['description']})...")
         t0 = time.perf_counter()
-        fridge = identify_ingredients(str(photo_path), model=model)
+        # client=eval_client pins this whole run to the dedicated eval key
+        # (identify_ingredients()'s existing DI seam) - never touches or
+        # depletes the production GOOGLE_API_KEY/_2/_3 rotation pool.
+        fridge = identify_ingredients(str(photo_path), model=model, client=eval_client)
         elapsed = time.perf_counter() - t0
 
         detected = [i.name for i in fridge.ingredients]

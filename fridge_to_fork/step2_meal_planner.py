@@ -373,6 +373,27 @@ TEXT_MODEL_FALLBACK_CHAIN = _dedupe([
     "gemini-3.1-pro-preview",
 ])
 
+# Multi-key rotation (2026-09) — same pool and same reasoning as
+# step1_fridge_vision.py's VISION_API_KEYS: only adds real headroom if
+# GOOGLE_API_KEY_2/_3 belong to separate Google Cloud projects from
+# GOOGLE_API_KEY, since Gemini's free-tier daily quota is scoped per
+# project, not per key. Kept as its own copy here rather than shared with
+# step1 — this codebase already keeps step1/step2 self-contained (e.g.
+# _dedupe itself is defined independently in both files).
+TEXT_API_KEYS = _dedupe([
+    os.environ.get("GOOGLE_API_KEY"),
+    os.environ.get("GOOGLE_API_KEY_2"),
+    os.environ.get("GOOGLE_API_KEY_3"),
+])
+
+
+def _build_text_clients() -> list[tuple[str, genai.Client]]:
+    """One (label, client) pair per configured production key — labels
+    only ("key1", "key2", ...), never real key values, so logging which
+    key served a request never risks leaking one."""
+    return [(f"key{i + 1}", genai.Client(api_key=k)) for i, k in enumerate(TEXT_API_KEYS)]
+
+
 # ---------------------------------------------------------------------------
 # Fallback suggestions (when API quota is exceeded)
 # ---------------------------------------------------------------------------
@@ -741,24 +762,28 @@ def plan_meals_stream(
     and been parsed. The prompt, JSON schema, and parsing logic are
     unchanged from plan_meals() — only the delivery timing differs.
     """
-    client = client or genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+    clients = [("injected", client)] if client is not None else _build_text_clients()
     prompt = _build_plan_prompt(fridge, target_dish, servings)
     chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
 
+    # Model-first/key-second, same reasoning as vision's
+    # _call_gemini_vision_with_fallback: try the strongest available model
+    # on every key before ever settling for a weaker model.
     for chain_model in chain:
-        try:
-            for kind, payload in _call_text_model_with_retry_stream(client, chain_model, prompt):
-                if kind == "partial":
-                    yield ("partial", payload)
+        for key_label, key_client in clients:
+            try:
+                for kind, payload in _call_text_model_with_retry_stream(key_client, chain_model, prompt):
+                    if kind == "partial":
+                        yield ("partial", payload)
+                    else:
+                        console.print(f"[green][OK] Meal planning succeeded with model: {chain_model} on {key_label}[/green]")
+                        yield ("result", _enrich_recipe_ingredients(payload, fridge))
+                        return
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} quota exhausted, trying next...[/yellow]")
                 else:
-                    console.print(f"[green][OK] Meal planning succeeded with model: {chain_model}[/green]")
-                    yield ("result", _enrich_recipe_ingredients(payload, fridge))
-                    return
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
-            else:
-                console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
+                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} failed with: {e}, trying next...[/yellow]")
 
     console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
     yield ("result", _enrich_recipe_ingredients(_fallback_meal_plan(fridge, target_dish), fridge))
@@ -912,7 +937,9 @@ def generate_top_up_suggestions(
     card and must never block the main flow.
     """
     try:
-        client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+        clients = _build_text_clients()
+        if not clients:
+            raise RuntimeError("no GOOGLE_API_KEY configured")
     except Exception as e:
         console.print(f"[yellow][WARNING] generate_top_up_suggestions failed to init client: {type(e).__name__}: {e}[/yellow]")
         return []
@@ -930,27 +957,30 @@ def generate_top_up_suggestions(
 
     missing_names = meal.missing_ingredients if meal and meal.missing_ingredients else []
 
+    # Model-first/key-second, same reasoning as vision's
+    # _call_gemini_vision_with_fallback and plan_meals_stream above.
     for chain_model in chain:
-        print(f"[TOP_UP] Attempting with model: {chain_model}")
-        try:
-            response = client.models.generate_content(
-                model=chain_model, contents=prompt,
-                config=types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS),
-            )
-            suggestions = _parse_top_up_response(response.text)
-            suggestions = [
-                s for s in suggestions
-                if not _fuzzy_ingredient_match(s["name"], missing_names)
-            ]
-            print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
-            if suggestions:
-                console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model}[/green]")
-                return suggestions[:5]
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model for top-up...[/yellow]")
-            else:
-                console.print(f"[yellow][WARNING] {chain_model} top-up failed with: {e}, trying next...[/yellow]")
+        for key_label, client in clients:
+            print(f"[TOP_UP] Attempting with model: {chain_model} on {key_label}")
+            try:
+                response = client.models.generate_content(
+                    model=chain_model, contents=prompt,
+                    config=types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS),
+                )
+                suggestions = _parse_top_up_response(response.text)
+                suggestions = [
+                    s for s in suggestions
+                    if not _fuzzy_ingredient_match(s["name"], missing_names)
+                ]
+                print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
+                if suggestions:
+                    console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model} on {key_label}[/green]")
+                    return suggestions[:5]
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} quota exhausted, trying next...[/yellow]")
+                else:
+                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} top-up failed with: {e}, trying next...[/yellow]")
 
     console.print("[yellow][WARNING] All Gemini models failed for top-up suggestions, skipping[/yellow]")
     return []

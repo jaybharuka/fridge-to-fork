@@ -83,6 +83,27 @@ VISION_MODEL_FALLBACK_CHAIN = _dedupe([
     "gemini-3.1-pro-preview",
 ])
 
+# Multi-key rotation (2026-09) — each Gemini free-tier daily quota is
+# scoped per API key's underlying Google Cloud PROJECT, not just per key
+# (confirmed by the quota error's own id:
+# "GenerateRequestsPerDayPerProjectPerModel-FreeTier") — GOOGLE_API_KEY_2/_3
+# only add real headroom if they belong to separate projects from
+# GOOGLE_API_KEY; keys sharing one project share its quota and rotation
+# does nothing for them. Order matters: GOOGLE_API_KEY stays primary/first.
+VISION_API_KEYS = _dedupe([
+    os.environ.get("GOOGLE_API_KEY"),
+    os.environ.get("GOOGLE_API_KEY_2"),
+    os.environ.get("GOOGLE_API_KEY_3"),
+])
+
+
+def _build_vision_clients() -> list[tuple[str, "genai.Client"]]:
+    """One (label, client) pair per configured production key. Labels are
+    1-indexed positions ("key1", "key2", ...), never the key values
+    themselves — nothing that touches a real key value should ever reach a
+    log line."""
+    return [(f"key{i + 1}", genai.Client(api_key=k)) for i, k in enumerate(VISION_API_KEYS)]
+
 
 def _fallback_fridge_contents() -> FridgeContents:
     """Return a small, safe placeholder fridge inventory when vision fails."""
@@ -906,33 +927,45 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
 
 
 def _call_gemini_vision_with_fallback(
-    client: genai.Client, image_bytes: bytes, prompt: str, model: str | None = None
+    clients: list[tuple[str, "genai.Client"]], image_bytes: bytes, prompt: str, model: str | None = None
 ) -> list[dict]:
     """Tries each model in VISION_MODEL_FALLBACK_CHAIN (an explicit
     `model` override first, if given, same convention as
-    _identify_with_gemini_fallback()) until one succeeds. Returns []
-    only if every model in the chain fails — this is the resilience the
-    rest of this file relies on for quota exhaustion, applied per scan
-    pass instead of once per whole scan."""
+    _identify_with_gemini_fallback()) — and for EACH model, tries every
+    available API key before moving to the next model. Model-first/
+    key-second, not the reverse: the observed real-world failure mode is
+    one model's quota exhausting independently of the others (each has its
+    own separate daily quota, and quota is scoped per key's underlying
+    project) — trying the SAME, stronger model on a second key before ever
+    settling for a weaker model preserves the whole point of ordering this
+    chain strongest-first. Returns [] only if every (model, key)
+    combination fails.
+    `clients` is a list of (label, Client) pairs — the label (never the
+    real key value) is what gets logged, so a later incident can show
+    whether a request was served by a fallback key/model or the primary."""
     chain = _dedupe([model, *VISION_MODEL_FALLBACK_CHAIN]) if model else VISION_MODEL_FALLBACK_CHAIN
     for chain_model in chain:
-        try:
-            return _call_gemini_vision(image_bytes, prompt, client, chain_model)
-        except Exception as e:
-            print(f"[Gemini] {chain_model} failed: {type(e).__name__}: {e}")
+        for key_label, client in clients:
+            try:
+                result = _call_gemini_vision(image_bytes, prompt, client, chain_model)
+                if len(clients) > 1 or key_label != "key1":
+                    console.print(f"[green][Gemini] {chain_model} succeeded on {key_label}[/green]")
+                return result
+            except Exception as e:
+                print(f"[Gemini] {chain_model} on {key_label} failed: {type(e).__name__}: {e}")
     return []
 
 
-def _gemini_wide_scan(image_bytes: bytes, dish_name: str, client: genai.Client, model: str | None = None) -> list[dict]:
+def _gemini_wide_scan(image_bytes: bytes, dish_name: str, clients: list[tuple[str, "genai.Client"]], model: str | None = None) -> list[dict]:
     """Pass 1 — scan entire fridge for all visible food items."""
     prompt = _build_wide_scan_prompt(dish_name)
-    return _call_gemini_vision_with_fallback(client, image_bytes, prompt, model)
+    return _call_gemini_vision_with_fallback(clients, image_bytes, prompt, model)
 
 
-def _gemini_deep_scan(image_bytes: bytes, found_items: list[str], client: genai.Client, model: str | None = None) -> list[dict]:
+def _gemini_deep_scan(image_bytes: bytes, found_items: list[str], clients: list[tuple[str, "genai.Client"]], model: str | None = None) -> list[dict]:
     """Pass 2 — focus on areas and items that might have been missed."""
     prompt = _build_deep_scan_prompt(found_items)
-    return _call_gemini_vision_with_fallback(client, image_bytes, prompt, model)
+    return _call_gemini_vision_with_fallback(clients, image_bytes, prompt, model)
 
 
 def identify_ingredients(
@@ -979,7 +1012,9 @@ def identify_ingredients(
         Optional Gemini model override, tried before the rest of
         VISION_MODEL_FALLBACK_CHAIN for every call.
     client:
-        Optional pre-built Gemini client (useful for testing / DI).
+        Optional pre-built Gemini client (useful for testing / DI) — bypasses
+        the multi-key rotation pool entirely and is used as the sole client,
+        same as before this existed.
 
     Returns
     -------
@@ -988,7 +1023,12 @@ def identify_ingredients(
     sources = image_source if isinstance(image_source, list) else [image_source]
 
     try:
-        client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        if client is not None:
+            clients: list[tuple[str, "genai.Client"]] = [("injected", client)]
+        else:
+            clients = _build_vision_clients()
+            if not clients:
+                raise RuntimeError("no GOOGLE_API_KEY configured")
     except Exception as e:
         console.print(f"[yellow][WARNING] Could not init Gemini client: {type(e).__name__}: {e}[/yellow]")
         return _fallback_fridge_contents()
@@ -1007,7 +1047,7 @@ def identify_ingredients(
             console.print(f"[yellow][WARNING] Could not prepare image: {type(e).__name__}: {e}[/yellow]")
             continue
 
-        pass1_items = _gemini_wide_scan(image_bytes, dish_name, client, model)
+        pass1_items = _gemini_wide_scan(image_bytes, dish_name, clients, model)
         console.print(f"[green][Gemini Pass 1] Found {len(pass1_items)} item(s)[/green]")
         for item in pass1_items:
             name = item.get("name", "").lower().strip()
@@ -1021,7 +1061,7 @@ def identify_ingredients(
         # found in a previous photo in a multi-photo scan — it's hunting
         # for what this specific image's first pass missed.
         found_names = list(all_items.keys())
-        pass2_items = _gemini_deep_scan(image_bytes, found_names, client, model)
+        pass2_items = _gemini_deep_scan(image_bytes, found_names, clients, model)
         console.print(f"[green][Gemini Pass 2] Found {len(pass2_items)} additional item(s)[/green]")
         for item in pass2_items:
             name = item.get("name", "").lower().strip()
