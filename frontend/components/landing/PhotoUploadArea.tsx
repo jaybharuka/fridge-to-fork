@@ -1,8 +1,9 @@
 'use client';
-import { useRef } from 'react';
-import { Camera, Plus, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Camera, Images, Plus, X } from 'lucide-react';
 import type { UsePhotoUpload } from '@/hooks/usePhotoUpload';
 import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/Sheet';
 import styles from './landing.module.css';
 
 const MAX_PHOTOS = 3;
@@ -15,8 +16,23 @@ type PhotoUploadAreaProps = Pick<UsePhotoUpload, 'photos' | 'thumbnailUrls' | 'a
 // Ported from templates/index.html:1818-1824 (markup), 4223-4243
 // (updatePhotoUI / input onChange). Toggles between a single "Scan Fridge"
 // button and a thumbnail-row + inline "+" once at least one photo is added.
+//
+// TWO separate hidden file inputs, not one — a single <input type="file"
+// accept="image/*"> was tried first (relying on the browser to present a
+// combined camera-or-gallery chooser on its own) and failed on a real
+// device: Android 14/15 + Chrome now routes a plain, capture-less input to
+// the OS's newer built-in Photo Picker, which has NO camera option at all
+// (a real, dated, cross-referenced platform change, not a one-off bug).
+// Two explicit buttons avoids depending on any single input's automatic
+// chooser behavior: the camera button's input always forces the camera
+// (capture's one reliable, universal effect, on both iOS Safari and
+// Android Chrome); the gallery button's input never has `capture`, so
+// gallery access is always available through it regardless of which exact
+// picker UI a given browser/OS version happens to show for it.
 export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }: PhotoUploadAreaProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function handleFiles(files: FileList | null) {
     if (!files) return;
@@ -25,22 +41,33 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
     for (const file of toAdd) {
       await addPhoto(file);
     }
-    if (inputRef.current) inputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+  }
+
+  function openCamera() {
+    setPickerOpen(false);
+    cameraInputRef.current?.click();
+  }
+
+  function openGallery() {
+    setPickerOpen(false);
+    galleryInputRef.current?.click();
   }
 
   return (
     <div className={styles.photoUploadArea}>
-      {/* No `capture` attribute, deliberately: on iOS Safari and Android
-          Chrome its mere presence (regardless of value) skips the native
-          file/photo picker and launches the camera app directly, with no
-          way back to the gallery — a well-documented mobile-web gotcha.
-          accept="image/*" alone still lets the OS offer its own camera
-          option inside that picker (e.g. iOS's "Take Photo or Video"),
-          it's just no longer the only option. Desktop is unaffected either
-          way — `capture` has no meaning there; it already just opens the
-          OS file picker. */}
       <input
-        ref={inputRef}
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        style={{ display: 'none' }}
+        onChange={e => handleFiles(e.target.files)}
+      />
+      <input
+        ref={galleryInputRef}
         type="file"
         accept="image/*"
         multiple
@@ -48,7 +75,7 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
         onChange={e => handleFiles(e.target.files)}
       />
       {photos.length === 0 ? (
-        <Button variant="secondary" icon={<Camera size={18} />} onClick={() => inputRef.current?.click()}>
+        <Button variant="secondary" icon={<Camera size={18} />} onClick={() => setPickerOpen(true)}>
           Scan Fridge
         </Button>
       ) : (
@@ -70,7 +97,7 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
             <button
               type="button"
               className={styles.addPhotoPlus}
-              onClick={() => inputRef.current?.click()}
+              onClick={() => setPickerOpen(true)}
               aria-label="Add another photo"
             >
               <Plus />
@@ -78,6 +105,17 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
           )}
         </div>
       )}
+
+      <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} ariaLabel="Add a fridge photo" title="Add a fridge photo">
+        <div className={styles.photoPickerOptions}>
+          <Button variant="secondary" icon={<Camera size={18} />} onClick={openCamera}>
+            Take Photo
+          </Button>
+          <Button variant="secondary" icon={<Images size={18} />} onClick={openGallery}>
+            Choose from Gallery
+          </Button>
+        </div>
+      </Sheet>
     </div>
   );
 }
