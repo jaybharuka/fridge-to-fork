@@ -849,10 +849,47 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
         model=model,
         contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), prompt],
         config=types.GenerateContentConfig(
-            max_output_tokens=2048,
+            # Phase B (vision-accuracy overhaul) added 5 more fields per
+            # item (category, estimated_quantity, state, needs_confirmation,
+            # possible_matches) - the combined eval run afterward showed
+            # near-constant JSONDecodeError ("Unterminated string",
+            # "Expecting ',' delimiter" - truncation, not garbage-from-the-
+            # start) on gemini-2.5-flash/gemini-flash-latest, and two photos
+            # took 94.6s/99.9s: the old 2048 cap was cutting the response
+            # off mid-item on any photo with enough items in it, forcing
+            # the fallback chain deeper every time. A fridge photo has
+            # produced up to ~26-30 items in one pass in this project's own
+            # eval runs; budgeting ~100 tokens/item (generous vs. the
+            # ~50-60 the extended schema's JSON actually costs) for 80
+            # items covers any realistically busy fridge with real margin,
+            # not just enough for the two photos that happened to fail.
+            max_output_tokens=8192,
+            # timeout is PER ATTEMPT, not a shared budget across retries (confirmed against the
+            # google-genai SDK's own source, _api_client.py: _request_once() receives this same
+            # value on every call _retry() makes) — so worst case for ONE model in the fallback
+            # chain is roughly timeout * attempts + backoff, not timeout alone. That's the real
+            # constraint on sizing this, given app.py's 60s whole-scan ceiling has to fit multiple
+            # models' worth of attempts, not just one.
+            #
+            # Raising max_output_tokens 2048->8192 fixed the JSON-truncation failures (Phase B's
+            # combined eval), but the very next clean run hit near-constant 504 DEADLINE_EXCEEDED
+            # on gemini-2.5-flash instead, at the old timeout=15_000/attempts=2 (worst case ~33s
+            # incl. backoff for that one model). Root cause isn't fully separable from today's
+            # general Gemini free-tier flakiness (503 "high demand" showed up the same day) — but
+            # a larger token cap can legitimately need more wall-clock time for a genuinely busy
+            # photo's response to complete, and 15s no longer has margin for that either way.
+            #
+            # attempts dropped 2->1 rather than raising both: this file's own retry-vs-fallback
+            # reasoning already holds (a slow/loaded model rarely recovers on an identical
+            # immediate retry; the cross-model fallback chain is the layer that actually helps,
+            # and only gets a fair shot if one model's failure doesn't eat too much of the 60s
+            # budget by itself). timeout raised 15s->25s to give a legitimately larger response
+            # real headroom. Worst case per model: ~25s (no retry multiplier) — leaves ~35s of
+            # the 60s ceiling for at least one, ideally two, fallback models to also get tried,
+            # versus ~33s a single model could already consume before this change.
             http_options=types.HttpOptions(
-                timeout=15_000,  # ms — one hung request can't quietly eat the whole scan budget
-                retry_options=types.HttpRetryOptions(attempts=2, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
+                timeout=25_000,
+                retry_options=types.HttpRetryOptions(attempts=1, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
             ),
         ),
     )
