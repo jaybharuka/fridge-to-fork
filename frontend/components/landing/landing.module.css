@@ -163,6 +163,7 @@
    1818-1824. Single "Scan Fridge" button until the first photo lands, then
    thumbnails + an inline "+" (up to 3) take its place. */
 .photoUploadArea { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.photoPickerOptions { display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-2); }
 .photoThumbnailRow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .addPhotoPlus {
   width: 80px; height: 80px; border-radius: 12px; border: 1.5px dashed rgba(252, 128, 25, 0.4);
