@@ -255,11 +255,51 @@ class SearchTests(InstamartCase):
         self.assertEqual([o["available"] for o in options], [True, False, False])  # variation OOS, product OOS
 
     async def test_no_match_and_all_out_of_stock_get_notes(self):
-        oos = {"products": [{"displayName": "X", "inStock": False, "variations": [{"spinId": "s", "skuId": "k", "price": {}, "isInStockAndAvailable": False}]}]}
+        oos = {"products": [{"displayName": "Saffron Threads", "inStock": False, "variations": [{"spinId": "s", "skuId": "k", "price": {}, "isInStockAndAvailable": False}]}]}
         s = self.session(search_products=[envelope({"products": []}), envelope(oos)])
         with using(s):
             out = await instamart.search_ingredients("tok", ["unobtainium", "saffron"])
         self.assertEqual([r["note"] for r in out["results"]], ["No match on Instamart", "Out of stock nearby"])
+
+    async def test_irrelevant_product_is_filtered_out_of_options(self):
+        """Regression test for a real bug: 'button mushrooms' matched to
+        'Yu 100% Whole Wheat Noodles' on the live demo, 2026-09-26 - Swiggy's
+        search_products returned it as the top result, and nothing in this
+        code checked relevance before showing/auto-picking it."""
+        noodles = {
+            "products": [{
+                "displayName": "Yu 100% Whole Wheat Noodles", "brand": "Yu", "inStock": True, "isAvail": True,
+                "variations": [{"spinId": "spin-noodles", "skuId": "sku-noodles", "quantityDescription": "150 g",
+                                "displayName": "Yu Whole Wheat Noodles 150 g", "price": {"mrp": 132, "offerPrice": 132},
+                                "isInStockAndAvailable": True}],
+            }],
+        }
+        s = self.session(search_products=envelope(noodles))
+        with using(s):
+            out = await instamart.search_ingredients("tok", ["button mushrooms"])
+        result = out["results"][0]
+        self.assertEqual(result["options"], [])
+        self.assertEqual(result["note"], "No relevant match on Instamart")
+
+    async def test_relevant_product_with_brand_and_size_words_still_matches(self):
+        """The loose bar (any shared word) must not reject a real match just
+        because the product name carries brand/size words the ingredient
+        name never has - that would be over-correcting the noodles bug into
+        a new false-negative bug."""
+        mushroom = {
+            "products": [{
+                "displayName": "Fresho Mushroom", "brand": "Fresho", "inStock": True, "isAvail": True,
+                "variations": [{"spinId": "spin-mush", "skuId": "sku-mush", "quantityDescription": "200 g",
+                                "displayName": "Fresho Mushroom - 200g", "price": {"mrp": 45, "offerPrice": 39},
+                                "isInStockAndAvailable": True}],
+            }],
+        }
+        s = self.session(search_products=envelope(mushroom))
+        with using(s):
+            out = await instamart.search_ingredients("tok", ["button mushrooms"])
+        result = out["results"][0]
+        self.assertEqual([o["spinId"] for o in result["options"]], ["spin-mush"])
+        self.assertIsNone(result["note"])
 
     async def test_no_saved_address_is_a_clear_error(self):
         s = FakeSession({"get_addresses": envelope({"addresses": []})})

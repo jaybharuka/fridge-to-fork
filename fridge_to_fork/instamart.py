@@ -19,6 +19,7 @@ import re
 from mcp import ClientSession
 
 from . import swiggy_common
+from .step2_meal_planner import _normalize_ingredient_words
 from .swiggy_common import (  # noqa: F401  (re-exported: sibling modules and tests import these from here)
     _account, _attempts, _call, _explain_methods, _inflight, _method_kind, _num, _outcome, _payment_options, _pick_address,
     _public_address, _remember, _resolve_address, _same_address_id, _same_id, _saved_addresses, _view_methods,
@@ -68,17 +69,42 @@ def _options(product: dict) -> list[dict]:
     return options
 
 
+def _is_relevant(ingredient: str, product_name: str) -> bool:
+    """True if `product_name` shares at least one normalized word with
+    `ingredient` — reuses step2_meal_planner's word normalization (lowercase,
+    phrase synonyms, descriptive-word stripping, singularization) but
+    deliberately NOT its subset-containment rule (_fuzzy_ingredient_match):
+    that rule requires one whole word-set to contain the other, which is
+    right for comparing two clean ingredient names but wrong here — a real
+    product name routinely carries brand/size/variant words a recipe
+    ingredient name never has (e.g. "Fresho Mushroom - 200g" for a "button
+    mushrooms" search), and subset-containment would reject that legitimate
+    match. A bare non-empty intersection is the loose floor this needs: it
+    only exists to catch a product with ZERO relation to the search term
+    (e.g. noodles for "mushrooms") slipping through as Swiggy's own
+    top-ranked result — found live, 2026-09-26, on the demo recording."""
+    return bool(_normalize_ingredient_words(ingredient) & _normalize_ingredient_words(product_name))
+
+
 async def _search_one(session: ClientSession, address_id: str, ingredient: str, limit: int = MAX_OPTIONS_PER_ITEM) -> dict:
     # One call, first page only. (Live probe, 2026-09-22: a page is ~20 products / up to ~46 variations, and `offset` does not
     # return new products, so there is nothing further to page through: `limit` just decides how much of this page is kept.)
     data = await _call(session, "search_products", addressId=address_id, query=ingredient)
     products = data.get("products") or []
     options = [o for p in products for o in _options(p)]
-    options.sort(key=lambda o: not o["available"])  # stable: in-stock first, Swiggy's ranking (variants side by side) kept
-    shown = options[:limit]
+    relevant = [o for o in options if _is_relevant(ingredient, o["name"])]
+    relevant.sort(key=lambda o: not o["available"])  # stable: in-stock first, Swiggy's ranking (variants side by side) kept
+    shown = relevant[:limit]
     if not products:
         note = "No match on Instamart"
-    elif not any(o["available"] for o in options):
+    elif not options:
+        note = "No match on Instamart"  # products came back with no purchasable variation at all
+    elif not relevant:
+        # Swiggy returned products, but none shared a single word with what was searched
+        # (the noodles-for-"button mushrooms" case) — never silently fall back to showing
+        # or auto-picking one of these; surface it as no match instead.
+        note = "No relevant match on Instamart"
+    elif not any(o["available"] for o in relevant):
         note = "Out of stock nearby"
     else:
         note = None
