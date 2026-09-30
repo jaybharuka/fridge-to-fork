@@ -30,6 +30,7 @@ from PIL import Image, ImageEnhance
 from rich.console import Console
 from rich.table import Table
 
+from .ingredient_matching import dedupe_detections, is_blocked_detection, passes_confidence
 from .models import FridgeContents, Ingredient
 
 load_dotenv()
@@ -134,9 +135,9 @@ def _build_vision_prompt(dish_name: str = "") -> str:
     guessed ones (chicken/fish inferred from wrapped packaging). Asking
     Gemini to both detect thoroughly AND self-police confidence in one
     pass pushed it toward under-reporting. This version asks it to report
-    everything it can identify — VISION_BLACKLIST and
-    _deduplicate_items() below are the actual line of defense against
-    false positives and repeat variants, not the model's own restraint.
+    everything it can identify — ingredient_matching.is_blocked_detection()
+    and dedupe_detections() are the actual line of defense against false
+    positives and repeat variants, not the model's own restraint.
     """
     dish_context = ""
     if dish_name:
@@ -375,99 +376,12 @@ def _load_image(source: Union[str, Path, bytes]) -> tuple[bytes, str]:
     return path.read_bytes(), media_type
 
 
-# Items that are almost never identified correctly from a fridge photo —
-# either pantry staples that don't normally live in a fridge (sugar, flour,
-# rice, dal), or the single most damaging class of false positive: meat/
-# fish reported off a wrapped/opaque container's shape alone. Code-side
-# backstop for the prompt above — never trust the model's own restraint
-# alone for these.
-VISION_BLACKLIST = {
-    'sugar', 'flour', 'maida', 'atta', 'wheat flour',
-    'rice', 'dal', 'lentil', 'lentils',
-    'salt', 'water', 'water bottle',
-    'spices', 'condiments', 'sauce', 'masala',
-    'chicken', 'fish', 'meat', 'beef', 'pork', 'mutton', 'lamb',
-    'shrimp', 'prawns', 'seafood',
-    'bread', 'roti', 'chapati',
-    'juice', 'soda', 'cola', 'drink',
-    'oil', 'vegetable oil', 'cooking oil',
-    'vinegar', 'pickle',
-    # Rekognition's own FOOD_CATEGORIES label names — these bleed through
-    # as detected "items" in their own right (a tomato photo gets both
-    # "Tomato" and "Vegetable" as separate labels; the allowlist in
-    # _identify_with_rekognition() correctly keeps both since it filters
-    # by category membership, not name — this is what strips the generic
-    # one back out afterward).
-    'food', 'vegetable', 'fruit', 'produce', 'beverage',
-    'dairy', 'herb', 'spice', 'grain', 'legume',
-    'nut', 'condiment', 'baked goods', 'dessert', 'ingredient',
-    'cooking', 'cuisine', 'meal', 'dish', 'snack', 'groceries',
-    # Vessels/packaging Gemini reports as if they were the food itself
-    # (a jar or dabba lid described in place of, or alongside, its actual
-    # contents) — these are containers, not ingredients.
-    'steel container', 'container', 'packet', 'package', 'wrapper',
-    'bottle', 'jar', 'box', 'carton', 'bag', 'pouch', 'dabba',
-    'utensil', 'vessel', 'pot', 'pan', 'bowl', 'plate', 'tray',
-    'plastic bag', 'plastic container', 'glass container',
-    'almond', 'cashew', 'walnut', 'raisin', 'dry fruit',
-    # Dry/ground spices — never actually visible in a fridge photo
-    # (stored in pantry jars, not the fridge), so any report of these is
-    # a hallucination from generic "Indian kitchen" priors, not something
-    # actually seen in the image.
-    'cardamom', 'cinnamon', 'cloves', 'star anise', 'mace', 'nutmeg',
-    'black pepper', 'white pepper', 'cumin', 'coriander powder',
-    'turmeric', 'chilli powder', 'garam masala', 'bay leaf',
-    'mustard seed', 'fenugreek', 'asafoetida', 'hing',
-}
-
-
-def _is_blacklisted(name: str) -> bool:
-    """Word-boundary match, not substring — "bell pepper" must not get
-    blocked just because "pepper" alone isn't blacklisted but shares
-    letters with something that is. A blocked term (possibly multi-word,
-    e.g. "water bottle") only fires when every one of its words appears
-    as a whole word somewhere in the item name — so "rice" blocks
-    "basmati rice", but "bell pepper" survives untouched."""
-    name_words = set(name.lower().strip().split())
-    for blocked in VISION_BLACKLIST:
-        blocked_words = set(blocked.split())
-        if blocked_words.issubset(name_words):
-            return True
-    return False
-
-
-def _deduplicate_items(items: list[dict]) -> list[dict]:
-    """
-    Collapse variants of the same ingredient Gemini reported separately —
-    e.g. "bell pepper", "red bell pepper", "green bell pepper" all landing
-    as distinct items in one response. Keeps only the highest-confidence
-    version of each. Sharing one word 4+ chars long is treated as "same
-    ingredient" — good enough for the common "<color/descriptor> + noun"
-    pattern without needing a real ingredient taxonomy.
-    """
-    items = sorted(items, key=lambda x: x.get('confidence', 0), reverse=True)
-
-    kept = []
-    for item in items:
-        name = item['name'].lower().strip()
-        name_words = set(name.split())
-
-        is_duplicate = False
-        for k in kept:
-            k_name = k['name'].lower().strip()
-            k_words = set(k_name.split())
-
-            shared = name_words & k_words
-            significant_shared = [w for w in shared if len(w) >= 4]
-
-            if significant_shared:
-                is_duplicate = True
-                break
-
-        if not is_duplicate:
-            kept.append(item)
-
-    return kept
+# VISION_BLACKLIST / _is_blacklisted() / _deduplicate_items() removed —
+# their word-subset rules were deleting real, distinct ingredients (see
+# main's FRIDGE_SCAN_FIX_REPORT.md F1/F2, ported 2026-09-30). Replaced
+# everywhere by ingredient_matching.is_blocked_detection() /
+# dedupe_detections(), which use the same head-noun + safe-modifier rule
+# step2 uses for fridge matching, imported at the top of this file.
 
 
 # ---------------------------------------------------------------------------
@@ -797,9 +711,12 @@ def _call_vision_model_with_retry(
             # low-confidence, then collapse repeat variants of the same
             # ingredient ("bell pepper" / "red bell pepper" / "green bell
             # pepper") down to the best single report of each.
-            items = [item for item in items if not _is_blacklisted(item.get("name", ""))]
-            items = [item for item in items if item.get("confidence", 0) >= 60]
-            items = _deduplicate_items(items)
+            items = [item for item in items if not is_blocked_detection(item.get("name", ""))]
+            items = [
+                item for item in items
+                if passes_confidence(item.get("name", ""), item.get("confidence", 0))
+            ]
+            items = dedupe_detections(items)
             items = sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
 
             ingredients = [
@@ -1074,12 +991,18 @@ def identify_ingredients(
         return FridgeContents(ingredients=[])
 
     # Re-key each dict's own "name" onto the (already lowercased/stripped)
-    # merge key — _deduplicate_items() and _is_blacklisted() below both
+    # merge key — dedupe_detections() and is_blocked_detection() below both
     # read item["name"], and the extended fields ride along unchanged.
     items = [{**item, "name": name} for name, item in all_items.items()]
-    items = [item for item in items if not _is_blacklisted(item["name"])]
-    items = [item for item in items if item.get("confidence", 0) >= 50]
-    items = _deduplicate_items(items)
+    items = [item for item in items if not is_blocked_detection(item["name"])]
+    # floor=50 explicitly, not the module's default 60 — preserves this
+    # path's existing confidence threshold; this is a matching-logic fix,
+    # not a confidence-tuning change.
+    items = [
+        item for item in items
+        if passes_confidence(item["name"], item.get("confidence", 0), floor=50)
+    ]
+    items = dedupe_detections(items)
     items = sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
 
     console.print(f"[green][OK] Vision succeeded: {len(items)} item(s) after filtering[/green]")
