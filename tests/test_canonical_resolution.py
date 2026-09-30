@@ -55,14 +55,25 @@ def test_canonical_resolution_does_not_cross_link_unrelated_items(seeded_db):
 
 
 def test_existing_word_overlap_matching_still_works(seeded_db):
-    """Pre-existing behavior (subset containment, phrase synonyms,
-    pluralization) must be completely unaffected by canonical resolution
-    existing alongside it."""
+    """Word-overlap matching (phrase synonyms, pluralization) must be
+    unaffected by canonical resolution existing alongside it — but the
+    fallback itself is no longer plain subset containment (ingredient_
+    matching.py port, 2026-09-30): see test_fuzzy_match_paste_needs_every_part
+    below for the one deliberately-changed case."""
     assert step2._fuzzy_ingredient_match("capsicum", ["bell pepper"]) is True
     assert step2._fuzzy_ingredient_match("capsicum", ["black pepper"]) is False
     assert step2._fuzzy_ingredient_match("grapes", ["grape"]) is True
-    assert step2._fuzzy_ingredient_match("ginger-garlic paste", ["ginger"]) is True
     assert step2._fuzzy_ingredient_match("coriander leaves", ["coriander powder"]) is False
+
+
+def test_fuzzy_match_paste_needs_every_part(seeded_db):
+    """Deliberate behavior change from tonight's ingredient_matching.py port
+    (FRIDGE_SCAN_FIX_REPORT.md F3): "ginger-garlic paste" used to count as
+    present with just ONE of its two parts in the fridge (plain subset
+    containment) — only half true, and one of the named bugs. The strict
+    fallback's paste exception now requires every part to be present."""
+    assert step2._fuzzy_ingredient_match("ginger-garlic paste", ["ginger"]) is False
+    assert step2._fuzzy_ingredient_match("ginger-garlic paste", ["ginger", "garlic"]) is True
 
 
 def test_no_match_when_neither_side_has_a_canonical_entry(seeded_db):

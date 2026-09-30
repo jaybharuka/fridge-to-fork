@@ -251,6 +251,11 @@ def test_coriander_leaves_still_does_not_match_coriander_powder():
     assert not _fuzzy_ingredient_match("coriander leaves", ["coriander powder"])
 
 
-def test_subset_match_still_works():
-    """Pre-existing behavior this fix must not regress."""
-    assert _fuzzy_ingredient_match("ginger-garlic paste", ["ginger"])
+def test_subset_match_needs_every_paste_part():
+    """Deliberate behavior change (ingredient_matching.py port, 2026-09-30,
+    FRIDGE_SCAN_FIX_REPORT.md F3): "ginger-garlic paste" used to count as
+    present with just one of its two parts (plain subset containment) — one
+    of the named bugs. Now requires every part to be present. See also
+    tests/test_canonical_resolution.py's version of this same test."""
+    assert not _fuzzy_ingredient_match("ginger-garlic paste", ["ginger"])
+    assert _fuzzy_ingredient_match("ginger-garlic paste", ["ginger", "garlic"])
