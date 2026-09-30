@@ -151,6 +151,26 @@ export function reducer(state: ScanState, action: Action): ScanState {
       return { ...state, topUpSuggestions: action.suggestions };
 
     case 'complete':
+      // app.py deliberately does NOT abort the stream after a step1 vision
+      // timeout — it falls through to step2 meal-planning on an empty
+      // fridge (the same path "no photo uploaded" recipe-only mode uses)
+      // and still reaches its own `yield _sse({"type": "complete"})` 30-90s
+      // later. Unconditionally flipping phase to 'results' here silently
+      // overwrote the 'error' state the 'step1' case above had just set:
+      // phase === 'results' makes app/page.tsx's resultsAlreadyShown true,
+      // which downgrades ScanStatusCard from the full "scan didn't
+      // complete" card to a barely-visible inline strip — exactly backward,
+      // since the fridge was never actually scanned (2026-09-30/10-01 live
+      // incident, third in one night). No "recipe found, fridge unknown"
+      // state exists in ScanStatusCard today, and app.py's own error paths
+      // never send both an error-carrying event and a later 'complete' in
+      // the same stream (see app.py's except branches) — so a prior error
+      // outcome here is unambiguously this timeout case, and the correct,
+      // narrowest fix is the same "honest failure over confident
+      // wrong-looking success" principle as the timeout fix itself: leave
+      // the error state exactly as 'step1' set it, don't resurrect it into
+      // 'results'.
+      if (state.scanOutcome?.kind === 'error') return state;
       return { ...state, phase: 'results' };
 
     case 'error':

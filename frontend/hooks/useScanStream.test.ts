@@ -78,3 +78,59 @@ describe('useScanStream reducer — step1 timeout handling', () => {
     assert.deepEqual(result.scanOutcome, { kind: 'error', message: "The scan didn't complete. Please try again." });
   });
 });
+
+describe('useScanStream reducer — a step2/complete sequence arriving after a step1 timeout', () => {
+  // Regression test for the 2026-10-01 live incident (third that night on
+  // this flow): app.py deliberately keeps streaming after a step1 timeout
+  // — step2 meal-planning runs on the empty fridge, and the request still
+  // ends with a 'complete' event 30-90s later. That's confirmed real via
+  // Render logs, not a hypothetical, and must NOT be "fixed" by changing
+  // backend behavior. The bug was scanReducer's 'complete' case
+  // unconditionally flipping phase to 'results', silently overwriting the
+  // error state 'step1' had just set and downgrading ScanStatusCard to an
+  // easy-to-miss inline strip on a page that otherwise looks like a normal
+  // (if fridge-empty) result.
+  const runTimedOutSequence = () => {
+    let state = scanningState;
+    state = reducer(state, { type: 'step1', raw_description: '', ingredients: [], timed_out: true });
+    // app.py still runs step2 on the empty fridge and sends it through as
+    // usual — this must not resurrect a "results" look.
+    state = reducer(state, {
+      type: 'step2',
+      decision: 'order_groceries',
+      recommended_meal: 'Butter Chicken',
+      reasoning: 'Fallback plan since no fridge items were confirmed.',
+      suggestions: [],
+      recipe_ingredients: [],
+      cooking_steps: [],
+      matched_fridge_items: [],
+    });
+    state = reducer(state, {
+      type: 'awaiting_user_choice',
+      reasoning: 'Fallback plan since no fridge items were confirmed.',
+      recommended_meal: 'Butter Chicken',
+      missing_ingredients: [],
+      total_order_price_inr: 0,
+    });
+    return reducer(state, { type: 'complete' });
+  };
+
+  it('stays in the error state instead of surfacing a misleading results phase', () => {
+    const result = runTimedOutSequence();
+
+    assert.equal(result.phase, 'error');
+    assert.deepEqual(result.scanOutcome, { kind: 'error', message: "The scan didn't complete. Please try again." });
+  });
+
+  it('a genuine complete (no prior timeout) still reaches results normally', () => {
+    let state = reducer(scanningState, {
+      type: 'step1',
+      raw_description: '2 ingredients detected.',
+      ingredients: [{ name: 'butter', quantity: '1', confidence: 90 }],
+    });
+    state = reducer(state, { type: 'complete' });
+
+    assert.equal(state.phase, 'results');
+    assert.equal(state.scanOutcome, null);
+  });
+});
