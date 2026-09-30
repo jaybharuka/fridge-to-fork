@@ -21,7 +21,6 @@ import time
 from pathlib import Path
 from typing import Union
 
-import boto3
 import httpx
 from dotenv import load_dotenv
 from google import genai
@@ -118,89 +117,11 @@ def _fallback_fridge_contents() -> FridgeContents:
     )
 
 # ---------------------------------------------------------------------------
-# Prompt
-# ---------------------------------------------------------------------------
-
-def _build_vision_prompt(dish_name: str = "") -> str:
-    """
-    Built per-call (not a module constant) so the scan can be primed with
-    the dish the user is targeting — Gemini pays extra attention to
-    ingredients that dish commonly needs, without narrowing the scan to
-    just those (it still reports everything visible).
-
-    Deliberately shifted the false-positive/false-negative tradeoff to the
-    code side rather than the prompt: an earlier, stricter version of this
-    prompt ("only report if you're almost certain") suppressed real,
-    clearly-visible items (mushrooms partially in a bag) along with the
-    guessed ones (chicken/fish inferred from wrapped packaging). Asking
-    Gemini to both detect thoroughly AND self-police confidence in one
-    pass pushed it toward under-reporting. This version asks it to report
-    everything it can identify — ingredient_matching.is_blocked_detection()
-    and dedupe_detections() are the actual line of defense against false
-    positives and repeat variants, not the model's own restraint.
-    """
-    dish_context = ""
-    if dish_name:
-        dish_context = f"\nContext: The user wants to cook {dish_name}. Pay special attention to ingredients relevant to this dish, but scan and report ALL visible food items regardless.\n"
-
-    return f"""You are a comprehensive kitchen inventory scanner with excellent vision.{dish_context}
-
-YOUR GOAL: Identify every food item visible in this fridge photo. Be thorough and complete. Missing a real item is worse than including an uncertain one — the code will filter out false positives.
-
-SCANNING METHOD:
-Scan the fridge systematically in this exact order:
-1. Top shelf — left to right
-2. Second shelf — left to right
-3. Third shelf — left to right
-4. Lower shelves and drawers — left to right
-5. Door compartments — top to bottom
-
-For each area, ask yourself: "What food items can I see here, even partially?"
-
-WHAT TO REPORT:
-- Fresh vegetables and fruits — even if partially visible or in bags
-- Dairy products — milk, yogurt, paneer, cheese, butter, cream
-- Eggs — if you can see an egg carton or individual eggs
-- Fresh herbs — coriander, mint, curry leaves if visible
-- Condiments and sauces — if you can identify them
-- Cooked food in containers — describe what it appears to be
-- Any clearly identifiable packaged food item
-
-WHAT TO NEVER REPORT (hard rules, no exceptions):
-- Meat, chicken, fish, seafood — ONLY if 100% unambiguously visible and unwrapped
-- Sugar, flour, atta, maida — dry goods not stored in fridges
-- Water bottles — not a food ingredient
-- Generic "spices" or "condiments" — must be specific
-- Non-food items
-- Items you genuinely cannot see at all
-
-CONFIDENCE SCORING:
-- 90-100: Completely clear, no doubt whatsoever
-- 75-89: Clearly visible but slightly obscured or partially in bag
-- 60-74: Reasonably confident — include these, the code will verify
-- Below 60: Skip
-
-NAMING RULES:
-- Standard English names only, never Hindi
-- Singular: "tomato" not "tomatoes", "mushroom" not "mushrooms"
-- Specific when possible: "button mushroom" not just "mushroom"
-- Never brand names
-
-Return ONLY a JSON array, no explanation, no markdown:
-[
-  {{"name": "button mushroom", "confidence": 82}},
-  {{"name": "bell pepper", "confidence": 90}},
-  {{"name": "eggs", "confidence": 95}}
-]
-
-If truly nothing is identifiable, return: []
-"""
-
-
-# ---------------------------------------------------------------------------
 # Two-pass scan prompts — used by identify_ingredients() below.
-# _build_vision_prompt() above is kept but no longer called directly by
-# identify_ingredients(); superseded by these two.
+# (The old single-pass _build_vision_prompt() this superseded, and the
+# single-pass call/fallback machinery that used it, were deleted along
+# with the retired LogMeal/Rekognition detectors — see identify_ingredients()'s
+# own docstring below.)
 # ---------------------------------------------------------------------------
 
 # Shared across both passes — vision-accuracy overhaul, Phase B. Kept as one
@@ -436,9 +357,9 @@ def _preprocess_for_gemini(image_bytes: bytes) -> bytes:
     Full preprocessing pipeline optimized for dark, cluttered Indian
     fridge photos, used by identify_ingredients() before every Gemini
     call: resize to 1024px, then brightness/contrast/sharpness/saturation
-    enhancement. Self-contained (doesn't call _resize_image() or
-    _enhance_for_detection() below) so it isn't coupled to those two,
-    which are now dead code left over from the retired Rekognition path.
+    enhancement. Self-contained — the retired Rekognition path's own
+    _resize_image()/_enhance_for_detection() helpers this never depended
+    on have since been deleted entirely.
     """
     img = Image.open(io.BytesIO(image_bytes))
 
@@ -465,292 +386,13 @@ def _preprocess_for_gemini(image_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 
-def _resize_image(image_bytes: bytes, max_size: int = 800) -> bytes:
-    """Downscale to at most max_size px on the longest side and re-encode
-    as JPEG before sending to Gemini — smaller payloads upload faster and
-    keep multi-image scans well under Gemini's per-request limits. Always
-    returns JPEG bytes regardless of the source format, so the caller must
-    use "image/jpeg" as the mime type for the result, not the original."""
-    img = Image.open(io.BytesIO(image_bytes))
-    img.thumbnail((max_size, max_size), Image.LANCZOS)
-    if img.mode not in ("RGB", "L"):
-        # JPEG has no alpha channel — flatten PNGs/GIFs with transparency.
-        img = img.convert("RGB")
-    out = io.BytesIO()
-    img.save(out, format="JPEG", quality=85)
-    return out.getvalue()
-
-
-# ---------------------------------------------------------------------------
-# AWS Rekognition — tried before Gemini (see identify_ingredients() below).
-# Purpose-built label detection, 5000 free calls/month on the AWS free
-# tier; Gemini is the emergency fallback when Rekognition has no
-# credentials configured, errors, or returns nothing food-relevant.
-# ---------------------------------------------------------------------------
-
-# STRICT FOOD ALLOWLIST — only accept labels that Rekognition explicitly
-# puts in one of these categories. No name-based blocklist, no confidence
-# bypass: a label with none of these categories is skipped regardless of
-# how high its own confidence is. Scales to anything Rekognition might
-# detect (a person, a device, furniture, ...) without needing to keep
-# expanding a blocklist to match every non-food thing it could ever return.
-FOOD_CATEGORIES = {
-    'food and drink',
-    'food',
-    'drink',
-    'fruit',
-    'vegetable',
-    'dairy',
-    'meat',
-    'seafood',
-    'herb and spice',
-    'grain',
-    'legume',
-    'nut',
-    'condiment and sauce',
-    'baked goods',
-    'dessert',
-    'beverage',
-    'produce',
-}
-
-
-def _enhance_for_detection(image_bytes: bytes) -> bytes:
-    """
-    Enhance image brightness and contrast for better detection in dark or
-    poorly lit conditions — common in Indian household fridges (dim
-    interior fridge lighting, photos often taken in an otherwise-dark
-    kitchen). Applied before Rekognition, not before Gemini — Gemini's
-    fallback path re-loads the original file independently.
-    """
-    img = Image.open(io.BytesIO(image_bytes))
-
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-
-    brightness = ImageEnhance.Brightness(img)
-    img = brightness.enhance(1.3)
-
-    contrast = ImageEnhance.Contrast(img)
-    img = contrast.enhance(1.2)
-
-    sharpness = ImageEnhance.Sharpness(img)
-    img = sharpness.enhance(1.3)
-
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=90)
-    return buf.getvalue()
-
-
-def _identify_with_rekognition(image_bytes: bytes) -> list[dict]:
-    """
-    AWS Rekognition — specialized label detection. Returns food-specific
-    labels with high accuracy. 5000 free calls/month on the AWS free tier.
-    Returns [] (never raises) on any failure — missing credentials, a
-    network error, or an API error all just mean "no results from this
-    source", not a scan failure.
-    """
-    access_key = os.getenv("AWS_ACCESS_KEY_ID", "")
-    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-    region = os.getenv("AWS_REGION", "ap-south-1")
-
-    if not access_key or not secret_key:
-        print("[Rekognition] No AWS credentials found — skipping")
-        return []
-
-    try:
-        client = boto3.client(
-            "rekognition",
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region,
-        )
-
-        response = client.detect_labels(
-            Image={"Bytes": image_bytes},
-            MaxLabels=80,
-            MinConfidence=50,
-        )
-
-        items = []
-
-        for label in response.get("Labels", []):
-            name = label.get("Name", "").lower().strip()
-            confidence = int(label.get("Confidence", 0))
-
-            # Get all categories Rekognition assigned to this label
-            categories = {
-                c.get("Name", "").lower()
-                for c in label.get("Categories", [])
-            }
-
-            # ONLY include if at least one category is in our food allowlist
-            # No exceptions, no confidence threshold bypass
-            if not categories.intersection(FOOD_CATEGORIES):
-                continue
-
-            items.append({"name": name, "confidence": confidence})
-
-        print(f"[Rekognition] Raw results: {len(items)} food items")
-        return items
-
-    except Exception as e:
-        print(f"[Rekognition] Error: {e}")
-        return []
-
-
-# ---------------------------------------------------------------------------
-# LogMeal — tried before Rekognition (see identify_ingredients() below).
-# Purpose-built food segmentation/recognition, 200 free calls/month.
-# ---------------------------------------------------------------------------
-
-def _identify_with_logmeal(image_bytes: bytes) -> list[dict]:
-    """
-    LogMeal food recognition — purpose-built for food ingredient detection.
-    Uses the /image/segmentation/complete endpoint. 200 free calls/month.
-    Returns [] (never raises) on any failure — missing key, auth failure,
-    network error, or non-200 response all just mean "no results from
-    this source", not a scan failure.
-    """
-    api_key = os.getenv("LOGMEAL_API_KEY", "")
-    if not api_key:
-        print("[LogMeal] No API key found")
-        return []
-
-    try:
-        with httpx.Client(timeout=30.0) as client:
-            resp = client.post(
-                "https://api.logmeal.com/v2/image/segmentation/complete",
-                headers={"Authorization": f"Bearer {api_key}"},
-                files={"image": ("fridge.jpg", image_bytes, "image/jpeg")},
-            )
-
-            if resp.status_code == 401:
-                print("[LogMeal] Auth failed — check LOGMEAL_API_KEY")
-                return []
-
-            if resp.status_code != 200:
-                print(f"[LogMeal] Error {resp.status_code}: {resp.text[:200]}")
-                return []
-
-            data = resp.json()
-            items = []
-
-            for food in data.get("segmentation_results", []):
-                for recognition in food.get("recognition_results", []):
-                    name = recognition.get("name", "").lower().strip()
-                    prob = recognition.get("prob", 0)
-                    confidence = int(prob * 100)
-
-                    if name and confidence >= 50:
-                        items.append({"name": name, "confidence": confidence})
-
-            print(f"[LogMeal] Found {len(items)} items")
-            return items
-
-    except Exception as e:
-        print(f"[LogMeal] Exception: {e}")
-        return []
-
-
-# ---------------------------------------------------------------------------
-# Core vision function
-# ---------------------------------------------------------------------------
-
-def _call_vision_model_with_retry(
-    client: genai.Client, model: str, image_parts: list[types.Part], prompt: str
-) -> FridgeContents:
-    """
-    Call `model` up to 3 times with exponential backoff, for transient
-    errors (503/network blips). Raises the last exception if all
-    attempts fail — the caller decides whether that means "try the next
-    model in the fallback chain" or "give up".
-    """
-    max_retries = 3
-    backoff = 1.0
-    # Gemini accepts multiple images in one call natively — no extra cost
-    # or latency versus a single image. With more than one, tell it
-    # explicitly not to double-count ingredients seen in more than one shot.
-    contents = list(image_parts)
-    if len(image_parts) > 1:
-        contents.append(
-            f"You are analyzing {len(image_parts)} photos of the same fridge, taken "
-            "from different angles or shelves. Combine your findings across all "
-            "photos — report each unique ingredient only once, even if it appears "
-            "in more than one photo."
-        )
-    contents.append(prompt)
-    for attempt in range(1, max_retries + 1):
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                # A short JSON array of detected ingredients should never
-                # need more than a few hundred tokens. Capping this makes a
-                # misbehaving model (seen returning 150KB+ of truncated,
-                # unparseable text) fail fast and cheaply instead of
-                # burning a full attempt generating runaway output.
-                config=types.GenerateContentConfig(max_output_tokens=2048),
-            )
-
-            raw_text = response.text.strip()
-
-            # Strip markdown fences if the model wraps the JSON
-            if raw_text.startswith("```"):
-                raw_text = raw_text.split("```")[1]
-                if raw_text.startswith("json"):
-                    raw_text = raw_text[4:]
-                raw_text = raw_text.strip()
-
-            items = json.loads(raw_text)
-
-            # The prompt now asks Gemini to report thoroughly rather than
-            # self-police confidence — these three code-side passes are
-            # the actual accuracy gate: strip categories it should never
-            # guess (meat/fish/pantry staples), drop anything genuinely
-            # low-confidence, then collapse repeat variants of the same
-            # ingredient ("bell pepper" / "red bell pepper" / "green bell
-            # pepper") down to the best single report of each.
-            items = [item for item in items if not is_blocked_detection(item.get("name", ""))]
-            items = [
-                item for item in items
-                if passes_confidence(item.get("name", ""), item.get("confidence", 0))
-            ]
-            items = dedupe_detections(items)
-            items = sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
-
-            ingredients = [
-                Ingredient(
-                    name=item["name"],
-                    # Prompt reports confidence on a 0-100 scale; Ingredient's
-                    # confidence field is documented (models.py) as 0.0-1.0,
-                    # so convert here — keeps this function's return format
-                    # unchanged for every downstream caller.
-                    confidence=item.get("confidence", 0) / 100.0,
-                )
-                for item in items
-            ]
-
-            return FridgeContents(
-                ingredients=ingredients,
-                raw_description=(
-                    f"{len(ingredients)} ingredient(s) detected in your fridge."
-                    if ingredients else "No ingredients detected."
-                ),
-            )
-
-        except Exception as e:
-            console.print(f"[yellow][WARNING] {model} attempt {attempt} failed: {type(e).__name__}: {e}[/yellow]")
-            if attempt == max_retries:
-                raise
-            time.sleep(backoff)
-            backoff *= 2
-
-    raise RuntimeError(f"{model} failed after {max_retries} attempts")  # unreachable safeguard
-
-
 # ---------------------------------------------------------------------------
 # Two-pass Gemini scanning — used by identify_ingredients() below.
+# (The old single-pass _call_vision_model_with_retry(), _resize_image(),
+# and the retired LogMeal/AWS Rekognition detectors that preceded Gemini
+# in earlier iterations were deleted here — none had any caller left once
+# _identify_with_gemini_fallback() below was also removed. See
+# identify_ingredients()'s own docstring for why they existed at all.)
 # ---------------------------------------------------------------------------
 
 def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, model: str) -> list[dict]:
@@ -758,9 +400,8 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
     Single Gemini vision call for one prompt/image. Raises on failure
     (network error, quota exhaustion, unparseable response) rather than
     swallowing it — _call_gemini_vision_with_fallback() below is what
-    catches that and moves on to the next model in the fallback chain,
-    same reasoning as _call_vision_model_with_retry() uses for the
-    single-pass path. Returns a plain list[dict] of {"name", "confidence"}
+    catches that and moves on to the next model in the fallback chain.
+    Returns a plain list[dict] of {"name", "confidence"}
     rather than a FridgeContents, since two passes' worth of results get
     merged (in identify_ingredients()) before that conversion happens.
 
@@ -847,8 +488,7 @@ def _call_gemini_vision_with_fallback(
     clients: list[tuple[str, "genai.Client"]], image_bytes: bytes, prompt: str, model: str | None = None
 ) -> list[dict]:
     """Tries each model in VISION_MODEL_FALLBACK_CHAIN (an explicit
-    `model` override first, if given, same convention as
-    _identify_with_gemini_fallback()) — and for EACH model, tries every
+    `model` override first, if given) — and for EACH model, tries every
     available API key before moving to the next model. Model-first/
     key-second, not the reverse: the observed real-world failure mode is
     one model's quota exhausting independently of the others (each has its
@@ -906,11 +546,11 @@ def identify_ingredients(
     detectors in earlier iterations — neither proved reliable for fridge
     scanning (LogMeal's account/plan kept blocking the segmentation
     endpoint; Rekognition's general-purpose label vocabulary wasn't a
-    good fit for kitchen ingredients). _identify_with_logmeal() and
-    _identify_with_rekognition() are left defined but unused rather than
-    deleted, in case either is worth revisiting later — same for the
-    single-pass _call_vision_model_with_retry()/_identify_with_gemini_fallback()
-    machinery this two-pass approach supersedes.
+    good fit for kitchen ingredients). Both detectors, and the single-pass
+    _call_vision_model_with_retry()/_identify_with_gemini_fallback()
+    machinery this two-pass approach supersedes, have been deleted —
+    confirmed zero callers before removal; recoverable from git history
+    if ever worth revisiting.
 
     Parameters
     ----------
@@ -1028,82 +668,6 @@ def identify_ingredients(
             if ingredients else "No ingredients detected."
         ),
     )
-
-
-def _identify_with_gemini_fallback(
-    image_source: Union[str, Path, bytes, list[Union[str, Path, bytes]]],
-    dish_name: str = "",
-    *,
-    model: str | None = None,
-    client: genai.Client | None = None,
-) -> FridgeContents:
-    """
-    Last-resort fallback when both LogMeal and Rekognition return nothing
-    for a photo — the original Gemini-only implementation, unchanged in
-    behavior, just no longer the primary path (see identify_ingredients()
-    above).
-
-    Parameters
-    ----------
-    image_source:
-        A single file path (str/Path), public image URL (str), or raw image
-        bytes — or a list of up to 3 of those (e.g. several angles/shelves
-        of the same fridge). All images in a list are sent to Gemini
-        together in one call; the model is told to de-duplicate ingredients
-        it sees in more than one photo.
-    dish_name:
-        Optional dish the user is targeting — when given, the scan is
-        primed to pay extra attention to that dish's typical ingredients
-        without narrowing the scan to just those (see
-        _build_vision_prompt()). Omit for a generic, unprimed scan.
-    model:
-        Optional Gemini model override. If omitted, tries each model in
-        VISION_MODEL_FALLBACK_CHAIN in order until one succeeds.
-    client:
-        Optional pre-built Gemini client (useful for testing / DI).
-
-    Returns
-    -------
-    FridgeContents with a list of Ingredient objects.
-
-    Retries transient API errors (quota/overload) up to 3 times with
-    exponential backoff per model. If a model's quota is exhausted (or it
-    keeps failing after retries), moves on to the next model in the
-    fallback chain before giving up and returning a placeholder inventory.
-    """
-    sources = image_source if isinstance(image_source, list) else [image_source]
-    prompt = _build_vision_prompt(dish_name)
-
-    try:
-        client = client or genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-        image_parts = []
-        for source in sources:
-            raw_bytes, _media_type = _load_image(source)
-            # _resize_image() always re-encodes as JPEG regardless of the
-            # source format, so the mime type sent alongside it must be
-            # "image/jpeg" too — not the original _media_type (e.g. a PNG
-            # sent as image/jpeg would be malformed).
-            raw_bytes = _resize_image(raw_bytes)
-            image_parts.append(types.Part.from_bytes(data=raw_bytes, mime_type="image/jpeg"))
-    except Exception as e:
-        console.print(f"[yellow][WARNING] Could not prepare image(s) for vision analysis: {type(e).__name__}: {e}[/yellow]")
-        return _fallback_fridge_contents()
-
-    chain = _dedupe([model, *VISION_MODEL_FALLBACK_CHAIN]) if model else VISION_MODEL_FALLBACK_CHAIN
-
-    for chain_model in chain:
-        try:
-            result = _call_vision_model_with_retry(client, chain_model, image_parts, prompt)
-            console.print(f"[green][OK] Vision succeeded with model: {chain_model}[/green]")
-            return result
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                console.print(f"[yellow][WARNING] {chain_model} quota exhausted, trying next model...[/yellow]")
-            else:
-                console.print(f"[yellow][WARNING] {chain_model} failed with: {e}, trying next...[/yellow]")
-
-    console.print("[yellow][WARNING] All Gemini vision models quota exhausted, using fallback[/yellow]")
-    return _fallback_fridge_contents()
 
 
 # ---------------------------------------------------------------------------
