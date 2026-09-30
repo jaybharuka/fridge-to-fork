@@ -69,7 +69,7 @@
 /* Zone 2 — AI progress stages — templates/index.html:1602-1645 */
 .loadingStatusZone { position: relative; z-index: 1; max-width: 280px; width: 100%; margin: 36px auto 0; }
 .loadingHeadline {
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 17px; font-weight: 700;
+  font-family: var(--font-heading); font-size: 17px; font-weight: 700;
   color: rgba(255, 255, 255, 0.95); text-align: center; margin-bottom: 28px;
   opacity: 0; transform: translateY(6px);
   transition: opacity .35s ease-out, transform .35s ease-out;
@@ -88,7 +88,7 @@
   transition: border-color .3s ease, background .3s ease;
 }
 .loadingStageLabel {
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 500;
+  font-family: var(--font-body); font-size: 14px; font-weight: 500;
   color: rgba(255, 255, 255, 0.35); transition: color .3s ease, font-weight .3s ease;
 }
 .loadingStage.active .loadingStageIcon { border-color: #FC8019; }
@@ -185,7 +185,7 @@
 }
 .detectedItemCheck svg { width: 14px; height: 14px; stroke: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.3); stroke-width: 2.5; }
 .detectedItemName {
-  flex: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 600;
+  flex: 1; font-family: var(--font-body); font-size: 15px; font-weight: 600;
   color: rgba(255, 255, 255, 0.92); text-transform: capitalize;
 }
 .detectedItemRow.high .detectedItemCheck { background: rgba(52, 199, 89, 0.12); border-color: rgba(52, 199, 89, 0.3); }
@@ -204,7 +204,7 @@
 .photoScanTimeoutState.hard svg { color: #FC8019; margin-bottom: 4px; }
 .photoScanTimeoutState.soft .photoScanTimeoutHeading { color: rgba(255, 255, 255, 0.75); }
 .photoScanTimeoutHeading {
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
+  font-family: var(--font-heading); font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
 }
 .photoScanTimeoutSub { font-size: 12px; color: rgba(255, 255, 255, 0.5); line-height: 1.5; }
 .photoScanRetryBtn {

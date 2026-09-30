@@ -26,6 +26,16 @@
   --text-xl: 18px; --text-2xl: 20px; --text-3xl: 24px; --text-4xl: 32px;
   --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600; --weight-bold: 700; --weight-extrabold: 800;
 
+  /* Typography pairing (ui-ux-pro-max redesign pass, 2026-10) — Rubik for
+     headings/emphasis, Nunito Sans for body. Additive, same migration
+     pattern as the rest of this block: `body` below switches to
+     --font-body directly (safe, was one flat font everywhere already);
+     --font-heading is opted into via `.heading-text` and applied to the
+     highest-visibility headings first (dish name, landing headline,
+     section labels) rather than every bold/large rule in one pass. */
+  --font-heading: 'Rubik', sans-serif;
+  --font-body: 'Nunito Sans', sans-serif;
+
   /* --radius/--radius-sm/--radius-pill (declared below, unchanged) stay the canonical small/pill sizes; these fill
      in the rest of the scale found in use. */
   --radius-xs: 6px; --radius-lg: 20px; --radius-xl: 24px;
@@ -170,10 +180,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
   outline: 2px solid #FC8019; outline-offset: 2px;
 }
 body {
-  font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; line-height:1.5; font-weight:400;
+  font-family:var(--font-body); font-size:14px; line-height:1.5; font-weight:400;
   background:var(--swiggy-bg); color:var(--swiggy-text); min-height:100vh; overflow-x:hidden;
   position:relative;
 }
+/* Rubik for headings/emphasis — dish names, section labels, card titles.
+   Applied via class rather than h1-h6 since most "headings" in this app
+   (dish name, meal card name, section label) are styled divs/spans, not
+   semantic heading elements. */
+h1, h2, h3, .heading-text { font-family:var(--font-heading); font-weight:700; }
 .top-bar { height:1px; width:100%; background:linear-gradient(90deg, transparent, #FC8019, transparent); }
 /* Lucide renders each icon as an inline <svg class="lucide">. Sizing it
    at 1em lets every existing "icon-holder { font-size:Npx; color:... }"
