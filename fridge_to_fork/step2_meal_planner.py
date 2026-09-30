@@ -326,16 +326,75 @@ def _classify_ingredient_status(name: str, category: str, fridge_items: list[str
     return "missing"
 
 
+def _compute_derived_fields(meal: MealSuggestion, fridge_names: list[str]) -> None:
+    """
+    Fills in missing_ingredients, total_order_price_inr, and
+    matched_fridge_items on a single suggestion IN PLACE, from its
+    recipe_ingredients' already-classified is_staple/found_in_fridge (see
+    _classify_ingredient_status). Pulled out of _enrich_recipe_ingredients()
+    so it can run for every suggestion, not just recommended_meal — the
+    "Meal Suggestions" picker needs every suggestion's own missing list and
+    matched fridge chips to switch instantly, with no new Gemini call, and
+    /api/replan's known-suggestion path (app.py) reuses this same function
+    for a single meal outside a full MealPlan.
+    """
+    if not meal or not meal.recipe_ingredients:
+        return
+
+    missing = [ri for ri in meal.recipe_ingredients if not (ri.is_staple or ri.found_in_fridge)]
+    meal.missing_ingredients = [ri.name for ri in missing]
+    meal.total_order_price_inr = sum(ri.estimated_price_inr for ri in missing)
+
+    # Which scanned fridge items (exact detected names) this specific
+    # recipe actually uses — same deterministic fuzzy matcher as
+    # found_in_fridge above, just from the fridge's side rather than
+    # the recipe's, so the fridge chips UI can show relevant items
+    # first. Staples are excluded — they're assumed available, so
+    # they shouldn't appear as "detected in fridge" chips either.
+    # Filters on the computed ri.is_staple (set just above), not the
+    # raw ri.category — a _FRIDGE_STAPLES ingredient (tomato, ginger,
+    # ...) can resolve to "have" despite Gemini tagging its category
+    # "staple", and that one should still show up as a matched chip.
+    non_staple_recipe_names = [ri.name for ri in meal.recipe_ingredients if not ri.is_staple]
+    meal.matched_fridge_items = [
+        name for name in fridge_names
+        if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, non_staple_recipe_names)
+    ]
+
+
+def classify_and_enrich_known_meal(meal: MealSuggestion, fridge: FridgeContents) -> MealSuggestion:
+    """
+    Public entry point for a meal whose recipe_ingredients are already known
+    (the frontend picked one of the suggestions /api/scan already generated
+    and sent back its recipe_ingredients as-is) — runs the same deterministic
+    classify + derive steps _enrich_recipe_ingredients() runs per-suggestion,
+    without needing a MealPlan or a fresh Gemini call. Used by app.py's
+    /api/replan for the "known suggestion" case; the "custom free-text dish"
+    case instead goes through plan_meals(), which calls
+    _enrich_recipe_ingredients() as usual.
+    """
+    fridge_names = [ing.name for ing in fridge.ingredients]
+    for ri in meal.recipe_ingredients or []:
+        status = _classify_ingredient_status(ri.name, ri.category, fridge_names)
+        ri.is_staple = status == "staple"
+        ri.found_in_fridge = status == "have"
+    _compute_derived_fields(meal, fridge_names)
+    return meal
+
+
 def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPlan:
     """
     Deterministically (not via LLM self-report on have/missing — Gemini
     only supplies each ingredient's category, see _RECIPE_RULES) fill in
     is_staple and found_in_fridge on every recipe ingredient, then derive
-    the recommended meal's missing_ingredients (name + total price) from
+    each suggestion's missing_ingredients (name + total price) from
     whatever's left unchecked — neither a staple nor detected in the
-    fridge photo. No cook/order_groceries/order_dish decision is made
-    here; the user picks for themselves between ordering the missing
-    items or ordering the finished dish.
+    fridge photo. Runs for every suggestion (not just recommended_meal) so
+    the frontend can switch its active suggestion instantly, with the
+    switched-to dish's missing list/matched chips/total price already
+    computed — see _compute_derived_fields(). No cook/order_groceries/
+    order_dish decision is made here; the user picks for themselves between
+    ordering the missing items or ordering the finished dish.
     """
     fridge_names = [ing.name for ing in fridge.ingredients]
 
@@ -346,33 +405,13 @@ def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPl
             status = _classify_ingredient_status(ri.name, ri.category, fridge_names)
             ri.is_staple = status == "staple"
             ri.found_in_fridge = status == "have"
+        _compute_derived_fields(suggestion, fridge_names)
 
-    if plan.recommended_meal and plan.recommended_meal.recipe_ingredients:
-        missing = [
-            ri for ri in plan.recommended_meal.recipe_ingredients
-            if not (ri.is_staple or ri.found_in_fridge)
-        ]
-        plan.recommended_meal.missing_ingredients = [ri.name for ri in missing]
-        plan.recommended_meal.total_order_price_inr = sum(ri.estimated_price_inr for ri in missing)
-
-        # Which scanned fridge items (exact detected names) this specific
-        # recipe actually uses — same deterministic fuzzy matcher as
-        # found_in_fridge above, just from the fridge's side rather than
-        # the recipe's, so the fridge chips UI can show relevant items
-        # first. Staples are excluded — they're assumed available, so
-        # they shouldn't appear as "detected in fridge" chips either.
-        # Filters on the computed ri.is_staple (set just above), not the
-        # raw ri.category — a _FRIDGE_STAPLES ingredient (tomato, ginger,
-        # ...) can resolve to "have" despite Gemini tagging its category
-        # "staple", and that one should still show up as a matched chip.
-        non_staple_recipe_names = [
-            ri.name for ri in plan.recommended_meal.recipe_ingredients
-            if not ri.is_staple
-        ]
-        plan.matched_fridge_items = [
-            name for name in fridge_names
-            if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, non_staple_recipe_names)
-        ]
+    # MealPlan.matched_fridge_items mirrors recommended_meal's own — kept for
+    # existing callers that read it at the plan level (e.g. app.py's step2
+    # "matched_fridge_items" field before this change).
+    if plan.recommended_meal:
+        plan.matched_fridge_items = plan.recommended_meal.matched_fridge_items
 
     return plan
 

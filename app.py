@@ -24,11 +24,12 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from google import genai
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
+from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
@@ -45,11 +46,16 @@ def _ascii_safe(value) -> str:
 
 from fridge_to_fork import db
 from fridge_to_fork.step1_fridge_vision import identify_ingredients
-from fridge_to_fork.step2_meal_planner import generate_top_up_suggestions, plan_meals_stream
+from fridge_to_fork.step2_meal_planner import (
+    classify_and_enrich_known_meal,
+    generate_top_up_suggestions,
+    plan_meals,
+    plan_meals_stream,
+)
 from fridge_to_fork.features import FOOD_MOVED_MESSAGE
 from fridge_to_fork.food_routes import make_router as make_food_router
 from fridge_to_fork.instamart_routes import make_router as make_instamart_router
-from fridge_to_fork.models import Decision, FridgeContents, MealPlan, MealSuggestion
+from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 from fridge_to_fork.scan_routes import make_router as make_scan_router
 from fridge_to_fork.seed_canonical_ingredients import seed as _seed_canonical_ingredients
 
@@ -221,6 +227,42 @@ def _access_token(request: Request) -> str | None:
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
+
+
+def _serialize_recipe_ingredients(ingredients: list) -> list[dict]:
+    return [
+        {
+            "name": ri.name,
+            "quantity": ri.quantity,
+            "estimated_price_inr": ri.estimated_price_inr,
+            "found_in_fridge": ri.found_in_fridge,
+            "is_staple": ri.is_staple,
+            "category": ri.category,
+        }
+        for ri in ingredients
+    ]
+
+
+def _serialize_suggestion(s: MealSuggestion) -> dict:
+    """Full per-suggestion payload for the step2 SSE event — every suggestion
+    carries its own recipe_ingredients/cooking_steps (step2_meal_planner.py's
+    single meal-planning call already generates a complete recipe for each
+    one, not just the recommended dish; _enrich_recipe_ingredients() already
+    classifies/derives missing_ingredients+total_order_price_inr+
+    matched_fridge_items for every suggestion too), so the frontend can
+    switch its active suggestion instantly with zero extra backend calls."""
+    return {
+        "name": s.name,
+        "description": s.description,
+        "cuisine": s.cuisine,
+        "can_cook_now": s.can_cook_now,
+        "missing_ingredients": s.missing_ingredients,
+        "prep_time_minutes": s.prep_time_minutes,
+        "recipe_ingredients": _serialize_recipe_ingredients(s.recipe_ingredients or []),
+        "cooking_steps": s.cooking_steps or [],
+        "total_order_price_inr": s.total_order_price_inr,
+        "matched_fridge_items": s.matched_fridge_items or [],
+    }
 
 
 def _run_plan_meals_stream(fridge, target_dish, servings, q: "queue.Queue") -> None:
@@ -736,33 +778,13 @@ async def scan(
                 "decision": plan.decision.value,
                 "recommended_meal": plan.recommended_meal.name if plan.recommended_meal else None,
                 "reasoning": plan.reasoning,
-                "suggestions": [
-                    {
-                        "name": s.name,
-                        "description": s.description,
-                        "cuisine": s.cuisine,
-                        "can_cook_now": s.can_cook_now,
-                        "missing_ingredients": s.missing_ingredients,
-                        "prep_time_minutes": s.prep_time_minutes,
-                    }
-                    for s in plan.suggestions
-                ],
-                "recipe_ingredients": [
-                    {
-                        "name": ri.name,
-                        "quantity": ri.quantity,
-                        "estimated_price_inr": ri.estimated_price_inr,
-                        "found_in_fridge": ri.found_in_fridge,
-                        "is_staple": ri.is_staple,
-                        "category": ri.category,
-                    }
-                    for ri in (
-                        plan.recommended_meal.recipe_ingredients
-                        if plan.recommended_meal
-                        and getattr(plan.recommended_meal, "recipe_ingredients", None)
-                        else []
-                    )
-                ],
+                "suggestions": [_serialize_suggestion(s) for s in plan.suggestions],
+                "recipe_ingredients": _serialize_recipe_ingredients(
+                    plan.recommended_meal.recipe_ingredients
+                    if plan.recommended_meal
+                    and getattr(plan.recommended_meal, "recipe_ingredients", None)
+                    else []
+                ),
                 "cooking_steps": (
                     plan.recommended_meal.cooking_steps
                     if plan.recommended_meal
@@ -824,32 +846,13 @@ async def scan(
                     "decision": plan.decision.value,
                     "recommended_meal": plan.recommended_meal.name if plan.recommended_meal else None,
                     "reasoning": plan.reasoning,
-                    "suggestions": [
-                        {
-                            "name": s.name,
-                            "description": s.description,
-                            "cuisine": s.cuisine,
-                            "can_cook_now": s.can_cook_now,
-                            "missing_ingredients": s.missing_ingredients,
-                            "prep_time_minutes": s.prep_time_minutes,
-                        }
-                        for s in plan.suggestions
-                    ],
-                    "recipe_ingredients": [
-                        {
-                            "name": ri.name,
-                            "quantity": ri.quantity,
-                            "estimated_price_inr": ri.estimated_price_inr,
-                            "found_in_fridge": ri.found_in_fridge,
-                            "is_staple": ri.is_staple,
-                        }
-                        for ri in (
-                            plan.recommended_meal.recipe_ingredients
-                            if plan.recommended_meal
-                            and getattr(plan.recommended_meal, "recipe_ingredients", None)
-                            else []
-                        )
-                    ],
+                    "suggestions": [_serialize_suggestion(s) for s in plan.suggestions],
+                    "recipe_ingredients": _serialize_recipe_ingredients(
+                        plan.recommended_meal.recipe_ingredients
+                        if plan.recommended_meal
+                        and getattr(plan.recommended_meal, "recipe_ingredients", None)
+                        else []
+                    ),
                     "cooking_steps": (
                         plan.recommended_meal.cooking_steps
                         if plan.recommended_meal
@@ -937,6 +940,89 @@ async def scan_vision_only(file: UploadFile = File(...)):
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Switching the active dish on an already-completed scan — reuses fridge
+# contents /api/scan already detected, never re-runs the vision step.
+# ---------------------------------------------------------------------------
+
+class ReplanIngredientIn(BaseModel):
+    name: str
+    quantity: str = ""
+    confidence: float = 1.0
+
+
+class ReplanRecipeIngredientIn(BaseModel):
+    name: str
+    quantity: str = ""
+    estimated_price_inr: int = 0
+    category: str = "specialty"
+
+
+class ReplanRequest(BaseModel):
+    dish_name: str
+    fridge_ingredients: list[ReplanIngredientIn] = []
+    servings: int = 2
+    # Present when the frontend already has full recipe data for dish_name
+    # (the user clicked one of the Meal Suggestions cards, whose
+    # recipe_ingredients arrived with the original /api/scan) — skips the
+    # Gemini recipe-generation call entirely and only (re)computes the
+    # deterministic fridge-match/staple fields plus top-up suggestions.
+    # Omitted/empty means an arbitrary free-text dish, which must go through
+    # plan_meals() to actually generate a recipe for it.
+    recipe_ingredients: list[ReplanRecipeIngredientIn] = []
+    cooking_steps: list[str] = []
+
+
+@app.post("/api/replan")
+async def replan(body: ReplanRequest):
+    dish_name = body.dish_name.strip()
+    if not dish_name:
+        raise HTTPException(400, "dish_name is required")
+
+    fridge = FridgeContents(
+        ingredients=[
+            Ingredient(name=i.name, quantity=i.quantity, confidence=i.confidence)
+            for i in body.fridge_ingredients
+        ]
+    )
+
+    if body.recipe_ingredients:
+        meal = MealSuggestion(
+            name=dish_name,
+            description="",
+            can_cook_now=True,
+            cooking_steps=body.cooking_steps,
+            recipe_ingredients=[
+                RecipeIngredient(
+                    name=ri.name, quantity=ri.quantity,
+                    estimated_price_inr=ri.estimated_price_inr, category=ri.category,
+                )
+                for ri in body.recipe_ingredients
+            ],
+        )
+        meal = classify_and_enrich_known_meal(meal, fridge)
+        decision, reasoning = Decision.COOK, ""
+    else:
+        plan = await asyncio.to_thread(plan_meals, fridge, target_dish=dish_name, servings=body.servings)
+        meal = plan.recommended_meal
+        if meal is None:
+            raise HTTPException(502, "Could not plan this dish")
+        decision, reasoning = plan.decision, plan.reasoning
+
+    top_up_suggestions = await asyncio.to_thread(generate_top_up_suggestions, fridge, meal, decision)
+
+    return {
+        "recommended_meal": meal.name,
+        "reasoning": reasoning,
+        "recipe_ingredients": _serialize_recipe_ingredients(meal.recipe_ingredients or []),
+        "cooking_steps": meal.cooking_steps or [],
+        "missing_ingredients": meal.missing_ingredients,
+        "total_order_price_inr": meal.total_order_price_inr,
+        "matched_fridge_items": meal.matched_fridge_items or [],
+        "top_up_suggestions": top_up_suggestions,
+    }
 
 
 # ---------------------------------------------------------------------------

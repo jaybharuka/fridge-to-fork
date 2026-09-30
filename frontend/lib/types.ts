@@ -6,6 +6,14 @@ export interface RecipeIngredient {
 export interface MealSuggestion {
   name: string; description: string; cuisine: string;
   can_cook_now: boolean; missing_ingredients: string[]; prep_time_minutes: number;
+  // Full recipe for this specific suggestion — step2_meal_planner.py's one
+  // meal-planning call already generates these for every suggestion, not
+  // just the recommended one, so picking a different suggestion can build
+  // its checklist instantly, no new request needed.
+  recipe_ingredients: RecipeIngredient[];
+  cooking_steps: string[];
+  total_order_price_inr: number;
+  matched_fridge_items: string[];
 }
 export interface TopUpSuggestion { name: string; estimated_price?: number; category?: string; }
 

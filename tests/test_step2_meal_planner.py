@@ -7,10 +7,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan
+from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 from fridge_to_fork.step2_meal_planner import (
+    _enrich_recipe_ingredients,
     _fuzzy_ingredient_match,
     _normalize_ingredient_words,
+    classify_and_enrich_known_meal,
     plan_meals,
 )
 
@@ -194,6 +196,76 @@ def test_plan_meals_with_target_dish():
     prompt_text = kwargs["contents"]
     assert "Mushroom Risotto" in prompt_text
     assert "eggs" in prompt_text
+
+
+# ---------------------------------------------------------------------------
+# _enrich_recipe_ingredients / classify_and_enrich_known_meal — "select a
+# meal suggestion" feature. The single meal-planning Gemini call already
+# returns a full recipe_ingredients list for every suggestion, not just
+# recommended_meal; these cover the enrichment step now running for all of
+# them (needed so switching the active suggestion in the UI is instant, with
+# no new Gemini call) and the standalone path /api/replan uses for a
+# suggestion whose recipe data the frontend already has.
+# ---------------------------------------------------------------------------
+
+def _ri(name, price=0, category="specialty"):
+    return RecipeIngredient(name=name, quantity="1", estimated_price_inr=price, category=category)
+
+
+def test_enrich_recipe_ingredients_covers_every_suggestion_not_just_recommended():
+    fridge = _make_fridge("eggs", "cheddar cheese")
+    recommended = MealSuggestion(
+        name="Cheese Omelette", description="", can_cook_now=True,
+        recipe_ingredients=[_ri("eggs"), _ri("cheddar cheese"), _ri("mozzarella cheese", price=20)],
+    )
+    other = MealSuggestion(
+        name="Pasta Carbonara", description="", can_cook_now=True,
+        recipe_ingredients=[_ri("eggs"), _ri("pancetta", price=150), _ri("salt")],
+    )
+    plan = MealPlan(suggestions=[recommended, other], decision=Decision.COOK, recommended_meal=recommended)
+
+    _enrich_recipe_ingredients(plan, fridge)
+
+    # Recommended: eggs/cheddar cheese found in fridge, mozzarella cheese missing.
+    assert recommended.missing_ingredients == ["mozzarella cheese"]
+    assert recommended.total_order_price_inr == 20
+    assert "eggs" in recommended.matched_fridge_items
+
+    # The OTHER suggestion — never read by the old code (only
+    # plan.recommended_meal was enriched) — must be enriched too: eggs found,
+    # salt is a pantry staple, pancetta is genuinely missing.
+    assert other.missing_ingredients == ["pancetta"]
+    assert other.total_order_price_inr == 150
+    assert "eggs" in other.matched_fridge_items
+
+
+def test_classify_and_enrich_known_meal_matches_plan_level_enrichment():
+    """/api/replan's known-suggestion path (app.py) calls this directly,
+    outside a MealPlan — must produce the same result _enrich_recipe_ingredients
+    would for that same suggestion inside a full plan."""
+    fridge = _make_fridge("eggs", "cheddar cheese")
+    meal = MealSuggestion(
+        name="Cheese Omelette", description="", can_cook_now=True,
+        recipe_ingredients=[_ri("eggs"), _ri("cheddar cheese"), _ri("mozzarella cheese", price=20)],
+    )
+
+    result = classify_and_enrich_known_meal(meal, fridge)
+
+    assert result is meal  # in place, returned for convenience
+    assert meal.missing_ingredients == ["mozzarella cheese"]
+    assert meal.total_order_price_inr == 20
+    assert set(meal.matched_fridge_items) == {"eggs", "cheddar cheese"}
+    assert meal.recipe_ingredients[0].found_in_fridge is True
+
+
+def test_classify_and_enrich_known_meal_handles_no_recipe_ingredients():
+    fridge = _make_fridge("eggs")
+    meal = MealSuggestion(name="Mystery Dish", description="", can_cook_now=True, recipe_ingredients=None)
+
+    result = classify_and_enrich_known_meal(meal, fridge)
+
+    assert result.missing_ingredients == []
+    assert result.matched_fridge_items == []
 
 
 # ---------------------------------------------------------------------------

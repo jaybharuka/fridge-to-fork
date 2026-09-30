@@ -4,7 +4,24 @@
 // useScanStream.ts uses for the actual network call — those use extensionless
 // value imports that only a bundler (not node --experimental-strip-types)
 // can resolve.
-import type { ChecklistItem, DetectedIngredient, MealSuggestion, ScanEvent, TopUpSuggestion } from '../lib/types';
+import type { ChecklistItem, DetectedIngredient, MealSuggestion, RecipeIngredient, ScanEvent, TopUpSuggestion } from '../lib/types';
+
+/** Shared by step2, SELECT_MEAL and REPLAN_SUCCESS — every place that turns
+ *  a dish's recipe_ingredients into the checklist the Order tab renders. */
+export function buildChecklist(ingredients: RecipeIngredient[]): ChecklistItem[] {
+  return ingredients.map(ing => {
+    const foundInFridge = ing.found_in_fridge === true;
+    const isStaple = ing.is_staple === true;
+    return {
+      name: ing.name,
+      quantity: ing.quantity,
+      estimated_price_inr: ing.estimated_price_inr || 0,
+      foundInFridge,
+      isStaple,
+      checked: foundInFridge || isStaple,
+    };
+  });
+}
 
 export interface ScanState {
   phase: 'idle' | 'loading' | 'photo-scanning' | 'results' | 'error';
@@ -19,6 +36,17 @@ export interface ScanState {
   topUpSuggestions: TopUpSuggestion[];
   awaitingChoice: boolean;
   recipeTabUnlocked: boolean;
+  /** True while a dish switch's backend call is in flight — the background
+   *  top-up refresh after picking an existing suggestion (checklist itself
+   *  switches instantly, only top-up needs a fresh call, since it's
+   *  dish-specific and was never pre-generated for every suggestion), or
+   *  the full /api/replan call for a free-text custom dish. */
+  replanPending: boolean;
+  /** Set only by a failed custom-dish request — an existing suggestion's
+   *  background top-up refresh fails silently (matches the backend's own
+   *  "top-up is best-effort, never blocks the main flow" behavior), since
+   *  its checklist switch already succeeded locally either way. */
+  replanError: string | null;
   /** What a failed scan leaves on screen (ScanStatusCard): an error, or an expired Swiggy session. */
   scanOutcome:
     | null
@@ -45,7 +73,19 @@ export type Action =
       reasoning: string;
       checklist: ChecklistItem[];
       topUpSuggestions: TopUpSuggestion[];
-    };
+    }
+  // Picking an already-known suggestion (Meal Suggestions card click) —
+  // instant, local, no network call for the checklist itself.
+  | { type: 'SELECT_MEAL'; suggestion: MealSuggestion }
+  // Free-text custom dish ("or tell us what you'd like to make instead"),
+  // and the background top-up refresh SELECT_MEAL triggers — both go
+  // through POST /api/replan.
+  | { type: 'REPLAN_START' }
+  | { type: 'REPLAN_SUCCESS'; suggestion: MealSuggestion; topUpSuggestions: TopUpSuggestion[] }
+  | { type: 'REPLAN_ERROR'; message: string }
+  // The background top-up-only refresh after SELECT_MEAL failed — clears
+  // replanPending without surfacing an error (best-effort, see topUpSuggestions doc comment above).
+  | { type: 'REPLAN_TOP_UP_FAILED' };
 
 export const initialState: ScanState = {
   phase: 'idle',
@@ -64,6 +104,8 @@ export const initialState: ScanState = {
   scanError: null,
   timedOutVision: false,
   step1Received: false,
+  replanPending: false,
+  replanError: null,
 };
 
 export function reducer(state: ScanState, action: Action): ScanState {
@@ -114,18 +156,7 @@ export function reducer(state: ScanState, action: Action): ScanState {
       };
 
     case 'step2': {
-      const checklist: ChecklistItem[] = action.recipe_ingredients.map(ing => {
-        const foundInFridge = ing.found_in_fridge === true;
-        const isStaple = ing.is_staple === true;
-        return {
-          name: ing.name,
-          quantity: ing.quantity,
-          estimated_price_inr: ing.estimated_price_inr || 0,
-          foundInFridge,
-          isStaple,
-          checked: foundInFridge || isStaple,
-        };
-      });
+      const checklist = buildChecklist(action.recipe_ingredients);
       return {
         ...state,
         suggestions: action.suggestions,
@@ -148,7 +179,59 @@ export function reducer(state: ScanState, action: Action): ScanState {
 
     case 'top_up':
       if (!state.suggestions.length) return state;
-      return { ...state, topUpSuggestions: action.suggestions };
+      return { ...state, topUpSuggestions: action.suggestions, replanPending: false };
+
+    // Clicking a Meal Suggestions card — the suggestion's full recipe
+    // already arrived with step2 (see MealSuggestion's recipe_ingredients
+    // in lib/types.ts), so the checklist switch is instant and local: no
+    // network call, works identically whether switching away from the
+    // original recommended dish or back to it. Top-up suggestions ARE
+    // dish-specific (generate_top_up_suggestions prompts on the meal's own
+    // name + missing_ingredients) and were only ever generated for the
+    // previously-active dish, so they're cleared here and refreshed by a
+    // background /api/replan call the caller (useScanStream.selectMeal)
+    // kicks off right after dispatching this.
+    case 'SELECT_MEAL':
+      return {
+        ...state,
+        recommendedMeal: action.suggestion.name,
+        checklist: buildChecklist(action.suggestion.recipe_ingredients),
+        cookingSteps: action.suggestion.cooking_steps,
+        matchedFridgeItems: action.suggestion.matched_fridge_items,
+        topUpSuggestions: [],
+        replanPending: true,
+        replanError: null,
+      };
+
+    case 'REPLAN_START':
+      return { ...state, replanPending: true, replanError: null };
+
+    // A free-text custom dish came back from /api/replan — same checklist
+    // switch as SELECT_MEAL, plus add it to `suggestions` so it's now also
+    // clickable/re-selectable like any other suggestion, and its top-up
+    // suggestions arrive in the same response (no second request needed).
+    case 'REPLAN_SUCCESS': {
+      const alreadyKnown = state.suggestions.some(s => s.name === action.suggestion.name);
+      return {
+        ...state,
+        suggestions: alreadyKnown
+          ? state.suggestions.map(s => (s.name === action.suggestion.name ? action.suggestion : s))
+          : [...state.suggestions, action.suggestion],
+        recommendedMeal: action.suggestion.name,
+        checklist: buildChecklist(action.suggestion.recipe_ingredients),
+        cookingSteps: action.suggestion.cooking_steps,
+        matchedFridgeItems: action.suggestion.matched_fridge_items,
+        topUpSuggestions: action.topUpSuggestions,
+        replanPending: false,
+        replanError: null,
+      };
+    }
+
+    case 'REPLAN_ERROR':
+      return { ...state, replanPending: false, replanError: action.message };
+
+    case 'REPLAN_TOP_UP_FAILED':
+      return { ...state, replanPending: false };
 
     case 'complete':
       // app.py deliberately does NOT abort the stream after a step1 vision

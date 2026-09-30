@@ -461,6 +461,29 @@ button.brand:hover { opacity: 0.8; }
 .mealTag { display: inline-flex; align-items: center; gap: 4px; background: var(--swiggy-surface-2); color: var(--swiggy-text-3); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; border-radius: 20px; padding: 4px 10px; }
 .mealTag svg { width: 11px; height: 11px; }
 
+/* Switching the active dish — 2026-10-01 feature. */
+.mealCardClickable { cursor: pointer; }
+.mealCardClickable:hover { box-shadow: var(--shadow); border-color: var(--swiggy-orange); }
+.mealCardClickable:focus-visible { outline: 2px solid var(--swiggy-orange); outline-offset: 2px; }
+.mealCardActive { border-color: var(--swiggy-orange); }
+.mealCardActive .mealHeaderBar { background: var(--swiggy-orange); }
+
+.customDishRow { display: flex; gap: 8px; margin-top: 14px; }
+.customDishInput {
+  flex: 1; min-width: 0; background: var(--swiggy-surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 14px; font-size: 14px; color: var(--swiggy-text);
+}
+.customDishInput:disabled { opacity: .6; }
+.customDishBtn {
+  flex-shrink: 0; background: var(--swiggy-orange); color: #fff; border: none; border-radius: 12px;
+  padding: 0 18px; font-size: 14px; font-weight: 600; min-width: 56px;
+  display: flex; align-items: center; justify-content: center;
+}
+.customDishBtn:disabled { opacity: .5; }
+.customDishError { color: var(--swiggy-danger, #e74c3c); font-size: 13px; margin-top: 8px; }
+.spin { width: 16px; height: 16px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Toast — templates/index.html:1670-1677 (CSS), 2077 (markup) */
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);

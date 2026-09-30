@@ -42,6 +42,8 @@ interface ResultsProps {
   fetchVideos: (dishName: string) => Promise<YoutubeData>;
   fetchYoutubeFirstThumbnail: () => Promise<string>;
   onToggleChecklistItem: (index: number) => void;
+  onSelectMeal: (suggestion: ScanState['suggestions'][number]) => void;
+  onCustomDish: (dishName: string) => void;
   onOrderGroceries: () => void;
   /** Tapping a checklist row's Instamart match: opens the order sheet on that item. */
   onOpenProduct: (ingredientName: string) => void;
@@ -77,6 +79,8 @@ export function Results({
   fetchVideos,
   fetchYoutubeFirstThumbnail,
   onToggleChecklistItem,
+  onSelectMeal,
+  onCustomDish,
   onOrderGroceries,
   onOpenProduct,
   focusIngredient,
@@ -187,6 +191,10 @@ export function Results({
               <MealSuggestionsSection
                 suggestions={state.suggestions}
                 recommendedMeal={state.recommendedMeal}
+                onSelect={onSelectMeal}
+                onCustomDish={onCustomDish}
+                pending={state.replanPending}
+                error={state.replanError}
               />
             )}
 

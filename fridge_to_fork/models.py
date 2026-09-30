@@ -58,6 +58,11 @@ class MealSuggestion:
     recipe_ingredients: list[RecipeIngredient] = None
     cooking_steps: list[str] = field(default_factory=list)
     total_order_price_inr: int = 0
+    # Scanned fridge items this specific suggestion uses — same fuzzy match as
+    # MealPlan.matched_fridge_items, computed per-suggestion (not just for
+    # recommended_meal) so switching the active suggestion in the UI doesn't
+    # need a fresh backend call to know which fridge chips are relevant to it.
+    matched_fridge_items: list[str] = field(default_factory=list)
 
 
 @dataclass

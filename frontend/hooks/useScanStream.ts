@@ -4,7 +4,7 @@ import { useCallback, useReducer } from 'react';
 import { authHeaders } from '../lib/auth';
 import { BACKEND_URL } from '../lib/backend';
 import { readSSEStream } from '../lib/sse';
-import type { ChecklistItem, TopUpSuggestion } from '../lib/types';
+import type { ChecklistItem, DetectedIngredient, MealSuggestion, TopUpSuggestion } from '../lib/types';
 // State/reducer live in their own pure module (no React, no fetch-only
 // imports) so hooks/useScanStream.test.ts can exercise the reducer directly
 // under Node's test runner. See that file's header comment.
@@ -63,5 +63,71 @@ export function useScanStream() {
     []
   );
 
-  return { state, startScan, toggleChecklistItem, reset, restore };
+  // Meal Suggestions card click: the checklist switch is instant and local
+  // (dispatched synchronously below, before any network call — see
+  // scanReducer's SELECT_MEAL case). Only top-up suggestions need a fresh
+  // /api/replan call, since they're dish-specific and were never
+  // pre-generated for every suggestion; that call is fire-and-forget from
+  // the caller's point of view and fails silently (best-effort, matches
+  // generate_top_up_suggestions' own behavior on the backend).
+  const selectMeal = useCallback(
+    async (suggestion: MealSuggestion, detectedIngredients: DetectedIngredient[], servings: number) => {
+      dispatch({ type: 'SELECT_MEAL', suggestion });
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/replan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dish_name: suggestion.name,
+            fridge_ingredients: detectedIngredients,
+            servings,
+            recipe_ingredients: suggestion.recipe_ingredients,
+            cooking_steps: suggestion.cooking_steps,
+          }),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const body = await res.json();
+        dispatch({ type: 'top_up', suggestions: body.top_up_suggestions ?? [] });
+      } catch {
+        dispatch({ type: 'REPLAN_TOP_UP_FAILED' });
+      }
+    },
+    []
+  );
+
+  // Free-text "or tell us what you'd like to make instead" — an arbitrary
+  // dish with no pre-generated recipe, so this always calls plan_meals()
+  // server-side (app.py's /api/replan, omitting recipe_ingredients).
+  const replanCustomDish = useCallback(
+    async (dishName: string, detectedIngredients: DetectedIngredient[], servings: number) => {
+      dispatch({ type: 'REPLAN_START' });
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/replan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dish_name: dishName, fridge_ingredients: detectedIngredients, servings }),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const body = await res.json();
+        const suggestion: MealSuggestion = {
+          name: body.recommended_meal,
+          description: '',
+          cuisine: '',
+          can_cook_now: true,
+          missing_ingredients: body.missing_ingredients ?? [],
+          prep_time_minutes: 0,
+          recipe_ingredients: body.recipe_ingredients ?? [],
+          cooking_steps: body.cooking_steps ?? [],
+          total_order_price_inr: body.total_order_price_inr ?? 0,
+          matched_fridge_items: body.matched_fridge_items ?? [],
+        };
+        dispatch({ type: 'REPLAN_SUCCESS', suggestion, topUpSuggestions: body.top_up_suggestions ?? [] });
+      } catch {
+        dispatch({ type: 'REPLAN_ERROR', message: "Couldn't plan that dish. Please try again." });
+      }
+    },
+    []
+  );
+
+  return { state, startScan, toggleChecklistItem, reset, restore, selectMeal, replanCustomDish };
 }

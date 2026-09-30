@@ -53,7 +53,7 @@ export default function Home() {
   const [recipeDotDismissed, setRecipeDotDismissed] = useState(false);
 
   const photos = usePhotoUpload();
-  const { state, startScan, toggleChecklistItem, reset, restore } = useScanStream();
+  const { state, startScan, toggleChecklistItem, reset, restore, selectMeal, replanCustomDish } = useScanStream();
   const { fetchVideos } = useYoutubeVideos();
   const toast = useToast();
   const auth = useAuth();
@@ -94,6 +94,22 @@ export default function Home() {
     if (next === 'recipe') setRecipeDotDismissed(true);
     setTab(next);
   }, []);
+
+  // Meal Suggestions card click / free-text custom dish — both reuse the
+  // fridge contents this scan already detected, never re-scanning the photo.
+  // See useScanStream.selectMeal/replanCustomDish.
+  const handleSelectMeal = useCallback(
+    (suggestion: (typeof state.suggestions)[number]) => {
+      selectMeal(suggestion, state.detectedIngredients, servings);
+    },
+    [selectMeal, state.detectedIngredients, servings]
+  );
+  const handleCustomDish = useCallback(
+    (dishName: string) => {
+      replanCustomDish(dishName, state.detectedIngredients, servings);
+    },
+    [replanCustomDish, state.detectedIngredients, servings]
+  );
 
   // Groceries go through the staged Instamart sheet (real products -> real
   // cart -> explicit Place order); it also works with nothing missing, offering
@@ -286,6 +302,8 @@ export default function Home() {
           fetchVideos={fetchVideos}
           fetchYoutubeFirstThumbnail={fetchYoutubeFirstThumbnail}
           onToggleChecklistItem={toggleChecklistItem}
+          onSelectMeal={handleSelectMeal}
+          onCustomDish={handleCustomDish}
           onOrderGroceries={handleOrderGroceries}
           onOpenProduct={handleOpenProduct}
           focusIngredient={focusIngredient}
