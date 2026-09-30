@@ -645,7 +645,7 @@ async def scan(
                         tmp.write(content)
                         tmp_paths.append(tmp.name)
 
-                # ── Step 1: Vision — all photos analysed in one Gemini call ──
+                # ── Step 1: Vision — each photo gets its own wide + deep Gemini pass (see identify_ingredients()) ──
                 yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
                 t_vision = time.time()
                 vision_timed_out = False
