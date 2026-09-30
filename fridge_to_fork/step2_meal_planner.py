@@ -27,6 +27,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from . import db
+from .ingredient_matching import matches_any, recipe_item_in_fridge
 from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 
 load_dotenv()
@@ -186,24 +187,29 @@ def _fuzzy_ingredient_match(recipe_name: str, candidate_names: list[str]) -> boo
     first (e.g. "onion" vs "pyaz" — share zero words, a gap the
     word-overlap comparison below can't close on its own since Hindi
     transliterations don't share letters with their English name), then
-    falls back to subset containment (not "any shared word") so e.g.
-    "ginger-garlic paste" still matches a plain "ginger", but "coriander
-    leaves" does NOT falsely match a "coriander powder" staple just because
-    both mention coriander."""
+    falls back to ingredient_matching.recipe_item_in_fridge()'s strict
+    same-head-noun rule.
+
+    The fallback used to be plain subset containment (`candidate_words <=
+    recipe_words or recipe_words <= candidate_words`), which produced false
+    matches like fridge "milk" matching recipe "coconut milk" — ported from
+    main's fridge-scan matching fix (FRIDGE_SCAN_FIX_REPORT.md F3/F4,
+    2026-09-30). The canonical-cache lookup above is untouched: it's checked
+    first, exactly as before, and only what happens on a cache miss changed.
+    "ginger-garlic paste" still matches a plain "ginger" (recipe_item_in_fridge's
+    own paste exception, which additionally now correctly requires BOTH
+    ginger AND garlic to be present, not just one)."""
     recipe_words = _normalize_ingredient_words(recipe_name)
     if not recipe_words:
         return False
     cache = _load_canonical_cache()
     recipe_canonical = cache.get(frozenset(recipe_words))
-    for candidate in candidate_names:
-        candidate_words = _normalize_ingredient_words(candidate)
-        if not candidate_words:
-            continue
-        if recipe_canonical is not None and cache.get(frozenset(candidate_words)) == recipe_canonical:
-            return True
-        if candidate_words <= recipe_words or recipe_words <= candidate_words:
-            return True
-    return False
+    if recipe_canonical is not None:
+        for candidate in candidate_names:
+            candidate_words = _normalize_ingredient_words(candidate)
+            if candidate_words and cache.get(frozenset(candidate_words)) == recipe_canonical:
+                return True
+    return recipe_item_in_fridge(recipe_name, candidate_names)
 
 
 # Never stored in a fridge (dry goods / spice jars) — always "staple",
@@ -276,8 +282,7 @@ def _safe_category(category: str, ingredient_name: str) -> str:
     match to count as available)."""
     if category in VALID_CATEGORIES:
         return category
-    lower = ingredient_name.lower()
-    if any(s in lower for s in _STAPLES):
+    if matches_any(ingredient_name, _STAPLES):
         return "staple"
     return "specialty"
 
@@ -304,19 +309,10 @@ def _classify_ingredient_status(name: str, category: str, fridge_items: list[str
        falling through to the same fridge-scan check for
        specialty/perishable ingredients.
     """
-    name_lower = name.lower().strip()
-    name_words = set(name_lower.split())
-
-    is_pantry_staple = any(
-        set(s.split()).issubset(name_words) for s in _PANTRY_ONLY_STAPLES
-    )
-    if is_pantry_staple:
+    if matches_any(name, _PANTRY_ONLY_STAPLES):
         return "staple"
 
-    is_fridge_staple = any(
-        set(s.split()).issubset(name_words) for s in _FRIDGE_STAPLES
-    )
-    if is_fridge_staple:
+    if matches_any(name, _FRIDGE_STAPLES):
         if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, fridge_items):
             return "have"
         return "staple"
