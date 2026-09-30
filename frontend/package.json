@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --no-warnings --test lib/*.test.ts"
+    "test": "node --experimental-strip-types --no-warnings --test lib/*.test.ts hooks/*.test.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
