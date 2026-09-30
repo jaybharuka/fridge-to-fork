@@ -4,7 +4,7 @@
   display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius);
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: var(--text-lg); font-weight: var(--weight-semibold);
+  font-family: var(--font-heading); font-size: var(--text-lg); font-weight: var(--weight-semibold);
   border: none; cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }

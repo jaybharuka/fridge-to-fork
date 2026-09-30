@@ -56,6 +56,11 @@ export function MealSuggestionsSection({
             <div
               key={i}
               className={`${styles.mealCard} ${isActive ? styles.mealCardActive : ''} ${clickable ? styles.mealCardClickable : ''}`}
+              // Staggered reveal (60ms/card, ui-ux-pro-max's Stagger List
+              // guidance) instead of every card fading in at once — the
+              // existing fadeSlideUp animation (results.module.css) already
+              // respects prefers-reduced-motion globally (globals.css).
+              style={{ animationDelay: `${i * 60}ms` }}
               role={clickable ? 'button' : undefined}
               tabIndex={clickable ? 0 : undefined}
               onClick={clickable ? () => onSelect!(s) : undefined}
