@@ -1,0 +1,4 @@
+Fridge to Fork: photograph your fridge, get a recipe you can actually make, and see exactly what's missing. Then Swiggy's MCP integration takes it from there: Instamart for the missing items, or Swiggy Food for the finished dish.
+
+Scan. Cook. Order what's missing.
+fridge-to-fork-cyan.vercel.app

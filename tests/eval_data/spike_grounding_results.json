@@ -1,0 +1,154 @@
+[
+  {
+    "file": "02ldN7R6shw.jpg",
+    "baseline_seconds": 58.36,
+    "baseline_items": [
+      "vintage selzer",
+      "butter substitute"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 19.56,
+    "grounding_box_count": 15,
+    "grounding_counts_by_label": {
+      "item name": 15
+    },
+    "combined_seconds": 77.92
+  },
+  {
+    "file": "3A0qRjOesX4.jpg",
+    "baseline_seconds": 102.58,
+    "baseline_items": [
+      "yoghurt",
+      "cheese"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 14.39,
+    "grounding_box_count": 25,
+    "grounding_counts_by_label": {
+      "martini bottle": 1,
+      "green egg carton": 2,
+      "red container": 1,
+      "foil-wrapped item": 1,
+      "olive oil bottle": 1,
+      "glass dish with food": 1,
+      "round black container": 1,
+      "coq d'or creme fraiche": 1,
+      "coulommiers cheese": 1,
+      "gervais yogurt": 8,
+      "u sauvignon blanc wine box": 1,
+      "bowl with white contents": 1,
+      "petit fromage frais": 2,
+      "orange bottle": 1,
+      "hugo cornichons jar": 1,
+      "bowl with dark contents": 1
+    },
+    "combined_seconds": 116.97
+  },
+  {
+    "file": "AEU9UZstCfs.jpg",
+    "baseline_seconds": 26.32,
+    "baseline_items": [
+      "avocado",
+      "lemon",
+      "bell pepper, green",
+      "egg",
+      "mushroom",
+      "brussels sprout",
+      "strawberry",
+      "kale",
+      "coriander",
+      "lime",
+      "onion",
+      "milk",
+      "zucchini",
+      "berry"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 7.96,
+    "grounding_box_count": 2,
+    "grounding_counts_by_label": {
+      "item name": 2
+    },
+    "combined_seconds": 34.28
+  },
+  {
+    "file": "gC-cKJebRhg.jpg",
+    "baseline_seconds": 46.93,
+    "baseline_items": [
+      "red bell pepper",
+      "spinach",
+      "lettuce",
+      "lemon",
+      "green apple",
+      "orange",
+      "red cabbage",
+      "tomato"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 34.88,
+    "grounding_box_count": 16,
+    "grounding_counts_by_label": {
+      "red bell pepper": 2,
+      "orange": 5,
+      "green apple": 1,
+      "lemon": 2,
+      "green bell pepper": 2,
+      "spinach": 2,
+      "red cabbage": 1,
+      "lettuce": 1
+    },
+    "combined_seconds": 81.81
+  },
+  {
+    "file": "XIMl4Crm1GQ.jpg",
+    "baseline_seconds": 37.23,
+    "baseline_items": [
+      "chickpea",
+      "carrot",
+      "orange",
+      "apple",
+      "banana",
+      "bell pepper",
+      "tomato",
+      "pickled jalape\u00f1o",
+      "cucumber"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 24.58,
+    "grounding_error": "ServerError: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}",
+    "combined_seconds": 61.81
+  },
+  {
+    "file": "zrUx-FjiuFc.jpg",
+    "baseline_seconds": 37.66,
+    "baseline_items": [
+      "cabbage",
+      "leafy greens",
+      "packaged cookies",
+      "grapes"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 1.79,
+    "grounding_error": "ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 25.571715648s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '25s'}]}}",
+    "combined_seconds": 39.45
+  },
+  {
+    "file": "ZUhM8LE_HGc.jpg",
+    "baseline_seconds": 56.1,
+    "baseline_items": [
+      "egg",
+      "sausage",
+      "strawberry",
+      "green bell pepper",
+      "carrot",
+      "garlic paste",
+      "red chilli",
+      "cheese",
+      "grape"
+    ],
+    "baseline_has_counts": false,
+    "grounding_seconds": 0.7,
+    "grounding_error": "ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 28.254715485s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '28s'}]}}",
+    "combined_seconds": 56.8
+  }
+]

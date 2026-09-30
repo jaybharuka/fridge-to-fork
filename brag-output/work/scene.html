@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="stylesheet" href="site.css" />
+<style>
+  html,body{margin:0;padding:0;background:#0F0F0F;width:1080px;height:1920px;overflow:hidden;}
+  .page{max-width:480px!important;}
+  #stage{position:relative;width:1080px;height:1920px;display:flex;align-items:center;justify-content:center;background:#0F0F0F;font-family:'Plus Jakarta Sans',sans-serif;}
+  #stage::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 20%, rgba(252,128,25,0.10), transparent 60%);}
+  .scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:920px;opacity:0;}
+  .zoomWrap{width:100%;}
+  .frame{background:var(--bg);border-radius:28px;overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.06);}
+  .frame-inner{padding-bottom:6px;}
+  /* --- caption / cursor overlays --- */
+  .cursor{position:absolute;width:0;height:0;border-left:16px solid #fff;border-bottom:10px solid transparent;border-top:10px solid transparent;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));transform-origin:0 0;z-index:50;}
+  .flash{position:absolute;inset:0;background:#FC8019;opacity:0;z-index:80;}
+  .outro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;opacity:0;width:900px;}
+  .outro-mark{width:180px;height:180px;margin:0 auto 36px;border-radius:40px;box-shadow:0 20px 60px rgba(252,128,25,.35);}
+  .outro-word{font-size:76px;font-weight:800;color:#F5F5F5;letter-spacing:-0.02em;margin:0 0 18px;}
+  .outro-tag{font-size:34px;font-weight:600;color:#FC8019;margin:0 0 28px;}
+  .outro-url{font-size:26px;font-weight:500;color:#A0A0A0;font-family:'SF Mono','Courier New',monospace;}
+  .checkburst{position:absolute;width:160px;height:160px;border-radius:50%;background:rgba(46,204,113,.18);display:flex;align-items:center;justify-content:center;opacity:0;z-index:60;}
+  .checkburst svg{width:90px;height:90px;}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- SCENE A: home / hero, typing -->
+  <div class="scene" id="sceneA">
+    <div class="frame">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="brand"><i data-lucide="utensils"></i><span>Fridge to Fork</span></div>
+          <div class="header-actions">
+            <button type="button" class="theme-toggle"><i data-lucide="moon"></i></button>
+          </div>
+        </div>
+      </header>
+      <div class="wrap">
+        <div class="hero">
+          <h1 class="hero-title">Cook anything.<br>Order what's missing.</h1>
+          <p class="hero-sub">Type a dish. Scan your fridge. Get exactly what you need delivered.</p>
+        </div>
+        <div class="input-section">
+          <input type="text" class="dish-input" id="typedInput" placeholder='Try "Paneer Tikka" or "Matar Pulao"' readonly />
+        </div>
+        <div class="servings-section">
+          <label class="input-label">For how many people?</label>
+          <div class="servings-pills">
+            <button type="button" class="servings-pill">1</button>
+            <button type="button" class="servings-pill active">2</button>
+            <button type="button" class="servings-pill">3</button>
+            <button type="button" class="servings-pill">4</button>
+            <button type="button" class="servings-pill">5</button>
+            <button type="button" class="servings-pill">6</button>
+          </div>
+        </div>
+        <button class="analyse-btn ready" id="getRecipeBtn">
+          <span><i data-lucide="wand-2"></i></span>
+          <span>Get Recipe</span>
+        </button>
+        <div style="height:24px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCENE C: results -->
+  <div class="scene" id="sceneC">
+    <div class="frame">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="brand"><i data-lucide="utensils"></i><span>Fridge to Fork</span></div>
+        </div>
+      </header>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);font-size:14px;">
+        <span><strong id="haveNum">0</strong> of 19 ingredients &middot; <strong style="color:#FC8019" id="orderNum">0</strong> to order</span>
+        <span style="color:var(--text-secondary)">Paneer Tikka</span>
+      </div>
+      <div style="position:relative;height:340px;">
+        <img src="dish.jpg" style="width:100%;height:100%;object-fit:cover;display:block;" />
+        <div style="position:absolute;inset:0;background:linear-gradient(to top, rgba(0,0,0,.75), transparent 55%)"></div>
+        <div style="position:absolute;left:24px;bottom:20px;color:#fff;">
+          <div style="font-size:36px;font-weight:800;">Paneer Tikka</div>
+          <div style="font-size:17px;opacity:.85;">For 2 people &middot; 45 min</div>
+        </div>
+      </div>
+      <div class="wrap">
+        <p class="recipe-stat-line" style="margin:20px 0 4px;font-size:17px;">You already have <span class="stat-num">13</span> of <span class="stat-num">19</span> ingredients. Just <span class="recipe-stat-z stat-num">6</span> items to order.</p>
+        <div id="rows" style="margin-top:14px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCENE D/E: choice card -->
+  <div class="scene" id="sceneD">
+    <div class="zoomWrap" id="zoomWrap">
+    <div class="frame">
+      <div class="wrap" style="padding-top:36px;">
+        <div class="card choice-card">
+          <div class="choice-header-row"><span class="choice-label">How do you want to handle this?</span></div>
+          <p class="choice-subtitle">Paneer Tikka is a classic Indian starter and main course, loved for its rich flavors.</p>
+          <div class="choice-buttons">
+            <button class="choice-btn choice-btn-primary" id="instamartBtn">
+              <div class="choice-icon-circle"><i data-lucide="shopping-cart"></i></div>
+              <div class="choice-text">
+                <div class="choice-btn-title">Order missing items from Instamart</div>
+                <div class="choice-btn-sub">Paneer, Thick Yogurt (Dahi), Besan (Gram Flour) + 3 more</div>
+              </div>
+            </button>
+            <button class="choice-btn choice-btn-outline">
+              <div class="choice-icon-circle"><i data-lucide="bike"></i></div>
+              <div class="choice-text">
+                <div class="choice-btn-title">Order the dish from Swiggy</div>
+                <div class="choice-btn-sub">Get Paneer Tikka delivered</div>
+              </div>
+              <div class="choice-meta">30 min</div>
+            </button>
+          </div>
+          <p class="powered-by-swiggy">Powered by <strong>Swiggy</strong></p>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div class="checkburst" id="checkburst">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#2ECC71" stroke-width="2.5"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="flash" id="flash"></div>
+  <div class="cursor" id="cursor"></div>
+
+  <!-- OUTRO -->
+  <div class="outro" id="outro">
+    <img class="outro-mark" src="mark.svg" />
+    <div class="outro-word">Fridge to Fork</div>
+    <div class="outro-tag">Cook anything. Order what's missing.</div>
+    <div class="outro-url">github.com/jaybharuka/fridge-to-fork</div>
+  </div>
+
+</div>
+
+<script>
+try { lucide.createIcons(); } catch(e) {}
+
+const DUR = 20; // seconds
+const rowsData = [
+  {name:'Paneer', qty:'200g', checked:false},
+  {name:'Thick Yogurt (Dahi)', qty:'1/2 cup (120g)', checked:false},
+  {name:'Besan (Gram Flour)', qty:'1 tbsp', checked:false},
+  {name:'Ginger-Garlic Paste', qty:'1 tbsp', checked:true, tag:'STAPLE'},
+  {name:'Onion', qty:'1 medium', checked:true, tag:'STAPLE'},
+  {name:'Tomato', qty:'1 medium', checked:true, tag:'STAPLE'},
+];
+
+let rowsBuilt = false;
+function buildRowsOnce(root) {
+  if (rowsBuilt) return;
+  root.innerHTML = rowsData.map((r, idx) => `
+    <div class="recipe-row ${r.checked ? 'checked' : ''}" data-row="${idx}" style="opacity:0;">
+      <span class="recipe-row-checkbox">${r.checked ? '<i data-lucide="circle-check"></i>' : ''}</span>
+      <div class="recipe-row-info">
+        <div class="recipe-row-name">${r.name}</div>
+        <div class="recipe-row-qty">${r.qty}</div>
+      </div>
+      <div class="recipe-row-right">${r.tag ? `<span class="recipe-row-tag recipe-row-tag-staple">${r.tag}</span>` : ''}</div>
+    </div>`).join('');
+  try { lucide.createIcons(); } catch(e) {}
+  rowsBuilt = true;
+}
+function updateRows(t) {
+  const root = document.getElementById('rows');
+  buildRowsOnce(root);
+  rowsData.forEach((r, idx) => {
+    const rowStart = 3.6 + idx * 0.45;
+    const p = ease(clamp01((t - rowStart) / 0.35));
+    const el = root.querySelector(`[data-row="${idx}"]`);
+    if (el) {
+      el.style.opacity = p;
+      el.style.transform = `translateY(${lerp(10, 0, p)}px)`;
+    }
+  });
+}
+
+const typedInput = document.getElementById('typedInput');
+const FULL_TEXT = 'Paneer Tikka';
+
+function ease(t){ return 1 - Math.pow(1-t, 3); }
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+window.__setTime = function(t) {
+  const A = document.getElementById('sceneA');
+  const C = document.getElementById('sceneC');
+  const D = document.getElementById('sceneD');
+  const flash = document.getElementById('flash');
+  const cursor = document.getElementById('cursor');
+  const outro = document.getElementById('outro');
+  const burst = document.getElementById('checkburst');
+  const btn = document.getElementById('getRecipeBtn');
+  const instamartBtn = document.getElementById('instamartBtn');
+
+  [A,C,D].forEach(el => { el.style.opacity = 0; el.style.pointerEvents='none'; });
+  flash.style.opacity = 0;
+  outro.style.opacity = 0;
+  burst.style.opacity = 0;
+  cursor.style.opacity = 0;
+
+  // ---- Scene A: 0.0 - 2.6s ----
+  if (t < 2.9) {
+    A.style.opacity = clamp01(t/0.4);
+    const chars = Math.floor(clamp01((t-0.3)/1.0) * FULL_TEXT.length);
+    typedInput.value = FULL_TEXT.slice(0, chars);
+    // cursor blink over input then move to button and "press"
+    if (t > 0.3 && t < 1.5) {
+      cursor.style.opacity = 1;
+      cursor.style.left = (300 + chars*14) + 'px';
+      cursor.style.top = '336px';
+    } else if (t >= 1.7 && t < 2.6) {
+      const p = ease(clamp01((t-1.7)/0.7));
+      cursor.style.opacity = 1;
+      cursor.style.left = lerp(300, 460, p) + 'px';
+      cursor.style.top = lerp(336, 468, p) + 'px';
+    }
+    if (t > 2.4) {
+      const p = clamp01((t-2.4)/0.5);
+      btn.style.transform = `scale(${lerp(1, 0.96, Math.sin(p*Math.PI))})`;
+    }
+    A.style.transform = `translate(-50%,-50%) scale(${lerp(1, 1.04, clamp01((t-2.5)/0.4))})`;
+  }
+
+  // ---- Flash transition: 2.6 - 2.9s ----
+  if (t >= 2.6 && t < 2.95) {
+    const p = clamp01((t-2.6)/0.35);
+    flash.style.opacity = Math.sin(p*Math.PI) * 0.9;
+  }
+
+  // ---- Scene C: results, 2.9 - 9.2s ----
+  if (t >= 2.85 && t < 9.4) {
+    const p = clamp01((t-2.85)/0.4);
+    C.style.opacity = p;
+    C.style.transform = `translate(-50%,-50%) scale(${lerp(1.05,1,ease(p))})`;
+
+    updateRows(t);
+    const have = Math.round(lerp(0, 13, ease(clamp01((t-3.3)/0.8))));
+    const order = Math.round(lerp(0, 6, ease(clamp01((t-3.3)/0.8))));
+    document.getElementById('haveNum').textContent = have;
+    document.getElementById('orderNum').textContent = order;
+
+    if (t > 9.0) {
+      const p2 = clamp01((t-9.0)/0.4);
+      C.style.opacity = 1 - p2;
+    }
+  }
+
+  // ---- Scene D: choice card, 9.2 - 17.2s ----
+  if (t >= 9.1 && t < 17.4) {
+    let p = clamp01((t-9.1)/0.5);
+    D.style.opacity = ease(p);
+    D.style.transform = `translate(-50%,${lerp(40,-50,ease(p))}%) translateX(-50%)`;
+
+    const zoomWrap = document.getElementById('zoomWrap');
+    // hold, then punch-zoom onto instamart button 14.0-17.0
+    if (t >= 14.0 && t < 17.2) {
+      const pz = clamp01((t-14.0)/0.6);
+      const scale = lerp(1, 1.7, ease(pz));
+      zoomWrap.style.transformOrigin = '50% 180px';
+      zoomWrap.style.transform = `scale(${scale})`;
+    } else {
+      zoomWrap.style.transformOrigin = '50% 50%';
+      zoomWrap.style.transform = 'scale(1)';
+    }
+    if (t >= 9.6) {
+      D.style.transform = `translate(-50%,-50%)`;
+    }
+
+    if (t >= 14.6 && t < 15.3) {
+      const pb = clamp01((t-14.6)/0.35);
+      instamartBtn.style.transform = `scale(${lerp(1,1.04,Math.sin(pb*Math.PI))})`;
+    }
+    if (t >= 15.0 && t < 15.9) {
+      const pc = clamp01((t-15.0)/0.5);
+      burst.style.opacity = Math.sin(pc*Math.PI);
+      burst.style.left = '900px';
+      burst.style.top = '913px';
+      burst.style.transform = `translate(-50%,-50%) scale(${lerp(0.6,1,pc)})`;
+    }
+    if (t > 17.0) {
+      const pf = clamp01((t-17.0)/0.4);
+      D.style.opacity = ease(1-pf);
+    }
+  }
+
+  // ---- Outro: 17.2 - 20 ----
+  if (t >= 17.2) {
+    const p = clamp01((t-17.2)/0.6);
+    outro.style.opacity = p;
+    outro.style.transform = `translate(-50%,-50%) scale(${lerp(0.92,1,ease(p))})`;
+  }
+};
+
+window.__setTime(0);
+</script>
+</body>
+</html>

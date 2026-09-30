@@ -24,6 +24,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from .ingredient_matching import matches_any, recipe_item_in_fridge
 from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 
 load_dotenv()
@@ -117,7 +118,16 @@ def _fuzzy_ingredient_match(recipe_name: str, candidate_names: list[str]) -> boo
     case/plural/descriptive-word insensitive. Uses subset containment
     (not "any shared word") so e.g. "ginger-garlic paste" still matches
     a plain "ginger", but "coriander leaves" does NOT falsely match a
-    "coriander powder" staple just because both mention coriander."""
+    "coriander powder" staple just because both mention coriander.
+
+    NOT used by this module's own have/missing/staple logic any more —
+    that now goes through ingredient_matching.py's stricter head-noun
+    rule (see matches_any() / recipe_item_in_fridge(), 2026-09-29 fridge-
+    scan accuracy fix: this two-way subset match produced false "in
+    fridge" ticks like fridge "milk" matching recipe "coconut milk").
+    Kept only because tests/eval_vision_accuracy.py's scoring and this
+    function's own dedicated tests (below) still depend on it — not dead
+    code, just no longer the production matcher."""
     recipe_words = _normalize_ingredient_words(recipe_name)
     if not recipe_words:
         return False
@@ -186,7 +196,7 @@ _VISION_BLOCKED_TERMS = list(_PANTRY_ONLY_STAPLES) + [
 
 
 def _is_vision_blocked(name: str) -> bool:
-    return _fuzzy_ingredient_match(name, _VISION_BLOCKED_TERMS)
+    return matches_any(name, _VISION_BLOCKED_TERMS)
 
 
 VALID_CATEGORIES = {"staple", "specialty", "perishable"}
@@ -200,8 +210,7 @@ def _safe_category(category: str, ingredient_name: str) -> str:
     match to count as available)."""
     if category in VALID_CATEGORIES:
         return category
-    lower = ingredient_name.lower()
-    if any(s in lower for s in _STAPLES):
+    if matches_any(ingredient_name, _STAPLES):
         return "staple"
     return "specialty"
 
@@ -228,20 +237,11 @@ def _classify_ingredient_status(name: str, category: str, fridge_items: list[str
        falling through to the same fridge-scan check for
        specialty/perishable ingredients.
     """
-    name_lower = name.lower().strip()
-    name_words = set(name_lower.split())
-
-    is_pantry_staple = any(
-        set(s.split()).issubset(name_words) for s in _PANTRY_ONLY_STAPLES
-    )
-    if is_pantry_staple:
+    if matches_any(name, _PANTRY_ONLY_STAPLES):
         return "staple"
 
-    is_fridge_staple = any(
-        set(s.split()).issubset(name_words) for s in _FRIDGE_STAPLES
-    )
-    if is_fridge_staple:
-        if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, fridge_items):
+    if matches_any(name, _FRIDGE_STAPLES):
+        if not _is_vision_blocked(name) and recipe_item_in_fridge(name, fridge_items):
             return "have"
         return "staple"
 
@@ -249,7 +249,7 @@ def _classify_ingredient_status(name: str, category: str, fridge_items: list[str
         return "staple"
     if _is_vision_blocked(name):
         return "missing"
-    if _fuzzy_ingredient_match(name, fridge_items):
+    if recipe_item_in_fridge(name, fridge_items):
         return "have"
     return "missing"
 
@@ -297,9 +297,17 @@ def _enrich_recipe_ingredients(plan: MealPlan, fridge: FridgeContents) -> MealPl
             ri.name for ri in plan.recommended_meal.recipe_ingredients
             if not ri.is_staple
         ]
+        # Per fridge name, checked against each recipe name individually
+        # (not the reverse-direction batch _fuzzy_ingredient_match used to
+        # do) — this means a single fridge item can't retroactively satisfy
+        # a compound "X-Y paste" recipe requirement on its own (that needs
+        # every part present, checked properly at the have/missing level
+        # above); this list is only the "relevant chip" highlight, not the
+        # have/missing determination itself.
         plan.matched_fridge_items = [
             name for name in fridge_names
-            if not _is_vision_blocked(name) and _fuzzy_ingredient_match(name, non_staple_recipe_names)
+            if not _is_vision_blocked(name)
+            and any(recipe_item_in_fridge(rn, [name]) for rn in non_staple_recipe_names)
         ]
 
     return plan
@@ -911,7 +919,7 @@ def generate_top_up_suggestions(
             suggestions = _parse_top_up_response(response.text)
             suggestions = [
                 s for s in suggestions
-                if not _fuzzy_ingredient_match(s["name"], missing_names)
+                if not matches_any(s["name"], missing_names)
             ]
             print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
             if suggestions:

@@ -1,0 +1,4 @@
+Built Fridge to Fork: tell it what you want to eat, it gives you the recipe and tells you exactly what's missing — then Swiggy brings the rest, groceries or the finished dish, your call.
+
+Cook anything. Order what's missing.
+github.com/jaybharuka/fridge-to-fork

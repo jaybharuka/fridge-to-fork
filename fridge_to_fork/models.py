@@ -9,6 +9,12 @@ class Decision(str, Enum):
     COOK = "cook"
     ORDER_DISH = "order_dish"       # order a ready dish from Swiggy Food
     ORDER_GROCERIES = "order_groceries"  # order missing ingredients from Instamart
+    # Add items to the Instamart cart only — explicitly NOT checkout-capable.
+    # See swiggy_agent._build_instruction(): the instruction text for this
+    # decision must never mention checkout/place order/COD (security-review
+    # fix — ORDER_GROCERIES's checkout instruction was previously the only
+    # option available to the cart-fill "Add" flow, see app.py cart_fill()).
+    ADD_TO_CART = "add_to_cart"
 
 
 @dataclass
@@ -70,3 +76,4 @@ class OrderResult:
     items: list[str] = field(default_factory=list)
     estimated_minutes: Optional[int] = None
     error: Optional[str] = None
+    not_found: list[str] = field(default_factory=list)  # missing_ingredients with no product match

@@ -59,21 +59,11 @@ async def order_groceries_from_instamart(
     *,
     dry_run: bool = False,
 ) -> OrderResult:
-    """Order `items` from Swiggy Instamart via the ADK agent."""
-    from .swiggy_agent import run_swiggy_agent
+    """Order `items` from Swiggy Instamart via the deterministic MCP call sequence."""
+    from .swiggy_agent import order_from_instamart_mcp
 
-    fake_meal = MealSuggestion(
-        name="meal", description="", can_cook_now=False, missing_ingredients=items,
-    )
-    plan = MealPlan(
-        suggestions=[fake_meal],
-        decision=Decision.ORDER_GROCERIES,
-        recommended_meal=fake_meal,
-        reasoning="",
-    )
-    result = await run_swiggy_agent(plan, delivery_address, access_token, dry_run=dry_run)
-    return result if result is not None else OrderResult(
-        success=False, platform="swiggy_instamart", error="Agent returned no result"
+    return await order_from_instamart_mcp(
+        items, access_token, delivery_address, dry_run=dry_run
     )
 
 
@@ -89,10 +79,10 @@ async def route_order(
         console.print("[green]Decision: cook at home — no order placed.[/green]")
         return None
 
-    if plan.decision == Decision.ORDER_GROCERIES:
+    if plan.decision in (Decision.ORDER_GROCERIES, Decision.ADD_TO_CART):
         missing = plan.recommended_meal.missing_ingredients if plan.recommended_meal else []
         if not missing:
-            console.print("[yellow]order_groceries chosen but no missing ingredients — cooking instead.[/yellow]")
+            console.print(f"[yellow]{plan.decision.value} chosen but no items — nothing to do.[/yellow]")
             return None
 
     from .swiggy_agent import run_swiggy_agent
@@ -123,17 +113,38 @@ def display_order_result(result: OrderResult) -> None:
         )
 
 
+_CLI_DECISIONS = {
+    "order_dish": Decision.ORDER_DISH,
+    "order_groceries": Decision.ORDER_GROCERIES,
+    "add_to_cart": Decision.ADD_TO_CART,  # Instamart cart only, never checks out
+}
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Place an order via Swiggy MCP.")
     p.add_argument(
         "--decision",
-        choices=["order_dish", "order_groceries"],
+        choices=list(_CLI_DECISIONS),
         required=True,
     )
     p.add_argument("--items", required=True, help="Comma-separated items / dish name")
     p.add_argument("--address", default=os.environ.get("DELIVERY_ADDRESS", "Test Address"))
     p.add_argument("--access-token", default=None, help="Swiggy Bearer access token")
     p.add_argument("--dry-run", action="store_true", default=False, help="Simulate order placement")
+    p.add_argument(
+        "--confirm-checkout",
+        action="store_true",
+        default=False,
+        help=(
+            "Required alongside --decision order_dish/order_groceries (unless "
+            "--dry-run) to actually place a real order — both are checkout-"
+            "capable and default to COD (see swiggy_agent.py). Without it, "
+            "the CLI refuses to run rather than silently placing a real, "
+            "unconfirmed order. Use --decision add_to_cart instead if you "
+            "only want items added to the Instamart cart; that decision "
+            "never checks out and never needs this flag."
+        ),
+    )
     p.add_argument("--json", action="store_true")
     return p.parse_args()
 
@@ -141,17 +152,29 @@ def _parse_args() -> argparse.Namespace:
 async def main_async() -> None:
     args = _parse_args()
     items = [i.strip() for i in args.items.split(",") if i.strip()]
+    decision = _CLI_DECISIONS[args.decision]
+
+    from .swiggy_agent import _CHECKOUT_CAPABLE_DECISIONS
+
+    if decision in _CHECKOUT_CAPABLE_DECISIONS and not args.dry_run and not args.confirm_checkout:
+        console.print(
+            f"[red]Refusing to run: --decision {args.decision} places a real, "
+            "COD order and needs either --dry-run (simulate) or "
+            "--confirm-checkout (place for real). Use --decision add_to_cart "
+            "to only add items to the cart instead.[/red]"
+        )
+        raise SystemExit(1)
 
     # Fake MealPlan to test routing standalone
     fake_meal = MealSuggestion(
         name=items[0] if args.decision == "order_dish" else "Fake Meal",
         description="Fake", can_cook_now=False,
-        missing_ingredients=items if args.decision == "order_groceries" else [],
+        missing_ingredients=items if args.decision != "order_dish" else [],
         cuisine="Fake", prep_time_minutes=0
     )
     plan = MealPlan(
         suggestions=[fake_meal],
-        decision=Decision.ORDER_DISH if args.decision == "order_dish" else Decision.ORDER_GROCERIES,
+        decision=decision,
         recommended_meal=fake_meal,
         reasoning="Test"
     )

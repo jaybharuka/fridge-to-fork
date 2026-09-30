@@ -416,19 +416,35 @@ async def get_ingredient_image(name: str):
 @app.post("/api/cart-fill")
 async def cart_fill(request: Request):
     """
-    SSE stream that uses the Google ADK agent to search each item on
-    Instamart and add it to the user's cart. Requires a valid Swiggy
-    Bearer token from session.
+    SSE stream that uses the Google ADK agent to add all requested items
+    to the user's Instamart cart in ONE agent call — Decision.ADD_TO_CART,
+    whose instruction explicitly forbids checkout/place-order (see
+    swiggy_agent._build_instruction()). Requires a valid Swiggy Bearer
+    token from session.
+
+    Security note (fixed): this previously looped per item and called
+    run_swiggy_agent() once per item with Decision.ORDER_GROCERIES, whose
+    instruction text told the agent to "search for each item, add to
+    cart, and checkout" — with dry_run hardcoded to False and no cart-only
+    decision available. That meant tapping "Add" for N items could place
+    up to N separate real COD orders with no user confirmation. Batched
+    into a single ADD_TO_CART call now; dry_run is a real, respected
+    parameter (see below), not a dead literal.
     """
     body = await request.json()
     items = body.get("items", [])
     # items = [{"id": "d1", "name": "Basmati Rice", "qty_needed": 5, "unit": "kg"}]
+    dry_run = bool(body.get("dry_run", False))
 
     access_token = request.session.get("access_token")
 
     async def stream():
         if not _token_valid(request):
             yield _sse({"type": "auth_required"})
+            return
+
+        if not items:
+            yield _sse({"type": "cart_complete"})
             return
 
         for item in items:
@@ -438,53 +454,61 @@ async def cart_fill(request: Request):
                 "itemName": item["name"]
             })
 
-            try:
-                from fridge_to_fork.swiggy_agent import run_swiggy_agent
+        try:
+            from fridge_to_fork.swiggy_agent import run_swiggy_agent
 
-                # Build a mini meal plan just for this item
-                suggestion = MealSuggestion(
-                    name=item["name"],
-                    description="",
-                    can_cook_now=False,
-                    missing_ingredients=[item["name"]],
-                    cuisine="",
-                    prep_time_minutes=0
-                )
-                plan = MealPlan(
-                    suggestions=[suggestion],
-                    decision=Decision.ORDER_GROCERIES,
-                    recommended_meal=suggestion,
-                    reasoning=""
-                )
+            # One meal plan covering every item — one agent call for the
+            # whole batch, not one per item.
+            suggestion = MealSuggestion(
+                name="Instamart cart items",
+                description="",
+                can_cook_now=False,
+                missing_ingredients=[item["name"] for item in items],
+                cuisine="",
+                prep_time_minutes=0
+            )
+            plan = MealPlan(
+                suggestions=[suggestion],
+                decision=Decision.ADD_TO_CART,
+                recommended_meal=suggestion,
+                reasoning=""
+            )
 
-                result = await run_swiggy_agent(
-                    plan=plan,
-                    delivery_address=os.environ.get(
-                        "DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS
-                    ),
-                    access_token=access_token,
-                    dry_run=False
-                )
+            result = await run_swiggy_agent(
+                plan=plan,
+                delivery_address=os.environ.get(
+                    "DELIVERY_ADDRESS", DEFAULT_DELIVERY_ADDRESS
+                ),
+                access_token=access_token,
+                dry_run=dry_run,
+            )
 
-                if result and result.success:
+            if result and result.success:
+                # A single batched call can't report per-item granularity
+                # the agent's free-text response doesn't reliably give —
+                # report every item added rather than claim precision we
+                # don't have.
+                for item in items:
                     yield _sse({
                         "type": "item_added",
                         "itemId": item["id"],
                         "itemName": item["name"]
                     })
-                else:
-                    error = result.error if result else "unknown"
-                    if error == "auth_required":
-                        yield _sse({"type": "auth_required"})
-                        return
+            else:
+                error = result.error if result else "unknown"
+                if error == "auth_required":
+                    yield _sse({"type": "auth_required"})
+                    return
+                for item in items:
                     yield _sse({
                         "type": "item_failed",
                         "itemId": item["id"],
                         "itemName": item["name"]
                     })
 
-            except Exception as e:
-                print(f"[CART_FILL] Error for {item['name']}: {e}")
+        except Exception as e:
+            print(f"[CART_FILL] Error: {e}")
+            for item in items:
                 yield _sse({
                     "type": "item_failed",
                     "itemId": item["id"],

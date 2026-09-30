@@ -1,0 +1,145 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--o:#FC8019;--k:#141414;--w:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--k);font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;color:#fff}
+.abs{position:absolute}
+.bg{position:absolute;inset:0}
+.dots{position:absolute;inset:0;background-image:radial-gradient(currentColor 2.5px,transparent 3px);background-size:48px 48px;opacity:.09}
+.mask{overflow:hidden;line-height:1.0;padding-bottom:.1em}
+.mask>span{display:block;will-change:transform}
+.blk{position:absolute;left:110px}
+.h{font-size:150px;letter-spacing:-.035em}
+.sub{font-size:48px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.pill{display:inline-block;border-radius:999px;padding:14px 34px;font-size:44px}
+/* stepper */
+#step{position:absolute;left:110px;top:64px;display:flex;gap:28px;font-size:24px;letter-spacing:.16em;text-transform:uppercase}
+#step span{opacity:.4;transition:none}
+#step i{font-style:normal;opacity:.3}
+/* phone */
+#phone{position:absolute;left:1160px;top:34px;width:480px;height:1012px;border-radius:66px;background:#0a0a0a;padding:12px;box-shadow:0 50px 130px rgba(0,0,0,.5),0 0 0 2px #2b2b2b inset}
+#screen{width:456px;height:988px;border-radius:54px;overflow:hidden;background:#fff}
+#screen img{width:100%;height:100%;object-fit:cover;display:block}
+#photo{position:absolute;left:1160px;top:34px;width:480px;height:1012px;border-radius:30px;overflow:hidden;box-shadow:0 50px 130px rgba(0,0,0,.6)}
+#photo img{width:100%;height:100%;object-fit:cover}
+/* outro */
+#outro{position:absolute;inset:0;background:var(--k);text-align:center}
+</style></head><body>
+
+<div class="bg" id="bg"></div>
+<div class="dots" id="dots" style="color:#fff"></div>
+
+<div id="step"></div>
+
+<!-- S1 -->
+<div class="blk" id="t1" style="top:300px">
+  <div class="h mask"><span>What do I</span></div>
+  <div class="h mask"><span style="color:var(--o)">cook with this?</span></div>
+</div>
+<!-- S2 -->
+<div class="blk" id="t2" style="top:290px">
+  <div class="h mask"><span>Scan your</span></div>
+  <div class="h mask"><span>fridge.</span></div>
+  <div class="sub mask" style="margin-top:34px"><span>Snap a photo. It sees every shelf.</span></div>
+</div>
+<!-- S3 -->
+<div class="blk" id="t3" style="top:250px">
+  <div class="h mask"><span>Recipes you</span></div>
+  <div class="h mask"><span style="color:var(--o)">can actually</span></div>
+  <div class="h mask"><span>make.</span></div>
+</div>
+<!-- S4 -->
+<div class="blk" id="t4" style="top:290px">
+  <div class="h mask"><span>Knows what's</span></div>
+  <div class="h mask"><span>missing.</span></div>
+  <div style="margin-top:40px" id="t4p"><span class="pill" style="background:#171717;color:#fff">7 of 10 in hand</span> <span class="pill" style="background:#fff;color:var(--o)">3 to order</span></div>
+</div>
+<!-- S5 -->
+<div class="blk" id="t5" style="top:250px">
+  <div class="h mask"><span style="color:var(--o)">Swiggy MCP</span></div>
+  <div class="h mask"><span>does the rest.</span></div>
+  <div style="margin-top:40px" id="t5p"><span class="pill" style="background:var(--o);color:#fff">Instamart</span> <span class="pill" style="background:#fff;color:var(--k)">Swiggy Food</span></div>
+  <div class="sub mask" style="margin-top:34px;color:#cfcfcf"><span id="t5s">Add the missing items, or order the dish.</span></div>
+</div>
+
+<div id="photo"><img id="photoImg" src="fridge_0064.jpg"></div>
+<div id="phone"><div id="screen"><img id="app"></div></div>
+
+<div id="outro" style="visibility:hidden">
+  <div class="dots" style="color:#fff"></div>
+  <div class="abs" id="og" style="left:660px;top:60px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(252,128,25,.42),transparent 65%)"></div>
+  <svg class="abs" id="om" style="left:830px;top:180px" width="260" height="260" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">
+  <rect width="280" height="280" rx="62" fill="#FC8019"/>
+  <rect x="55" y="55" width="105" height="170" rx="16" fill="none" stroke="#FFFFFF" stroke-width="9"/>
+  <line x1="55" y1="105" x2="160" y2="105" stroke="#FFFFFF" stroke-width="9"/>
+  <line x1="145" y1="70" x2="145" y2="95" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+  <line x1="205" y1="60" x2="205" y2="225" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/>
+  <line x1="187" y1="60" x2="187" y2="118" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+  <line x1="205" y1="55" x2="205" y2="118" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+  <line x1="223" y1="60" x2="223" y2="118" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 187 118 Q 187 140 205 140 Q 223 140 223 118" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linejoin="round"/>
+</svg>
+
+  <div class="abs mask" style="left:0;right:0;top:490px;font-size:160px;letter-spacing:-.035em"><span id="oa">Fridge to <span style="color:var(--o)">Fork</span></span></div>
+  <div class="abs mask" style="left:0;right:0;top:700px;font-size:66px;font-weight:600;color:#e2e2e2"><span id="ob">Scan. Cook. Order what's missing.</span></div>
+  <div class="abs" id="ou" style="left:0;right:0;top:860px"><span class="pill" style="background:var(--o);color:#fff;font-size:42px">fridge-to-fork-cyan.vercel.app</span></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const cl=x=>Math.min(1,Math.max(0,x));
+const P=(t,a,d)=>cl((t-a)/d);
+const eo=x=>1-Math.pow(1-x,3);
+const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const SC=[ // start,end,bg,dots,stepIdx
+ {s:0,e:2.0,bg:'#0c0c0c',st:0},{s:2.0,e:7.0,bg:'#FC8019',st:1},{s:7.0,e:10.5,bg:'#141414',st:2},
+ {s:10.5,e:15.0,bg:'#FC8019',st:3},{s:15.0,e:22.0,bg:'#141414',st:4}];
+const LAB=['Fridge','AI vision','Recipe','Missing','Swiggy'];
+$('step').innerHTML=LAB.map((l,i)=>`<span>${l}</span>`).join('<i>→</i>');
+const stepEls=[...$('step').querySelectorAll('span')];
+const BGS=SC.map(s=>s.bg);
+// bg layers for wipe
+const bg=$('bg');bg.innerHTML=SC.map((s,i)=>`<div class="abs" id="bg${i}" style="inset:0;background:${s.bg}"></div>`).join('');
+function up(el,t,a,d=.5){const p=eo(P(t,a,d));el.style.transform=`translateY(${(1-p)*118}%)`}
+function textBlock(id,t,s,e,extra){
+  const b=$(id);const vis=t>=s-.01&&t<e;b.style.visibility=vis?'visible':'hidden';if(!vis)return;
+  const spans=[...b.querySelectorAll('.mask>span')];
+  const out=P(t,e-.28,.28);
+  spans.forEach((sp,i)=>{const a=s+.12+i*.11;const pin=eo(P(t,a,.5));sp.style.transform=`translateY(${(1-pin)*118+eo(out)*-118}%)`});
+  b.querySelectorAll('[id$="p"]').forEach(x=>{x.style.opacity=eo(P(t,s+.5,.4))*(1-out);x.style.transform=`translateY(${(1-eo(P(t,s+.5,.4)))*30}px)`});
+}
+const cssVar=(c)=>c;
+window.__setTime=async function(t,src){
+  // backgrounds: each later bg wipes in left->right
+  SC.forEach((sc,i)=>{const el=$('bg'+i);if(i===0){el.style.clipPath='none';return}
+    const p=eio(P(t,sc.s-.02,.4));el.style.clipPath=`inset(0 ${(1-p)*100}% 0 0)`});
+  const cur=SC.findIndex(s=>t>=s.s&&t<s.e);
+  const dark=cur<0||[0,2,4].includes(cur);
+  $('dots').style.opacity=dark?.06:.12;
+  stepEls.forEach((e,i)=>{e.style.opacity=(cur===i)?1:.4;e.style.color=(cur===i&&dark)?'#FC8019':'#fff'});
+  $('step').style.visibility=t<22.0?'visible':'hidden';
+  // text
+  textBlock('t1',t,0,2.0);textBlock('t2',t,2.0,7.0);textBlock('t3',t,7.0,10.5);textBlock('t4',t,10.5,15.0);textBlock('t5',t,15.0,22.0);
+  // photo -> phone
+  const pp=eio(P(t,1.7,.45));
+  const ph=$('photo');ph.style.opacity=t<2.25?1:0;
+  ph.style.transform=`scale(${1-.32*pp})`;ph.style.borderRadius=`${30+40*pp}px`;
+  const pin=eio(P(t,1.85,.45));const phone=$('phone');
+  const pout=eio(P(t,21.7,.4));
+  phone.style.opacity=(t<1.85?0:pin)*(1-pout);
+  phone.style.transform=`translateX(${pout*140}px) scale(${.92+.08*pin})`;
+  // hook photo: slow push
+  $('photoImg').style.transform=`scale(${1.04+.02*t})`;
+  // outro
+  const o=$('outro');const os=22.0;
+  o.style.visibility=t>=os-.02?'visible':'hidden';
+  o.style.clipPath=`inset(0 ${(1-eio(P(t,os-.02,.4)))*100}% 0 0)`;
+  $('og').style.opacity=eo(P(t,os+.2,.9));
+  $('om').style.transform=`scale(${.6+.4*eo(P(t,os+.3,.6))})`;$('om').style.opacity=cl(P(t,os+.25,.25));
+    up($('oa'),t,os+.7);up($('ob'),t,os+1.05);
+  $('ou').style.opacity=eo(P(t,os+1.5,.5));$('ou').style.transform=`translateY(${(1-eo(P(t,os+1.5,.5)))*24}px)`;
+  if(src){const im=$('app');if(im.dataset.s!==src){im.dataset.s=src;im.src=src;try{await im.decode()}catch(e){}}}
+};
+</script></body></html>

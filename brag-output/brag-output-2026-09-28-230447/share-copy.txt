@@ -1,0 +1,4 @@
+Scan your fridge, get a recipe you can actually make, and an AI agent fills your Instamart cart with exactly what's missing, through Swiggy's real MCP servers.
+
+Fridge to Fork: Scan. Cook. Order what's missing.
+fridge-to-fork-cyan.vercel.app

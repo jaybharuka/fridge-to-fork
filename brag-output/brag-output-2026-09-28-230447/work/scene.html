@@ -1,0 +1,189 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--o:#FC8019;--od:#E8700A;--ol:#FFF3E8;--k:#171717;--w:#fff;--g:#2ECC71}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--k);font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800}
+.scene{position:absolute;inset:0;overflow:hidden}
+.dots{position:absolute;inset:0;background-image:radial-gradient(currentColor 2.5px,transparent 3px);background-size:48px 48px;opacity:.12}
+.abs{position:absolute}
+.mask{overflow:hidden;line-height:1.02;padding-bottom:.08em}
+.mask>span{display:block;will-change:transform}
+.tag{position:absolute;left:120px;top:84px;font-size:30px;letter-spacing:.18em;text-transform:uppercase;font-weight:800}
+/* S1 */
+#s1{background:var(--o);color:#fff}
+#s1 .h{position:absolute;left:120px;font-size:216px;letter-spacing:-.035em}
+/* S2 */
+#s2{background:var(--k);color:#fff}
+#s2 .h{position:absolute;left:120px;top:250px;font-size:170px;letter-spacing:-.035em}
+#s2 .sub{position:absolute;left:124px;top:700px;font-size:52px;font-weight:600;color:#bdbdbd;line-height:1.25}
+.chip{position:absolute;left:1560px;padding:16px 30px;border-radius:999px;background:var(--o);color:#fff;font-size:42px;display:flex;gap:14px;align-items:center;white-space:nowrap}
+.chip i{display:block;width:34px;height:34px;border-radius:50%;background:#fff;color:var(--o);font-style:normal;text-align:center;line-height:34px;font-size:24px}
+/* S3 */
+#s3{background:#fff;color:var(--k)}
+#s3 .h{position:absolute;left:120px;top:210px;font-size:150px;letter-spacing:-.035em}
+#s3 .sub{position:absolute;left:124px;top:800px;font-size:48px;font-weight:600;color:#6b6b6b}
+.card{position:absolute;left:1000px;top:130px;width:800px;height:820px;border-radius:44px;background:#fff;box-shadow:0 30px 90px rgba(23,23,23,.18);overflow:hidden}
+.card .hd{height:150px;background:var(--o);color:#fff;padding:0 48px;display:flex;align-items:center;justify-content:space-between;font-size:56px}
+.badge{background:#171717;color:#fff;border-radius:999px;padding:10px 26px;font-size:36px}
+.row{height:104px;margin:0 32px;border-bottom:2px solid #f1f1f1;display:flex;align-items:center;padding:0 16px;font-size:44px;position:relative}
+.row .n{flex:1}
+.row .q{font-size:32px;color:#8a8a8a;font-weight:600;margin-right:28px}
+.row .st{font-size:30px;padding:8px 22px;border-radius:999px}
+.have .st{background:rgba(46,204,113,.14);color:#1a9a52}
+.miss{background:transparent}
+.miss .st{background:#f1f1f1;color:#6b6b6b}
+.row .bg{position:absolute;inset:6px -8px;background:var(--ol);border-radius:18px;opacity:0;z-index:0}
+.row>*:not(.bg){position:relative;z-index:1}
+/* S4 */
+#s4{background:var(--o);color:#fff}
+#s4 .h{position:absolute;left:120px;top:190px;font-size:112px;letter-spacing:-.035em}
+.pill{position:absolute;top:560px;height:104px;padding:0 44px;border-radius:999px;background:#fff;color:var(--k);font-size:44px;display:flex;align-items:center}
+#s4 .sub{position:absolute;left:124px;font-size:46px;font-weight:600;line-height:1.2}
+.cart{position:absolute;left:1180px;top:150px;width:620px;height:780px;border-radius:44px;background:var(--k);color:#fff;box-shadow:0 40px 100px rgba(90,40,0,.45);overflow:hidden}
+.cart .hd{height:130px;padding:0 44px;display:flex;align-items:center;justify-content:space-between;font-size:48px;border-bottom:2px solid #2a2a2a}
+.cart .cnt{width:64px;height:64px;border-radius:50%;background:var(--o);text-align:center;line-height:64px;font-size:38px}
+.ci{position:absolute;left:36px;right:36px;height:120px;border-radius:26px;background:#232323;display:flex;align-items:center;padding:0 28px;font-size:42px}
+.ci b{width:64px;height:64px;border-radius:18px;background:var(--o);margin-right:24px;text-align:center;line-height:64px;font-size:34px}
+.ci .n{flex:1}
+.ci .ok{color:var(--g);font-size:30px}
+.cart .ft{position:absolute;left:0;right:0;bottom:0;height:120px;background:var(--o);display:flex;align-items:center;justify-content:center;font-size:34px}
+/* S5 */
+#s5{background:var(--k);color:#fff}
+</style></head><body>
+
+<div class="scene" id="s1">
+  <div class="dots" style="color:#fff"></div>
+  <div class="abs" id="s1c" style="right:-220px;top:-220px;width:760px;height:760px;border-radius:50%;background:#FF9A45"></div>
+  <div class="tag" id="s1t">Fridge to Fork</div>
+  <div class="h mask" style="top:290px"><span id="s1a">Fridge full.</span></div>
+  <div class="h mask" style="top:520px;color:var(--k)"><span id="s1b">Nothing to cook.</span></div>
+</div>
+
+<div class="scene" id="s2">
+  <div class="dots" style="color:#fff;opacity:.07"></div>
+  <div class="tag" style="color:var(--o)">01 · Scan</div>
+  <div class="h mask"><span id="s2a">Scan your</span></div>
+  <div class="h mask" style="top:420px;color:var(--o)"><span id="s2b">fridge.</span></div>
+  <div class="sub" id="s2s">Gemini reads what's inside.<br>Nothing to type.</div>
+  <svg class="abs" id="s2f" style="left:1010px;top:150px" width="440" height="780" viewBox="0 0 440 780">
+    <rect x="20" y="10" width="400" height="760" rx="44" fill="#F4F4F4"/>
+    <rect x="44" y="34" width="352" height="250" rx="26" fill="#E6E6E6"/>
+    <rect x="44" y="304" width="352" height="440" rx="26" fill="#E6E6E6"/>
+    <rect x="352" y="90" width="14" height="110" rx="7" fill="#9a9a9a"/>
+    <rect x="352" y="380" width="14" height="150" rx="7" fill="#9a9a9a"/>
+    <rect x="70" y="150" width="90" height="90" rx="16" fill="#FC8019" opacity=".85"/>
+    <rect x="180" y="180" width="70" height="60" rx="14" fill="#2ECC71" opacity=".85"/>
+    <rect x="70" y="440" width="120" height="70" rx="14" fill="#f5c542" opacity=".9"/>
+    <circle cx="260" cy="600" r="50" fill="#e85d5d" opacity=".85"/>
+    <rect x="80" y="620" width="90" height="90" rx="16" fill="#9ad0f5" opacity=".9"/>
+  </svg>
+  <div class="abs" id="s2bar" style="left:990px;width:480px;height:10px;border-radius:5px;background:var(--o);box-shadow:0 0 50px 14px rgba(252,128,25,.65)"></div>
+  <svg class="abs" id="s2br" style="left:980px;top:130px" width="500" height="820" viewBox="0 0 500 820" fill="none" stroke="#FC8019" stroke-width="10" stroke-linecap="round">
+    <path d="M10 70V10H70M430 10H490V70M490 750V810H430M70 810H10V750"/>
+  </svg>
+  <div class="chip" id="c0" style="top:260px"><i>✓</i>Onion</div>
+  <div class="chip" id="c1" style="top:400px"><i>✓</i>Tomato</div>
+  <div class="chip" id="c2" style="top:540px"><i>✓</i>Capsicum</div>
+  <div class="chip" id="c3" style="top:680px"><i>✓</i>Ginger</div>
+</div>
+
+<div class="scene" id="s3">
+  <div class="abs" id="s3c" style="left:880px;top:20px;width:1040px;height:1040px;border-radius:50%;background:var(--ol)"></div>
+  <div class="tag" style="color:var(--o)">02 · Cook</div>
+  <div class="h mask"><span id="s3a">A recipe you</span></div>
+  <div class="h mask" style="top:365px"><span id="s3b"><span style="color:var(--o)">can actually</span></span></div>
+  <div class="h mask" style="top:520px"><span id="s3d">make.</span></div>
+  <div class="sub" id="s3s">Pantry staples are already ticked.</div>
+  <div class="card" id="s3card">
+    <div class="hd"><span>Paneer Tikka</span><span class="badge" id="s3bd" style="background:#171717">3 to order</span></div>
+    <div class="row have" id="r0"><span class="n">Onion</span><span class="q">2 large</span><span class="st">In fridge</span></div>
+    <div class="row have" id="r1"><span class="n">Tomato</span><span class="q">2</span><span class="st">In fridge</span></div>
+    <div class="row have" id="r2"><span class="n">Salt</span><span class="q">to taste</span><span class="st">Staple</span></div>
+    <div class="row miss" id="r3"><span class="bg"></span><span class="n">Paneer</span><span class="q">250 g</span><span class="st">Missing</span></div>
+    <div class="row miss" id="r4"><span class="bg"></span><span class="n">Yogurt</span><span class="q">1/2 cup</span><span class="st">Missing</span></div>
+    <div class="row miss" id="r5"><span class="bg"></span><span class="n">Besan</span><span class="q">2 tbsp</span><span class="st">Missing</span></div>
+  </div>
+</div>
+
+<div class="scene" id="s4">
+  <div class="dots" style="color:#fff"></div>
+  <div class="tag">03 · Order</div>
+  <div class="h mask"><span id="s4a">Powered by Swiggy's</span></div>
+  <div class="h mask" style="top:315px"><span id="s4b">own <span style="color:var(--k)">MCP</span> servers.</span></div>
+  <div class="pill" id="p0" style="left:120px">Swiggy Food</div>
+  <div class="pill" id="p1" style="left:520px;background:var(--k);color:#fff;box-shadow:0 0 0 8px rgba(255,255,255,.55)">Instamart</div>
+  <div class="pill" id="p2" style="left:870px">Dineout</div>
+  <div class="sub" id="s4s" style="top:730px">An AI agent fills your Instamart cart.</div>
+  <div class="sub" id="s4t" style="top:820px;color:var(--k)">Or orders the finished dish from Swiggy Food.</div>
+  <div class="cart" id="cart">
+    <div class="hd"><span>Instamart cart</span><span class="cnt" id="cnt">0</span></div>
+    <div class="ci" id="i0" style="top:170px"><b>P</b><span class="n">Paneer</span><span class="ok">Added ✓</span></div>
+    <div class="ci" id="i1" style="top:316px"><b>Y</b><span class="n">Yogurt</span><span class="ok">Added ✓</span></div>
+    <div class="ci" id="i2" style="top:462px"><b>B</b><span class="n">Besan</span><span class="ok">Added ✓</span></div>
+    <div class="ft">Added by the Fridge to Fork agent</div>
+  </div>
+</div>
+
+<div class="scene" id="s5">
+  <div class="dots" style="color:#fff;opacity:.06"></div>
+  <div class="abs" id="s5g" style="left:660px;top:120px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(252,128,25,.4),transparent 65%)"></div>
+  <svg class="abs" id="s5m" style="left:830px;top:200px" width="260" height="260" viewBox="0 0 260 260">
+    <rect width="260" height="260" rx="66" fill="#FC8019"/>
+    <g fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" id="s5p" stroke-dasharray="400" >
+      <path d="M88 56V100Q88 128 130 128Q172 128 172 100V56M130 56V204M130 56V128"/>
+    </g>
+  </svg>
+  <div class="abs mask" style="left:0;right:0;top:500px;text-align:center;font-size:150px;letter-spacing:-.035em"><span id="s5a">Fridge to <span style="color:var(--o)">Fork</span></span></div>
+  <div class="abs mask" style="left:0;right:0;top:700px;text-align:center;font-size:62px;font-weight:600;color:#d8d8d8"><span id="s5b">Scan. Cook. Order what's missing.</span></div>
+  <div class="abs" id="s5u" style="left:0;right:0;top:850px;text-align:center"><span style="display:inline-block;background:var(--o);color:#fff;font-size:44px;padding:20px 50px;border-radius:999px">fridge-to-fork-cyan.vercel.app</span></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const cl=x=>Math.min(1,Math.max(0,x));
+const P=(t,a,d)=>cl((t-a)/d);
+const eo=x=>1-Math.pow(1-x,3);
+const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const eb=x=>{const c=1.9;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+function up(id,t,a,d=.55){const p=eo(P(t,a,d));$(id).style.transform=`translateY(${(1-p)*115}%)`}
+function pop(id,t,a,{d=.5,dx=0,dy=0,s=1,back=false}={}){const r=P(t,a,d),p=back?eb(r):eo(r);const e=$(id);e.style.opacity=cl(r*3);e.style.transform=`translate(${dx*(1-p)}px,${dy*(1-p)}px) scale(${s+(1-s)*p})`}
+function wipe(id,t,a,d=.45){const p=eio(P(t,a,d));$(id).style.clipPath=`inset(0 ${(1-p)*100}% 0 0)`;$(id).style.visibility=p>0?'visible':'hidden'}
+
+window.__setTime=function(t){
+  wipe('s1',t,-1,.01);wipe('s2',t,3.0);wipe('s3',t,7.5);wipe('s4',t,12.5);wipe('s5',t,17.5);
+  // S1
+  up('s1a',t,.15);up('s1b',t,1.0);
+  pop('s1t',t,0,{d:.5,dy:-20});
+  $('s1c').style.transform=`scale(${1+t*.08})`;
+  // S2
+  up('s2a',t,3.35);up('s2b',t,3.55);pop('s2s',t,4.0,{d:.6,dy:30});
+  pop('s2f',t,3.4,{d:.7,dx:80});
+  const sp=P(t,3.9,1.6);const by=170+eio(sp)*730;
+  const bar=$('s2bar');bar.style.top=by+'px';bar.style.opacity=(t>3.85&&t<5.6)?1:0;
+  pop('s2br',t,3.5,{d:.5,s:.92});
+  [4.6,4.85,5.1,5.35].forEach((a,i)=>pop('c'+i,t,a,{d:.5,dx:-90,s:.85,back:true}));
+  // S3
+  up('s3a',t,7.85);up('s3b',t,8.0);up('s3d',t,8.15);pop('s3s',t,9.3,{d:.6,dy:24});
+  pop('s3card',t,7.85,{d:.7,dy:80});
+  for(let i=0;i<6;i++)pop('r'+i,t,8.3+i*.32,{d:.4,dx:60});
+  for(let i=3;i<6;i++){const b=$('r'+i).querySelector('.bg');b.style.opacity=eo(P(t,10.4+(i-3)*.1,.3));
+    const st=$('r'+i).querySelector('.st');const on=t>10.4+(i-3)*.1;st.style.background=on?'#FC8019':'';st.style.color=on?'#fff':'';}
+  pop('s3bd',t,10.6,{d:.5,s:.4,back:true});
+  // S4
+  up('s4a',t,12.85);up('s4b',t,13.0);
+  [0,1,2].forEach(i=>pop('p'+i,t,13.3+i*.15,{d:.5,dy:40,back:true}));
+  pop('s4s',t,13.9,{d:.6,dy:24});pop('s4t',t,15.2,{d:.6,dy:24});
+  pop('cart',t,12.9,{d:.7,dx:120});
+  let n=0;[14.0,14.5,15.0].forEach((a,i)=>{pop('i'+i,t,a,{d:.5,dx:140,back:true});if(t>=a)n++});
+  $('cnt').textContent=n;$('cnt').style.transform=`scale(${1+.35*Math.max(0,1-((t-[14,14.5,15][Math.max(0,n-1)])*4))*(n>0?1:0)})`;
+  // S5
+  pop('s5g',t,17.7,{d:1.0,s:.6});
+  $('s5p').style.strokeDashoffset=400*(1-eio(P(t,17.8,.8)));
+  pop('s5m',t,17.75,{d:.6,s:.6,back:true});
+  up('s5a',t,18.2);up('s5b',t,18.5);pop('s5u',t,18.9,{d:.5,dy:24});
+};
+window.__setTime(0);
+</script>
+</body></html>
