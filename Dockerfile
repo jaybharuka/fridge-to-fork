@@ -1,5 +1,14 @@
 FROM python:3.11-slim
 
+# Without this, Python fully block-buffers stdout when it isn't a TTY (true
+# in any container) — print() output only flushes in bursts, so Render's
+# log timestamps stop reflecting real execution order/timing. Confirmed
+# live (2026-09-30 incident investigation): multiple log lines a real
+# fallback-chain grind apart shared the same microsecond timestamp, making
+# it impossible to tell whether a request actually exceeded app.py's 60s
+# vision timeout or the logs just looked that way.
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # System deps for Pillow's image codecs.

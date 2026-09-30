@@ -60,14 +60,14 @@ def _dedupe(models: list[str | None]) -> list[str]:
 # identify_ingredients() was quietly running on the third entry for every
 # scan with nobody noticing, since the fallback machinery's own resilience
 # hid the failure. Mixed pinned-version and "-latest" alias entries on
-# purpose: pinned entries (gemini-2.5-flash/-lite) are predictable; the
-# "-latest" aliases auto-repoint to whatever Google currently considers
-# current, so a future retirement degrades gracefully instead of 404ing
-# outright the way a pinned name does. Ordered strongest-and-fast first
-# (matches GEMINI_TEXT_MODEL's already-correct default, and is what most
-# scans should actually run on), fast/light fallbacks next, and the
+# purpose: a pinned entry (gemini-2.5-flash) is predictable; the "-latest"
+# aliases auto-repoint to whatever Google currently considers current, so
+# a future retirement degrades gracefully instead of 404ing outright the
+# way a pinned name does. Ordered strongest-and-fast first (matches
+# GEMINI_TEXT_MODEL's already-correct default, and is what most scans
+# should actually run on), fast/light fallback next, and the
 # slower-but-strongest pro-tier model last — worth the extra latency only
-# once four faster attempts have already failed and something is better
+# once earlier attempts have already failed and something is better
 # than an empty fridge. gemini-2.5-pro itself turned out to be a second,
 # subtler version of the same drift problem this audit exists to catch:
 # client.models.list() lists it as existing, but calling it with this
@@ -75,10 +75,17 @@ def _dedupe(models: list[str | None]) -> list[str]:
 # listed existence isn't the same as this key having access. Verified
 # gemini-3.1-pro-preview (Google's own suggested replacement) is reachable
 # with this key (a 429 rate-limit, not a 404) before using it here.
+#
+# gemini-2.5-flash-lite removed (2026-09-30, live prod incident) — hard
+# 404s ("no longer available to new users") on 2 of 3 configured keys,
+# confirmed live in Render's logs. Same drift problem the two paragraphs
+# above already describe; this pinned entry hit it too. Guaranteed-dead
+# weight on every single scan until Google's own replacement
+# (gemini-3.5-flash-lite, per the 404 body) is verified reachable with
+# this project's actual keys the same way gemini-3.1-pro-preview was.
 VISION_MODEL_FALLBACK_CHAIN = _dedupe([
     os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash"),
     "gemini-flash-latest",
-    "gemini-2.5-flash-lite",
     "gemini-flash-lite-latest",
     "gemini-3.1-pro-preview",
 ])
