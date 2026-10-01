@@ -7,7 +7,15 @@
 .statLine { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text-secondary); padding: var(--space-4) var(--space-5); }
 .statZ { color: var(--orange); font-weight: var(--weight-bold); }
 
-.hookLine { font-size: var(--text-base); font-style: italic; font-weight: var(--weight-regular); color: var(--grey-400); padding: var(--space-4) var(--space-5); }
+/* 2026-10-02: was `padding: var(--space-4) var(--space-5)` (16px on all
+   sides) — its own top padding STACKED with statLine's bottom padding,
+   doubling the gap above this line (32px) relative to the gap below it
+   (16px, since hintLine's own top padding is explicitly 0). Pre-existing
+   since this card's very first version, unrelated to any of tonight's
+   redesign/reasoning-text work (confirmed via git log) — just not noticed
+   until now. Zero top padding here, matching hintLine's own pattern,
+   makes every gap in this stat/hook/hint block a consistent 16px. */
+.hookLine { font-size: var(--text-base); font-style: italic; font-weight: var(--weight-regular); color: var(--grey-400); padding: 0 var(--space-5) var(--space-4); }
 
 /* Explains what tapping a row does — plain, not italic, so it doesn't
    read as more of the encouragement copy above it. */

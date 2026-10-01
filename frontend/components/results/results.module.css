@@ -390,7 +390,14 @@ button.brand:hover { opacity: 0.8; }
 .sectionLabel svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
 .emptyState { text-align: center; padding: 40px 16px; color: var(--swiggy-text-3); font-size: 13px; }
 @keyframes sectionFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.sectionReveal { animation: sectionFadeIn .3s ease-out forwards; }
+/* margin-bottom matches the page's established section-gap convention
+   (var(--space-8), 32px — same value .card/.recipeChecklistCard/.authCard
+   already use below the checklist and choice cards). Without it, this
+   section's last child (.customDishRow, the free-text "or tell us..."
+   row) ran directly into IngredientChecklistCard below with zero gap —
+   found 2026-10-02, pre-existing since this section had no spacing of its
+   own at all, not a regression from any single change. */
+.sectionReveal { margin-bottom: var(--space-8); animation: sectionFadeIn .3s ease-out forwards; }
 
 /* Recipe steps ("How to make it") — templates/index.html:3355-3372,
    3491-3497 (markup/behavior), 666-689 (CSS). Reuses the same
