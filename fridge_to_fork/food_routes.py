@@ -144,6 +144,10 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     async def cart(body: CartRequest, request: Request):
         return await run(request, lambda t: food.build_cart(t, body.address_id, body.selection.model_dump()))
 
+    @router.post("/probe-options")  # TEMPORARY diagnostic, remove with the fix
+    async def probe_options(body: CartRequest, request: Request):
+        return await run(request, lambda t: food.probe_valid_addons(t, body.address_id, body.selection.model_dump()))
+
     @router.post("/coupon")
     async def coupon(body: CouponRequest, request: Request):
         return await run(request, lambda t: food.apply_coupon(t, body.address_id, body.coupon_code, body.restaurant_id, body.restaurant_name))

@@ -515,6 +515,23 @@ async def build_cart(token: str, address_id: str, sel: dict) -> dict:
     return {"review": review, "adjustments": [], "coupons": coupons}
 
 
+async def probe_valid_addons(token: str, address_id: str, sel: dict) -> dict:
+    """TEMPORARY diagnostic: add one dish with no options, log its raw `valid_addons`, always flush again. Remove with the fix."""
+    async with _session(token) as session:
+        address = await _resolve_address(session, address_id)
+        existing = _inner(await _logged(session, "get_food_cart", addressId=address["id"]))
+        if existing.get("items"):
+            raise SwiggyError("probe_skipped", "Cart already has items; refusing to flush it for a probe.")
+        try:
+            update = await _logged(session, "update_food_cart", restaurantId=sel["restaurant_id"], cartItems=[{"menu_item_id": sel["menu_item_id"], "quantity": 1}], addressId=address["id"])
+            first = next((i for i in _inner(await _logged(session, "get_food_cart", addressId=address["id"])).get("items") or [] if isinstance(i, dict)), {})
+            log.warning("[FOOD][diag] probe update=%s", json.dumps(update, ensure_ascii=False, default=str)[:1500])
+            log.warning("[FOOD][diag] probe valid_addons=%s", json.dumps(first, ensure_ascii=False, default=str)[:4000])
+            return {"item": first}
+        finally:
+            await _logged(session, "flush_food_cart")
+
+
 def _same_items(a: dict, b: dict) -> bool:
     key = lambda review: sorted((i["menuItemId"], i["quantity"]) for i in review["items"])  # noqa: E731
     return key(a) == key(b)
