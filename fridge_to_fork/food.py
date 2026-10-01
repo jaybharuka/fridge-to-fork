@@ -217,6 +217,11 @@ async def search_dish(token: str, dish: str, address_id: str | None = None) -> d
     open_or_unknown.sort(key=lambda r: (not r["available"], r["restaurant"]["open"] is None))  # stable: Swiggy's ranking kept
     results = open_or_unknown[:MAX_RESULTS]
     log.warning("[FOOD][diag] search: %s", _describe_search(menu, found, results, closed))
+    # TEMPORARY: raw item JSON for each unsupported dish, to see what Swiggy returns. Remove once scoped.
+    unsupported_ids = {r["menuItemId"] for r in results if not r["customization"]["supported"]}
+    for raw in menu.get("items") or []:
+        if isinstance(raw, dict) and str(raw.get("menu_item_id")) in unsupported_ids:
+            log.warning("[FOOD][diag] unsupported_raw: %s", json.dumps({k: v for k, v in raw.items() if k != "imageUrl"}, ensure_ascii=False, default=str)[:900])
     return {"address": address, "dish": dish, "results": results, "hasMore": bool(menu.get("hasMore"))}
 
 
