@@ -98,6 +98,24 @@ def _options(variations: list[dict]) -> list[dict]:
     ]
 
 
+def _addon_group(group_id, name, min_addons, max_addons, choices, price) -> dict:
+    """One add-on group in the shape the picker renders. `price` converts Swiggy's price for that source (see load_options)."""
+    return {
+        "groupId": str(group_id), "name": name or "Add-ons", "min": max(int(min_addons or 0), 0),
+        "max": max_addons if isinstance(max_addons, int) and max_addons > 0 else None,
+        "choices": [
+            {"id": str(c["id"]), "name": c.get("name") or "", "price": price(c.get("price")), "available": _in_stock(c.get("inStock"))}
+            for c in choices or [] if isinstance(c, dict) and c.get("id") not in (None, "")
+        ],
+    }
+
+
+def _paise_to_rupees(value) -> float | None:
+    """Cart-time `valid_addons` prices are in PAISE (1900 = ₹19) while every other price Swiggy sends is in rupees."""
+    amount = _num(value)
+    return None if amount is None else round(amount / 100, 2)
+
+
 def _customization(item: dict) -> dict:
     """Variant groups (pick exactly one per group) and add-on groups (optional, within min/max) for one menu item.
 
@@ -129,16 +147,18 @@ def _customization(item: dict) -> dict:
     if item.get("hasVariants") and not groups:
         supported = False  # Swiggy says it has variants but gave none we can use
     addons = [
-        {
-            "groupId": str(g["groupId"]), "name": g.get("groupName") or "Add-ons", "min": int(g.get("minAddons") or 0),
-            "max": g.get("maxAddons") if isinstance(g.get("maxAddons"), int) and g["maxAddons"] > 0 else None,
-            "choices": [{"id": str(c["id"]), "name": c.get("name") or "", "price": _num(c.get("price"))} for c in g.get("choices") or [] if c.get("id") not in (None, "")],
-        }
+        _addon_group(g["groupId"], g.get("groupName"), g.get("minAddons"), g.get("maxAddons"), g.get("choices"), _num)
         for g in item.get("addons") or [] if g.get("groupId") not in (None, "")
     ]
+    # Swiggy flags add-ons but sends none at search time: they only come back in the cart (load_options), so this
+    # item is orderable after one more step, not a dead end. Only when nothing else about it is unsupported.
+    options_on_demand = bool(item.get("hasAddons")) and not addons and supported and not groups
     if item.get("hasAddons") and not addons:
         supported = False
-    return {"format": fmt, "variantGroups": groups, "addonGroups": [a for a in addons if a["choices"]], "supported": supported}
+    return {
+        "format": fmt, "variantGroups": groups, "addonGroups": [a for a in addons if a["choices"]],
+        "supported": supported, "optionsOnDemand": options_on_demand,
+    }
 
 
 def _restaurant(item: dict, known: dict | None) -> dict:
@@ -217,11 +237,6 @@ async def search_dish(token: str, dish: str, address_id: str | None = None) -> d
     open_or_unknown.sort(key=lambda r: (not r["available"], r["restaurant"]["open"] is None))  # stable: Swiggy's ranking kept
     results = open_or_unknown[:MAX_RESULTS]
     log.warning("[FOOD][diag] search: %s", _describe_search(menu, found, results, closed))
-    # TEMPORARY: raw item JSON for each unsupported dish, to see what Swiggy returns. Remove once scoped.
-    unsupported_ids = {r["menuItemId"] for r in results if not r["customization"]["supported"]}
-    for raw in menu.get("items") or []:
-        if isinstance(raw, dict) and str(raw.get("menu_item_id")) in unsupported_ids:
-            log.warning("[FOOD][diag] unsupported_raw: %s", json.dumps({k: v for k, v in raw.items() if k != "imageUrl"}, ensure_ascii=False, default=str)[:900])
     return {"address": address, "dish": dish, "results": results, "hasMore": bool(menu.get("hasMore"))}
 
 
@@ -515,19 +530,42 @@ async def build_cart(token: str, address_id: str, sel: dict) -> dict:
     return {"review": review, "adjustments": [], "coupons": coupons}
 
 
-async def probe_valid_addons(token: str, address_id: str, sel: dict) -> dict:
-    """TEMPORARY diagnostic: add one dish with no options, log its raw `valid_addons`, always flush again. Remove with the fix."""
+async def _flush_quietly(session: ClientSession) -> bool:
+    """Best-effort cart cleanup that never hides the error that got us here. False = the cart may still hold the item."""
+    try:
+        await _call(session, "flush_food_cart")
+        return True
+    except SwiggyError as exc:
+        log.warning("[FOOD] cart cleanup after loading options failed: %s", exc.message)
+        return False
+
+
+async def load_options(token: str, address_id: str, restaurant_id: str, menu_item_id: str, restaurant_name: str | None = None) -> dict:
+    """Add-on groups for an item whose search result said `hasAddons` but listed none (customization.optionsOnDemand).
+
+    Swiggy only returns them in the cart: flush, add the item with no options, read its `valid_addons`, flush again. The
+    flush runs in `finally`, in this same request, so the user's Swiggy cart is empty again whether this succeeds, is
+    refused, or the browser walked away: there is no separate abandon step to forget. (Like build_cart, it replaces
+    whatever the cart held; the picker asks the user to confirm before calling this, the server doesn't need to know.)
+    """
     async with _session(token) as session:
         address = await _resolve_address(session, address_id)
-        await _logged(session, "flush_food_cart")  # user confirmed the cart holds nothing of value
+        name_arg = {"restaurantName": restaurant_name} if restaurant_name else {}
+        await _logged(session, "flush_food_cart")
         try:
-            update = await _logged(session, "update_food_cart", restaurantId=sel["restaurant_id"], cartItems=[{"menu_item_id": sel["menu_item_id"], "quantity": 1}], addressId=address["id"])
-            first = next((i for i in _inner(await _logged(session, "get_food_cart", addressId=address["id"])).get("items") or [] if isinstance(i, dict)), {})
-            log.warning("[FOOD][diag] probe update=%s", json.dumps(update, ensure_ascii=False, default=str)[:1500])
-            log.warning("[FOOD][diag] probe valid_addons=%s", json.dumps(first, ensure_ascii=False, default=str)[:4000])
-            return {"item": first}
+            await _logged(session, "update_food_cart", restaurantId=restaurant_id, cartItems=[{"menu_item_id": menu_item_id, "quantity": 1}], addressId=address["id"], **name_arg)
+            cart = await _logged(session, "get_food_cart", addressId=address["id"], **name_arg)
         finally:
-            await _logged(session, "flush_food_cart")
+            cleared = await _flush_quietly(session)
+    item = next((i for i in _inner(cart).get("items") or [] if isinstance(i, dict) and str(i.get("menu_item_id")) == str(menu_item_id)), {})
+    groups = [
+        _addon_group(gid, g.get("group_name", g.get("groupName")), g.get("minAddons"), g.get("maxAddons"), g.get("choices"), _paise_to_rupees)
+        for g in item.get("valid_addons") or [] if isinstance(g, dict) and (gid := g.get("group_id", g.get("groupId"))) not in (None, "")
+    ]
+    groups = [g for g in groups if g["choices"]]
+    if not groups:
+        raise SwiggyError("options_unavailable", "Swiggy didn't list any options for this dish. Order it in the Swiggy app.", tool="get_food_cart")
+    return {"addonGroups": groups, "cartCleared": cleared}
 
 
 def _same_items(a: dict, b: dict) -> bool:

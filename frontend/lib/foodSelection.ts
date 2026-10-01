@@ -4,7 +4,7 @@
 // Nothing is defaulted silently: Swiggy's own "default" option is pre-selected so it is visible on screen, and
 // every variant group must still have a pick before the cart is built. Add-ons are optional within min/max.
 
-import type { FoodResult, FoodSelection } from './food';
+import type { AddonGroup, FoodResult, FoodSelection } from './food';
 
 export interface Picks {
   /** groupId -> chosen variation id */
@@ -15,6 +15,11 @@ export interface Picks {
 }
 
 export const MAX_QUANTITY = 20;
+
+/** The dish with the add-on groups Swiggy's cart revealed: now orderable, through the same picker as any other add-ons. */
+export function withLoadedOptions(result: FoodResult, addonGroups: AddonGroup[]): FoodResult {
+  return { ...result, customization: { ...result.customization, addonGroups, supported: true, optionsOnDemand: false } };
+}
 
 /** Start from Swiggy's default variant of each group (shown selected on screen), no add-ons, quantity 1. */
 export function initialPicks(result: FoodResult): Picks {
@@ -54,7 +59,10 @@ export function pickProblem(result: FoodResult, picks: Picks): string | null {
     if (!option.available) return `${option.name} is out of stock. Choose another.`;
   }
   for (const group of customization.addonGroups) {
-    const count = (picks.addons[group.groupId] ?? []).length;
+    const chosen = picks.addons[group.groupId] ?? [];
+    const gone = group.choices.find(c => !c.available && chosen.includes(c.id));
+    if (gone) return `${gone.name} is out of stock. Remove it.`;
+    const count = chosen.length;
     if (count < group.min) return `Choose at least ${group.min} from ${group.name}.`;
     if (group.max !== null && count > group.max) return `Choose at most ${group.max} from ${group.name}.`;
   }

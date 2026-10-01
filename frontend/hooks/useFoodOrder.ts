@@ -5,9 +5,11 @@ import {
   foodApplyCoupon,
   foodCart,
   foodCheckout,
+  foodLoadOptions,
   foodPaymentStatus,
   foodSearch,
   newIdempotencyKey,
+  type AddonGroup,
   type AppliedCoupon,
   type CouponList,
   type FoodOutcome,
@@ -18,7 +20,7 @@ import {
 } from '../lib/food';
 import { setSelectedAddressId } from '../lib/addressStore';
 import { pollPayment as pollPaymentLoop } from '../lib/pollPayment';
-import { initialPicks, setQuantity, setVariant, toggleAddon, toSelection, type Picks } from '../lib/foodSelection';
+import { initialPicks, setQuantity, setVariant, toggleAddon, toSelection, withLoadedOptions, type Picks } from '../lib/foodSelection';
 
 export type Stage = 'searching' | 'picking' | 'building' | 'reviewing' | 'placing' | 'done' | 'error';
 
@@ -29,6 +31,8 @@ export interface FoodState {
   /** The dish being customized (menuItemId) and what has been picked for it. */
   openId: string | null;
   picks: Picks | null;
+  /** The dish whose options are being fetched from Swiggy's cart (one at a time). */
+  loadingOptionsId: string | null;
   review: FoodReview | null;
   coupons: CouponList;
   /** Set once Swiggy's cart actually shows the discount; there is no remove-coupon tool. */
@@ -52,6 +56,9 @@ type Action =
   | { type: 'SEARCH_OK'; address: InstamartAddress; results: FoodResult[] }
   | { type: 'OPEN'; result: FoodResult }
   | { type: 'CLOSE_ITEM' }
+  | { type: 'OPTIONS_START'; id: string }
+  | { type: 'OPTIONS_OK'; id: string; addonGroups: AddonGroup[] }
+  | { type: 'OPTIONS_FAIL'; notice: string; tool?: string | null }
   | { type: 'VARIANT'; groupId: string; optionId: string }
   | { type: 'ADDON'; groupId: string; addonId: string; max: number | null }
   | { type: 'QTY'; quantity: number }
@@ -71,7 +78,7 @@ type Action =
 const NO_COUPONS: CouponList = { available: false, items: [] };
 
 const initial: FoodState = {
-  stage: 'searching', address: null, results: [], openId: null, picks: null, review: null, coupons: NO_COUPONS, appliedCoupon: null, couponBusy: null, paymentKey: null,
+  stage: 'searching', address: null, results: [], openId: null, picks: null, loadingOptionsId: null, review: null, coupons: NO_COUPONS, appliedCoupon: null, couponBusy: null, paymentKey: null,
   idempotencyKey: null, outcome: null, notice: null, noticeTool: null, error: null, errorTool: null, authNeeded: false,
 };
 
@@ -98,6 +105,15 @@ function reducer(state: FoodState, action: Action): FoodState {
       return { ...state, openId: action.result.menuItemId, picks: initialPicks(action.result), notice: null, noticeTool: null };
     case 'CLOSE_ITEM':
       return { ...state, openId: null, picks: null };
+    case 'OPTIONS_START':
+      return { ...state, loadingOptionsId: action.id, notice: null, noticeTool: null };
+    case 'OPTIONS_OK': {
+      const results = state.results.map(r => (r.menuItemId === action.id ? withLoadedOptions(r, action.addonGroups) : r));
+      const loaded = results.find(r => r.menuItemId === action.id);
+      return loaded ? { ...state, results, loadingOptionsId: null, openId: action.id, picks: initialPicks(loaded) } : { ...state, loadingOptionsId: null };
+    }
+    case 'OPTIONS_FAIL':
+      return { ...state, loadingOptionsId: null, notice: action.notice, noticeTool: action.tool ?? null };
     case 'VARIANT':
       return state.picks ? { ...state, picks: setVariant(state.picks, action.groupId, action.optionId) } : state;
     case 'ADDON':
@@ -212,6 +228,22 @@ export function useFoodOrder() {
     }
   }, []);
 
+  /** Never leaves anything behind in the user's cart: the server empties it again before it replies, so there is no
+   *  abandon step. Closing the sheet mid-load just drops the reply (run.current moved on). */
+  const loadOptions = useCallback(async (addressId: string, result: FoodResult) => {
+    const id = run.current;
+    dispatch({ type: 'OPTIONS_START', id: result.menuItemId });
+    try {
+      const { addonGroups } = await foodLoadOptions(addressId, result);
+      if (run.current === id) dispatch({ type: 'OPTIONS_OK', id: result.menuItemId, addonGroups });
+    } catch (e) {
+      const d = describe(e);
+      if (run.current !== id) return;
+      if (d.authNeeded) dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
+      else dispatch({ type: 'OPTIONS_FAIL', notice: d.message, tool: d.tool });
+    }
+  }, []);
+
   const applyCoupon = useCallback(async (addressId: string, code: string, restaurant: { id: string | null; name: string | null } | null) => {
     const id = run.current;
     dispatch({ type: 'COUPON_START', code });
@@ -265,5 +297,5 @@ export function useFoodOrder() {
     }
   }, [pollPayment]);
 
-  return { state, search, open, closeItem, chooseVariant, chooseAddon, setQty, selectPayment, backToPicking, buildCart, applyCoupon, placeOrder, reset };
+  return { state, search, open, loadOptions, closeItem, chooseVariant, chooseAddon, setQty, selectPayment, backToPicking, buildCart, applyCoupon, placeOrder, reset };
 }

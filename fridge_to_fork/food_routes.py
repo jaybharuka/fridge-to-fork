@@ -58,6 +58,13 @@ class CartRequest(BaseModel):
     selection: Selection
 
 
+class LoadOptionsRequest(BaseModel):
+    address_id: Id
+    restaurant_id: Id
+    menu_item_id: Id
+    restaurant_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+
+
 class CouponRequest(BaseModel):
     address_id: Id
     coupon_code: str = Field(min_length=1, max_length=64)
@@ -144,9 +151,9 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     async def cart(body: CartRequest, request: Request):
         return await run(request, lambda t: food.build_cart(t, body.address_id, body.selection.model_dump()))
 
-    @router.post("/probe-options")  # TEMPORARY diagnostic, remove with the fix
-    async def probe_options(body: CartRequest, request: Request):
-        return await run(request, lambda t: food.probe_valid_addons(t, body.address_id, body.selection.model_dump()))
+    @router.post("/load-options")
+    async def load_options(body: LoadOptionsRequest, request: Request):
+        return await run(request, lambda t: food.load_options(t, body.address_id, body.restaurant_id, body.menu_item_id, body.restaurant_name))
 
     @router.post("/coupon")
     async def coupon(body: CouponRequest, request: Request):

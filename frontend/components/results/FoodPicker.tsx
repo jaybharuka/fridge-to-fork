@@ -1,9 +1,10 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Minus, Plus, Star } from 'lucide-react';
 import { formatInr, type FoodResult } from '@/lib/food';
 import { pickProblem, type Picks } from '@/lib/foodSelection';
+import { askGate, cancelGate, confirmGate, type Gate } from '@/lib/loadGate';
 import { Icon } from '@/components/ui/Icon';
 import { ProductThumb } from './ProductThumb';
 import styles from './instamart.module.css';
@@ -32,13 +33,21 @@ interface CardProps {
   result: FoodResult;
   picks: Picks | null;
   onOpen: () => void;
+  /** Some dish's options are being fetched: one at a time, since each is a cart round-trip. */
+  loadingOptions: boolean;
+  loadingThis: boolean;
+  /** Loading options empties the user's Swiggy cart, so it asks first (see lib/loadGate.ts). */
+  confirming: boolean;
+  onAsk: () => void;
+  onCancelAsk: () => void;
+  onConfirm: () => void;
   onClose: () => void;
   onVariant: (groupId: string, optionId: string) => void;
   onAddon: (groupId: string, addonId: string, max: number | null) => void;
   onQuantity: (quantity: number) => void;
 }
 
-function DishCard({ result, picks, onOpen, onClose, onVariant, onAddon, onQuantity }: CardProps) {
+function DishCard({ result, picks, onOpen, loadingOptions, loadingThis, confirming, onAsk, onCancelAsk, onConfirm, onClose, onVariant, onAddon, onQuantity }: CardProps) {
   const { customization: c, restaurant: r } = result;
   const problem = picks ? pickProblem(result, picks) : null;
   const blocked = !result.available || !c.supported;
@@ -98,11 +107,11 @@ function DishCard({ result, picks, onOpen, onClose, onVariant, onAddon, onQuanti
                           type="button"
                           aria-pressed={on}
                           className={`${styles.option} ${on ? styles.on : ''}`}
-                          disabled={!on && group.max !== null && chosen.length >= group.max}
+                          disabled={!a.available || (!on && group.max !== null && chosen.length >= group.max)}
                           onClick={() => onAddon(group.groupId, a.id, group.max)}
                         >
                           <span className={styles.optionName}>{a.name}</span>
-                          {a.price !== null && a.price > 0 && <span className={styles.optionPrice}>+{formatInr(a.price)}</span>}
+                          {!a.available ? <span className={`${styles.optionPrice} ${styles.oos}`}>Out of stock</span> : a.price !== null && a.price > 0 && <span className={styles.optionPrice}>+{formatInr(a.price)}</span>}
                         </button>
                       </li>
                     );
@@ -128,6 +137,16 @@ function DishCard({ result, picks, onOpen, onClose, onVariant, onAddon, onQuanti
         <div className={styles.actions}>
           {!result.available ? (
             <span className={styles.oos}>Out of stock</span>
+          ) : c.optionsOnDemand && confirming && !loadingOptions ? (
+            <div className={styles.confirmDelete} style={{ maxWidth: 'none', alignItems: 'flex-start' }}>
+              <p className={styles.couponWhy} role="alert">Choosing options for this dish will clear your current Swiggy cart. Continue?</p>
+              <button type="button" className={styles.dangerBtn} onClick={onConfirm}>Clear cart &amp; continue</button>
+              <button type="button" className={styles.linkBtn} onClick={onCancelAsk}>Cancel</button>
+            </div>
+          ) : c.optionsOnDemand ? (
+            <button type="button" className={styles.linkBtn} disabled={loadingOptions} aria-busy={loadingThis} onClick={onAsk}>
+              {loadingThis ? 'Loading options…' : 'Choose options'}
+            </button>
           ) : !c.supported ? (
             <span className={styles.skipped}>Needs options we can&apos;t set here — order it in the Swiggy app.</span>
           ) : (
@@ -146,6 +165,8 @@ interface PickerProps {
   openId: string | null;
   picks: Picks | null;
   onOpen: (result: FoodResult) => void;
+  onLoadOptions: (result: FoodResult) => void;
+  loadingOptionsId: string | null;
   onClose: () => void;
   onVariant: (groupId: string, optionId: string) => void;
   onAddon: (groupId: string, addonId: string, max: number | null) => void;
@@ -153,7 +174,8 @@ interface PickerProps {
 }
 
 /** Real matching dishes near the address. While one is being customized, only that dish is shown. */
-export function FoodPicker({ results, openId, picks, onOpen, onClose, onVariant, onAddon, onQuantity }: PickerProps) {
+export function FoodPicker({ results, openId, picks, onOpen, onLoadOptions, loadingOptionsId, onClose, onVariant, onAddon, onQuantity }: PickerProps) {
+  const [gate, setGate] = useState<Gate>(null);
   if (results.length === 0) {
     return <p className={styles.none}>No matching dishes are available near this address right now. Try another address, or order the ingredients instead.</p>;
   }
@@ -166,6 +188,12 @@ export function FoodPicker({ results, openId, picks, onOpen, onClose, onVariant,
           result={result}
           picks={result.menuItemId === openId ? picks : null}
           onOpen={() => onOpen(result)}
+          confirming={gate === result.menuItemId}
+          onAsk={() => setGate(g => askGate(g, result.menuItemId))}
+          onCancelAsk={() => setGate(cancelGate())}
+          onConfirm={() => setGate(confirmGate(gate, result.menuItemId, () => onLoadOptions(result)))} // not inside an updater: those run twice in StrictMode
+          loadingOptions={loadingOptionsId !== null}
+          loadingThis={loadingOptionsId === result.menuItemId}
           onClose={onClose}
           onVariant={onVariant}
           onAddon={onAddon}

@@ -2,34 +2,34 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { FoodResult } from './food.ts';
-import { initialPicks, pickProblem, setQuantity, setVariant, toggleAddon, toSelection } from './foodSelection.ts';
+import { initialPicks, pickProblem, setQuantity, setVariant, toggleAddon, toSelection, withLoadedOptions } from './foodSelection.ts';
 
 const restaurant = { id: 'r2', name: 'Biryani House', area: null, etaMinutes: 35, etaRange: null, distanceKm: null, rating: 4.1, costForTwo: null, offer: null, open: true };
 
 const plain: FoodResult = {
   menuItemId: 'm-plain', name: 'Butter Chicken', price: 320, isVeg: false, imageUrl: null, rating: null, ratingCount: null, bestseller: false, available: true,
   restaurant: { ...restaurant, id: 'r1', name: 'Punjabi Tadka' },
-  customization: { format: null, variantGroups: [], addonGroups: [], supported: true },
+  customization: { format: null, variantGroups: [], addonGroups: [], supported: true, optionsOnDemand: false },
 };
 
 const bowl: FoodResult = {
   ...plain, menuItemId: 'm-v2', name: 'Butter Chicken Bowl', restaurant,
   customization: {
-    format: 'variantsV2', supported: true,
+    format: 'variantsV2', supported: true, optionsOnDemand: false,
     variantGroups: [{ groupId: 'g-size', name: 'Size', options: [
       { id: 'v-half', name: 'Half', price: 250, default: true, available: true },
       { id: 'v-full', name: 'Full', price: 420, default: false, available: true },
       { id: 'v-xl', name: 'XL', price: 600, default: false, available: false },
     ] }],
     addonGroups: [{ groupId: 'g-extra', name: 'Extras', min: 0, max: 2, choices: [
-      { id: 'a-raita', name: 'Raita', price: 30 }, { id: 'a-naan', name: 'Butter Naan', price: 40 }, { id: 'a-salad', name: 'Salad', price: 20 },
+      { id: 'a-raita', name: 'Raita', price: 30, available: true }, { id: 'a-naan', name: 'Butter Naan', price: 40, available: true }, { id: 'a-salad', name: 'Salad', price: 20, available: true },
     ] }],
   },
 };
 
 const required: FoodResult = {
   ...bowl,
-  customization: { ...bowl.customization, addonGroups: [{ groupId: 'g-must', name: 'Spice level', min: 1, max: 1, choices: [{ id: 's-mild', name: 'Mild', price: 0 }, { id: 's-hot', name: 'Hot', price: 0 }] }] },
+  customization: { ...bowl.customization, addonGroups: [{ groupId: 'g-must', name: 'Spice level', min: 1, max: 1, choices: [{ id: 's-mild', name: 'Mild', price: 0, available: true }, { id: 's-hot', name: 'Hot', price: 0, available: true }] }] },
 };
 
 describe('initialPicks', () => {
@@ -131,5 +131,44 @@ describe('toSelection', () => {
     const sel = toSelection(bowl, picks);
     assert.deepEqual(sel.variants, [{ group_id: 'g-size', variation_id: 'v-half' }]);
     assert.deepEqual(sel.addons, []);
+  });
+});
+
+// A dish Swiggy flagged hasAddons for but sent no groups: its groups come from the cart (backend load_options), already in rupees.
+const onDemand: FoodResult = { ...plain, menuItemId: 'm-od', name: 'Sabudana Khichdi & Curd Meal', price: 260, customization: { ...plain.customization, supported: false, optionsOnDemand: true } };
+const loadedGroups = [{ groupId: '280938322', name: 'Upvas Add ons', min: 0, max: 7, choices: [
+  { id: '122782206', name: 'Imli Chutney', price: 19, available: true },
+  { id: '116558510', name: 'Upvas Aloo Pattice (2pcs)', price: 69, available: false },
+] }];
+
+describe('withLoadedOptions', () => {
+  const loaded = withLoadedOptions(onDemand, loadedGroups);
+  it('makes the dish orderable through the ordinary add-on rules', () => {
+    assert.equal(loaded.customization.supported, true);
+    assert.equal(loaded.customization.optionsOnDemand, false);
+    assert.equal(pickProblem(loaded, initialPicks(loaded)), null); // optional group: orderable as is
+    assert.equal(pickProblem(onDemand, initialPicks(onDemand)) !== null, true); // and not before
+  });
+  it('does not mutate the original result', () => {
+    assert.equal(onDemand.customization.optionsOnDemand, true);
+    assert.deepEqual(onDemand.customization.addonGroups, []);
+  });
+  it('keeps the dish, its price (rupees) and its restaurant', () => {
+    assert.equal(loaded.price, 260);
+    assert.equal(loaded.restaurant, onDemand.restaurant);
+  });
+  it('builds the cart request from the loaded groups with ids exactly as Swiggy sent them', () => {
+    const picks = toggleAddon(initialPicks(loaded), '280938322', '122782206', 7);
+    assert.deepEqual(toSelection(loaded, picks).addons, [{ group_id: '280938322', addon_id: '122782206', quantity: 1 }]);
+    assert.equal(toSelection(loaded, picks).format, null);
+  });
+  it('an out-of-stock add-on is refused even if a caller bypasses the disabled button', () => {
+    const picks = toggleAddon(initialPicks(loaded), '280938322', '116558510', 7);
+    assert.match(pickProblem(loaded, picks) ?? '', /Aloo Pattice.*out of stock/);
+  });
+  it('a loaded group that requires a pick blocks until one is made', () => {
+    const must = withLoadedOptions(onDemand, [{ ...loadedGroups[0], min: 1, max: 1 }]);
+    assert.match(pickProblem(must, initialPicks(must)) ?? '', /at least 1 from Upvas Add ons/);
+    assert.equal(pickProblem(must, toggleAddon(initialPicks(must), '280938322', '122782206', 1)), null);
   });
 });

@@ -26,7 +26,7 @@ export interface FoodRestaurant {
 
 export interface VariantOption { id: string; name: string; price: number | null; default: boolean; available: boolean }
 export interface VariantGroup { groupId: string; name: string; options: VariantOption[] }
-export interface AddonChoice { id: string; name: string; price: number | null }
+export interface AddonChoice { id: string; name: string; price: number | null; available: boolean }
 export interface AddonGroup { groupId: string; name: string; min: number; max: number | null; choices: AddonChoice[] }
 
 export interface FoodCustomization {
@@ -36,6 +36,8 @@ export interface FoodCustomization {
   addonGroups: AddonGroup[];
   /** false = the item needs options we can't identify, so it is shown but can't be ordered here. */
   supported: boolean;
+  /** true = Swiggy flagged add-ons but sent none; foodLoadOptions fetches them (one cart round-trip) and makes it orderable. */
+  optionsOnDemand: boolean;
 }
 
 export interface FoodResult {
@@ -125,6 +127,15 @@ export const foodSearch = (dish: string, addressId: string | null = null) =>
 
 export const foodCart = (addressId: string, selection: FoodSelection) =>
   post<{ review: FoodReview; adjustments: string[]; coupons: CouponList }>('cart', { address_id: addressId, selection });
+
+/** Add-on groups that only Swiggy's cart reveals. The server empties the cart again before replying. */
+export const foodLoadOptions = (addressId: string, result: FoodResult, signal?: AbortSignal) =>
+  post<{ addonGroups: AddonGroup[]; cartCleared: boolean }>('load-options', {
+    address_id: addressId,
+    restaurant_id: result.restaurant.id,
+    menu_item_id: result.menuItemId,
+    ...(result.restaurant.name ? { restaurant_name: result.restaurant.name } : {}),
+  }, signal);
 
 /** `restaurant` is the one the reviewed cart was built for: fetch_food_coupons needs it and the cart doesn't always name it. */
 export const foodApplyCoupon = (addressId: string, couponCode: string, restaurant: { id: string | null; name: string | null } | null = null) =>

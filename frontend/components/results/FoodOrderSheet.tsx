@@ -154,6 +154,8 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
               openId={state.openId}
               picks={state.picks}
               onOpen={order.open}
+              onLoadOptions={r => { if (state.address) void order.loadOptions(state.address.id, r); }}
+              loadingOptionsId={state.loadingOptionsId}
               onClose={order.closeItem}
               onVariant={order.chooseVariant}
               onAddon={order.chooseAddon}

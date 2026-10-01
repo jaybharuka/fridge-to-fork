@@ -7,6 +7,7 @@ Phase 2 adds fetch_food_coupons/apply_food_coupon, and UPI (place_food_order PEN
 confirm_order, which for Food echoes addressId/cartId/lat/lng and never uses paasId), on top of the shared classifier.
 """
 
+import asyncio
 import copy
 import json
 import logging
@@ -56,6 +57,11 @@ LEGACY = {"name": "Butter Chicken Combo", "price": 300, "menu_item_id": "m-legac
 CLOSED = {"name": "Butter Chicken Roll", "price": 150, "menu_item_id": "m-closed", "inStock": 1, "restaurant_id": "r3", "restaurant_name": "Late Night Bites"}
 UNKNOWN_REST = {"name": "Butter Chicken Thali", "price": 280, "menu_item_id": "m-unk", "inStock": 1, "restaurant_id": "r9", "restaurant_name": "Somewhere New"}
 OUT_OF_STOCK = {**PLAIN, "menu_item_id": "m-oos", "name": "Butter Chicken Special", "inStock": 0}
+HAS_ADDONS_NO_DATA = {"name": "Sabudana Khichdi & Curd Meal", "price": 260, "isVeg": True, "menu_item_id": "m-onDemand", "inStock": 1, "restaurant_id": "r1", "hasAddons": True}
+# What Swiggy returned for the real dish (probe, 2026-10-01): snake_case group keys, camelCase min/max, prices in PAISE.
+VALID_ADDONS = [{"group_id": 280938322, "group_name": "Upvas Add ons", "minAddons": 0, "maxAddons": 7, "maxFreeAddons": -1, "order": 100000, "choices": [
+    {"id": 122782206, "name": "Imli Chutney", "price": 1900, "inStock": 1, "isVeg": 1, "order": 99996, "default": 0},
+    {"id": 116558510, "name": "Upvas Aloo Pattice (2pcs)", "price": 6900, "inStock": 0, "isVeg": 1, "order": 100000, "default": 0}]}]
 BROKEN_VARIANTS = {"name": "Mystery Curry", "price": 200, "menu_item_id": "m-broken", "inStock": 1, "restaurant_id": "r1", "hasVariants": True}
 NO_ID = {"name": "Butter Chicken (no id)", "price": 200, "restaurant_id": "r1"}
 
@@ -183,7 +189,7 @@ class SearchTests(FoodCase):
             {"id": "v-half", "name": "Half", "price": 250.0, "default": True, "available": True},
             {"id": "v-full", "name": "Full", "price": 420.0, "default": False, "available": True}]}])
         self.assertEqual(c["addonGroups"], [{"groupId": "g-extra", "name": "Extras", "min": 0, "max": 2, "choices": [
-            {"id": "a-raita", "name": "Raita", "price": 30.0}, {"id": "a-naan", "name": "Butter Naan", "price": 40.0}]}])
+            {"id": "a-raita", "name": "Raita", "price": 30.0, "available": True}, {"id": "a-naan", "name": "Butter Naan", "price": 40.0, "available": True}]}])
 
     async def test_legacy_variations_are_grouped_by_group_id_and_keep_their_own_format(self):
         out, _, _ = await self.search()
@@ -195,6 +201,13 @@ class SearchTests(FoodCase):
         out, _, _ = await self.search()
         self.assertFalse(next(r for r in out["results"] if r["menuItemId"] == "m-broken")["customization"]["supported"])
         self.assertTrue(next(r for r in out["results"] if r["menuItemId"] == "m-plain")["customization"]["supported"])
+
+    async def test_hasaddons_with_no_addon_data_is_loadable_on_demand_not_a_dead_end(self):
+        out, _, _ = await self.search(search_menu=envelope({**MENU, "items": [HAS_ADDONS_NO_DATA, BROKEN_VARIANTS]}))
+        c = {r["menuItemId"]: r["customization"] for r in out["results"]}
+        self.assertEqual((c["m-onDemand"]["supported"], c["m-onDemand"]["optionsOnDemand"]), (False, True))
+        self.assertEqual((c["m-broken"]["supported"], c["m-broken"]["optionsOnDemand"]), (False, False))  # variants we can't read: still a dead end
+        self.assertFalse(any(food._customization(i)["optionsOnDemand"] for i in (PLAIN, V2, LEGACY)))
 
     async def test_a_failing_restaurant_search_still_returns_the_dishes(self):
         out, _, _ = await self.search(search_restaurants=envelope(success=False, error="down"))
@@ -253,6 +266,99 @@ class FoodAddressTests(FoodCase):
         with using(s), self.assertRaises(SwiggyError) as ctx:
             await food.search_dish("tok", "x", None)
         self.assertEqual(ctx.exception.code, "no_address")
+
+
+# ---------------------------------------------------------------------------- loading add-ons that only the cart reveals
+
+
+def options_cart(valid_addons=VALID_ADDONS, menu_item_id="m-onDemand") -> dict:
+    return food_cart(items=[{"menu_item_id": menu_item_id, "name": "Sabudana Khichdi & Curd Meal", "quantity": 1, "subtotal": 260, "total": 275.6, "final_price": 260,
+                             "in_stock": 1, "variants": [], "addons": [], "valid_addons": valid_addons}])
+
+
+class LoadOptionsTests(FoodCase):
+    async def load(self, session=None):
+        s = session or cart_session(options_cart())
+        with using(s):
+            return await food.load_options("tok", "addr-home", "r1", "m-onDemand", "Punjabi Tadka"), s
+
+    async def test_paise_become_rupees_not_1900_and_not_a_mangled_float(self):
+        out, _ = await self.load()
+        price = out["addonGroups"][0]["choices"][0]["price"]
+        self.assertEqual(price, 19)
+        self.assertNotEqual(price, 1900)
+        self.assertEqual(json.dumps(price), "19.0")  # a plain number in JSON, which the UI formats as ₹19
+        self.assertEqual(food._paise_to_rupees(6900), 69)
+        self.assertEqual(food._paise_to_rupees("1950"), 19.5)
+        self.assertEqual(food._paise_to_rupees(0), 0)
+        self.assertIsNone(food._paise_to_rupees(None))
+
+    async def test_groups_have_exactly_the_shape_search_time_addons_have(self):
+        out, _ = await self.load()
+        search_time = food._customization(V2)["addonGroups"][0]
+        group = out["addonGroups"][0]
+        self.assertEqual(set(group), set(search_time))
+        self.assertEqual(set(group["choices"][0]), set(search_time["choices"][0]))
+        self.assertEqual(group, {"groupId": "280938322", "name": "Upvas Add ons", "min": 0, "max": 7, "choices": [
+            {"id": "122782206", "name": "Imli Chutney", "price": 19.0, "available": True},
+            {"id": "116558510", "name": "Upvas Aloo Pattice (2pcs)", "price": 69.0, "available": False}]})
+
+    async def test_out_of_stock_choices_are_marked_unavailable(self):
+        out, _ = await self.load()
+        self.assertEqual([c["available"] for c in out["addonGroups"][0]["choices"]], [True, False])
+
+    async def test_a_required_group_keeps_its_minimum(self):
+        out, _ = await self.load(cart_session(options_cart([{**VALID_ADDONS[0], "minAddons": 1, "maxAddons": 1}])))
+        self.assertEqual((out["addonGroups"][0]["min"], out["addonGroups"][0]["max"]), (1, 1))
+
+    async def test_no_cap_and_junk_groups_are_handled(self):
+        groups = [{**VALID_ADDONS[0], "maxAddons": -1, "minAddons": -1}, {"group_name": "no id", "choices": [{"id": 1}]}, {"group_id": 9, "group_name": "empty", "choices": []}]
+        out, _ = await self.load(cart_session(options_cart(groups)))
+        self.assertEqual(len(out["addonGroups"]), 1)
+        self.assertEqual((out["addonGroups"][0]["min"], out["addonGroups"][0]["max"]), (0, None))
+
+    async def test_the_cart_is_flushed_before_and_after_and_the_item_added_empty(self):
+        out, s = await self.load()
+        self.assertEqual(s.names()[s.names().index("flush_food_cart"):], ["flush_food_cart", "update_food_cart", "get_food_cart", "flush_food_cart"])
+        self.assertEqual(s.args("update_food_cart"), {"restaurantId": "r1", "cartItems": [{"menu_item_id": "m-onDemand", "quantity": 1}],
+                                                       "addressId": "addr-home", "restaurantName": "Punjabi Tadka"})
+        self.assertTrue(out["cartCleared"])
+        self.assertNotIn("place_food_order", s.names())  # never anywhere near checkout
+
+    async def test_the_cart_is_cleaned_up_even_when_swiggy_refuses_the_add(self):
+        s = cart_session(options_cart(), update_food_cart=envelope(success=False, error="needs a choice first"))
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING"), self.assertRaises(SwiggyError):
+            await food.load_options("tok", "addr-home", "r1", "m-onDemand")
+        self.assertEqual((s.names()[-1], s.names().count("flush_food_cart")), ("flush_food_cart", 2))
+
+    async def test_the_cart_is_cleaned_up_when_the_request_is_cancelled_mid_flight(self):
+        def walk_away(_args):
+            raise asyncio.CancelledError  # the browser left while we waited on Swiggy
+
+        s = cart_session(options_cart(), get_food_cart=walk_away)
+        with using(s), self.assertRaises(asyncio.CancelledError):
+            await food.load_options("tok", "addr-home", "r1", "m-onDemand")
+        self.assertEqual(s.names().count("flush_food_cart"), 2)
+
+    async def test_a_failed_cleanup_is_reported_and_does_not_hide_the_options(self):
+        s = cart_session(options_cart(), flush_food_cart=[envelope({"success": True}), envelope(success=False, error="down")])
+        with self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            out, _ = await self.load(s)
+        self.assertFalse(out["cartCleared"])
+        self.assertIn("cleanup", "\n".join(logs.output))
+        self.assertEqual(len(out["addonGroups"]), 1)
+
+    async def test_a_dish_swiggy_lists_no_options_for_is_an_honest_error_after_cleanup(self):
+        s = cart_session(options_cart([]))
+        with using(s), self.assertRaises(SwiggyError) as ctx:
+            await food.load_options("tok", "addr-home", "r1", "m-onDemand")
+        self.assertEqual(ctx.exception.code, "options_unavailable")
+        self.assertEqual(s.names().count("flush_food_cart"), 2)
+
+    async def test_a_cart_holding_some_other_item_yields_nothing_rather_than_its_options(self):
+        s = cart_session(options_cart(menu_item_id="m-other"))
+        with using(s), self.assertRaises(SwiggyError):
+            await food.load_options("tok", "addr-home", "r1", "m-onDemand")
 
 
 # ---------------------------------------------------------------------------- stage 3+4: cart and review
@@ -1106,6 +1212,18 @@ class FoodRouteTests(unittest.TestCase):
         passed = fn.await_args.args[2]
         self.assertEqual((passed["menu_item_id"], passed["format"], passed["variants"], passed["addons"]),
                          ("m-v2", "variantsV2", [{"group_id": "g", "variation_id": "v"}], [{"group_id": "g2", "addon_id": "a", "quantity": 1}]))
+
+    def test_load_options_passes_ids_through_and_needs_the_feature_flag(self):
+        out = {"addonGroups": [], "cartCleared": True}
+        body = {"address_id": "addr-home", "restaurant_id": "r1", "menu_item_id": "m1", "restaurant_name": "Punjabi Tadka"}
+        with patch.object(features, "FOOD_ORDERING_ENABLED", True), patch.object(food, "load_options", AsyncMock(return_value=out)) as fn:
+            r = self.post("load-options", body, signed_bearer())
+        self.assertEqual(r.json(), {"ok": True, **out})
+        fn.assert_awaited_once_with("swiggy-tok", "addr-home", "r1", "m1", "Punjabi Tadka")
+        with patch.object(features, "FOOD_ORDERING_ENABLED", False), patch.object(food, "load_options", AsyncMock()) as fn:
+            r = self.post("load-options", body, signed_bearer())
+        self.assertEqual(r.json()["error"]["code"], "food_disabled")
+        fn.assert_not_awaited()
 
     def test_checkout_passes_the_key_and_total_through(self):
         order = {"status": "placed", "orderIds": ["F-1"], "message": "Order placed.", "verified": True, "total": 386, "payment": None}
