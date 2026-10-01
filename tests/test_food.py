@@ -389,7 +389,7 @@ class CartTests(FoodCase):
         _, s, _ = await self.build(sel, update_food_cart=envelope(cart), get_food_cart=envelope(cart))
         item = s.args("update_food_cart")["cartItems"][0]
         self.assertEqual(item, {"menu_item_id": "m-v2", "quantity": 1, "variantsV2": [{"group_id": "g-size", "variation_id": "v-full"}],
-                                "addons": [{"group_id": "g-extra", "addon_id": "a-raita", "quantity": 1}]})
+                                "addons": [{"group_id": "g-extra", "id": "a-raita", "quantity": 1}]})
         self.assertNotIn("variants", item)  # docs: one format or the other, never both
 
     async def test_legacy_variations_are_sent_as_variants(self):

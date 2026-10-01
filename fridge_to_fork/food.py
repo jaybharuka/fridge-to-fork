@@ -250,7 +250,8 @@ def _cart_item(sel: dict) -> dict:
     The docs leave this shape undefined. What they do document: the item id is `menu_item_id`; customizations are
     `variants` OR `variantsV2` (never both, the same one the item has); and the reorder items in get_food_orders,
     which exist to be fed back into the cart, are {menu_item_id, quantity, variants:[{variation_id, group_id}],
-    addons:[{addon_id, group_id}]}. This follows that. It is the one place to change if Swiggy's real validation
+    addons:[{addon_id, group_id}]}. This follows that for variants; for add-ons the documented FoodCartAddon names the choice `id`
+    (not `addon_id`): a real cart refused `addon_id` with "Restaurant may have removed the item(s)" (2026-10-01). It is the one place to change if Swiggy's real validation
     says otherwise; _check_cart verifies the outcome regardless.
     """
     item: dict = {"menu_item_id": sel["menu_item_id"], "quantity": sel["quantity"]}
@@ -259,7 +260,7 @@ def _cart_item(sel: dict) -> dict:
             {"group_id": v["group_id"], "variation_id": v["variation_id"]} for v in sel["variants"]
         ]
     if sel["addons"]:
-        item["addons"] = [{"group_id": a["group_id"], "addon_id": a["addon_id"], "quantity": a["quantity"]} for a in sel["addons"]]
+        item["addons"] = [{"group_id": a["group_id"], "id": a["addon_id"], "quantity": a["quantity"]} for a in sel["addons"]]
     return item
 
 
