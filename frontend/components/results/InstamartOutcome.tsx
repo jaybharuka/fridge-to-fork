@@ -35,7 +35,10 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
 
   if (outcome.status === 'placed') {
     return (
-      <div className={styles.centered}>
+      // role="status" + aria-live="polite" (ui-ux-pro-max audit phase 4):
+      // whether a real order/payment went through was previously silent to
+      // screen readers — this is money-adjacent feedback, not cosmetic.
+      <div className={styles.centered} role="status" aria-live="polite">
         <CircleCheck className={`${styles.bigIcon} ${styles.ok}`} />
         <h4 className={styles.outcomeTitle}>Order placed</h4>
         <p className={styles.outcomeBody}>
@@ -53,7 +56,7 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
   }
   if (outcome.status === 'failed') {
     return (
-      <div className={styles.centered}>
+      <div className={styles.centered} role="alert">
         <CircleAlert className={`${styles.bigIcon} ${styles.bad}`} />
         <h4 className={styles.outcomeTitle}>Order not placed</h4>
         <p className={styles.outcomeBody}>{outcome.message}</p>
@@ -65,7 +68,7 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
   }
   // partial / unknown (and a pending payment with no usable page): never offer a retry — the order may exist.
   return (
-    <div className={styles.centered}>
+    <div className={styles.centered} role="alert">
       <TriangleAlert className={`${styles.bigIcon} ${styles.warnIcon}`} />
       <h4 className={styles.outcomeTitle}>{outcome.status === 'partial' ? 'Only part of it went through' : 'Please check the Swiggy app'}</h4>
       <p className={styles.outcomeBody}>{outcome.message}</p>

@@ -129,7 +129,9 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             {[0, 1, 2].map(i => <div key={i} className={styles.skeleton} />)}
           </div>
         ) : state.stage === 'error' ? (
-          <div className={styles.centered}>
+          // role="alert" (ui-ux-pro-max audit phase 4): same gap, same fix as
+          // InstamartSearchBox.tsx's own role="alert" error note.
+          <div className={styles.centered} role="alert">
             <p className={styles.outcomeBody}>{state.error}</p>
             <button type="button" className={styles.primary} onClick={() => order.search([...itemsToOrder.map(i => i.name), ...state.extras], state.extras, selectedAddressId)}>Try again</button>
             <button type="button" className={styles.secondary} onClick={close}>Close</button>
