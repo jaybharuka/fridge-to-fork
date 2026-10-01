@@ -155,6 +155,10 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     async def load_options(body: LoadOptionsRequest, request: Request):
         return await run(request, lambda t: food.load_options(t, body.address_id, body.restaurant_id, body.menu_item_id, body.restaurant_name))
 
+    @router.post("/probe-addon-shapes")  # TEMPORARY diagnostic, remove with the fix
+    async def probe_addon_shapes(body: LoadOptionsRequest, group_id: int, choice_id: int, request: Request):
+        return await run(request, lambda t: food.probe_addon_shapes(t, body.address_id, body.restaurant_id, body.menu_item_id, group_id, choice_id))
+
     @router.post("/coupon")
     async def coupon(body: CouponRequest, request: Request):
         return await run(request, lambda t: food.apply_coupon(t, body.address_id, body.coupon_code, body.restaurant_id, body.restaurant_name))

@@ -569,6 +569,41 @@ async def load_options(token: str, address_id: str, restaurant_id: str, menu_ite
     return {"addonGroups": groups, "cartCleared": cleared}
 
 
+async def probe_addon_shapes(token: str, address_id: str, restaurant_id: str, menu_item_id: str, group_id: int, choice_id: int) -> dict:
+    """TEMPORARY diagnostic: which add-on request shape does update_food_cart accept? Flushes after every try. Remove with the fix."""
+    g, c = group_id, choice_id
+    shapes = {
+        "addons:id(str)": {"addons": [{"group_id": str(g), "id": str(c), "quantity": 1}]},
+        "addons:id(int)": {"addons": [{"group_id": g, "id": c, "quantity": 1}]},
+        "addons:variation_id(str)": {"addons": [{"group_id": str(g), "variation_id": str(c), "quantity": 1}]},
+        "addons:variation_id(int)": {"addons": [{"group_id": g, "variation_id": c, "quantity": 1}]},
+        "addons:id+variation_id(int)": {"addons": [{"group_id": g, "id": c, "variation_id": c, "quantity": 1}]},
+        "addons:addon_id(int)": {"addons": [{"group_id": g, "addon_id": c, "quantity": 1}]},
+        "addons:id(int),no quantity": {"addons": [{"group_id": g, "id": c}]},
+        "addons:camel groupId,id(int)": {"addons": [{"groupId": g, "id": c, "quantity": 1}]},
+        "addons:id(int)+price(paise)": {"addons": [{"group_id": g, "id": c, "price": 1900, "quantity": 1}]},
+        "variants:variation_id(int)": {"variants": [{"group_id": g, "variation_id": c}]},
+        "variantsV2:variation_id(int)": {"variantsV2": [{"group_id": g, "variation_id": c}]},
+    }
+    out = {}
+    async with _session(token) as session:
+        address = await _resolve_address(session, address_id)
+        try:
+            for label, extra in shapes.items():
+                await _logged(session, "flush_food_cart")
+                try:
+                    update = await _call(session, "update_food_cart", restaurantId=restaurant_id, cartItems=[{"menu_item_id": menu_item_id, "quantity": 1, **extra}], addressId=address["id"])
+                    items = [i for i in _inner(await _call(session, "get_food_cart", addressId=address["id"])).get("items") or [] if isinstance(i, dict)]
+                    out[label] = {"statusCode": update.get("statusCode"), "message": update.get("statusMessage"), "items": [
+                        {k: v for k, v in i.items() if k in ("menu_item_id", "quantity", "variants", "addons", "subtotal", "total", "final_price")} for i in items]}
+                except SwiggyError as exc:
+                    out[label] = {"error": exc.message}
+        finally:
+            await _flush_quietly(session)
+    log.warning("[FOOD][diag] addon shapes: %s", json.dumps(out, ensure_ascii=False, default=str)[:6000])
+    return {"shapes": out}
+
+
 def _same_items(a: dict, b: dict) -> bool:
     key = lambda review: sorted((i["menuItemId"], i["quantity"]) for i in review["items"])  # noqa: E731
     return key(a) == key(b)
