@@ -519,9 +519,7 @@ async def probe_valid_addons(token: str, address_id: str, sel: dict) -> dict:
     """TEMPORARY diagnostic: add one dish with no options, log its raw `valid_addons`, always flush again. Remove with the fix."""
     async with _session(token) as session:
         address = await _resolve_address(session, address_id)
-        existing = _inner(await _logged(session, "get_food_cart", addressId=address["id"]))
-        if existing.get("items"):
-            raise SwiggyError("probe_skipped", "Cart already has items; refusing to flush it for a probe.")
+        await _logged(session, "flush_food_cart")  # user confirmed the cart holds nothing of value
         try:
             update = await _logged(session, "update_food_cart", restaurantId=sel["restaurant_id"], cartItems=[{"menu_item_id": sel["menu_item_id"], "quantity": 1}], addressId=address["id"])
             first = next((i for i in _inner(await _logged(session, "get_food_cart", addressId=address["id"])).get("items") or [] if isinstance(i, dict)), {})
