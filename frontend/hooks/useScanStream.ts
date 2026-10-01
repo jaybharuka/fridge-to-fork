@@ -121,7 +121,7 @@ export function useScanStream() {
           total_order_price_inr: body.total_order_price_inr ?? 0,
           matched_fridge_items: body.matched_fridge_items ?? [],
         };
-        dispatch({ type: 'REPLAN_SUCCESS', suggestion, topUpSuggestions: body.top_up_suggestions ?? [] });
+        dispatch({ type: 'REPLAN_SUCCESS', suggestion, reasoning: body.reasoning ?? '', topUpSuggestions: body.top_up_suggestions ?? [] });
       } catch {
         dispatch({ type: 'REPLAN_ERROR', message: "Couldn't plan that dish. Please try again." });
       }

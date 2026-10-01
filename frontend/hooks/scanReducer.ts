@@ -81,7 +81,7 @@ export type Action =
   // and the background top-up refresh SELECT_MEAL triggers — both go
   // through POST /api/replan.
   | { type: 'REPLAN_START' }
-  | { type: 'REPLAN_SUCCESS'; suggestion: MealSuggestion; topUpSuggestions: TopUpSuggestion[] }
+  | { type: 'REPLAN_SUCCESS'; suggestion: MealSuggestion; reasoning: string; topUpSuggestions: TopUpSuggestion[] }
   | { type: 'REPLAN_ERROR'; message: string }
   // The background top-up-only refresh after SELECT_MEAL failed — clears
   // replanPending without surfacing an error (best-effort, see topUpSuggestions doc comment above).
@@ -191,10 +191,22 @@ export function reducer(state: ScanState, action: Action): ScanState {
     // previously-active dish, so they're cleared here and refreshed by a
     // background /api/replan call the caller (useScanStream.selectMeal)
     // kicks off right after dispatching this.
+    //
+    // reasoning: null out here too — it's a 2026-10-01 live-bug fix.
+    // `reasoning` is a MealPlan-level field (the AI's explanation for its
+    // ORIGINAL top-level recommendation), not per-suggestion, so there is
+    // no "this dish's own reasoning" to show for a known-suggestion switch.
+    // Leaving the old dish's reasoning in state instead left ChoiceCard
+    // showing a stale, wrong-dish description indefinitely after switching
+    // (confirmed live: "Aloo Jeera is a quick, highly comforting..." still
+    // showing under a selected "Dal Tadka") — ChoiceCard already hides its
+    // subtitle entirely for an empty string (isInternalReasoning('') is
+    // true), so clearing it here is the correct fix, not a regression.
     case 'SELECT_MEAL':
       return {
         ...state,
         recommendedMeal: action.suggestion.name,
+        reasoning: '',
         checklist: buildChecklist(action.suggestion.recipe_ingredients),
         cookingSteps: action.suggestion.cooking_steps,
         matchedFridgeItems: action.suggestion.matched_fridge_items,
@@ -210,6 +222,9 @@ export function reducer(state: ScanState, action: Action): ScanState {
     // switch as SELECT_MEAL, plus add it to `suggestions` so it's now also
     // clickable/re-selectable like any other suggestion, and its top-up
     // suggestions arrive in the same response (no second request needed).
+    // Unlike SELECT_MEAL, /api/replan's custom-dish path DOES generate a
+    // fresh, real reasoning via plan_meals() (app.py's "reasoning": reasoning
+    // in the response) — carry it through instead of discarding it.
     case 'REPLAN_SUCCESS': {
       const alreadyKnown = state.suggestions.some(s => s.name === action.suggestion.name);
       return {
@@ -218,6 +233,7 @@ export function reducer(state: ScanState, action: Action): ScanState {
           ? state.suggestions.map(s => (s.name === action.suggestion.name ? action.suggestion : s))
           : [...state.suggestions, action.suggestion],
         recommendedMeal: action.suggestion.name,
+        reasoning: action.reasoning,
         checklist: buildChecklist(action.suggestion.recipe_ingredients),
         cookingSteps: action.suggestion.cooking_steps,
         matchedFridgeItems: action.suggestion.matched_fridge_items,

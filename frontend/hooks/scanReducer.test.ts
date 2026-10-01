@@ -41,6 +41,7 @@ const resultsState = {
   phase: 'results' as const,
   suggestions: [recommended, alternative],
   recommendedMeal: recommended.name,
+  reasoning: "Butter Chicken is a quick, highly comforting dish using what's already in the fridge.",
   checklist: buildChecklist(recommended.recipe_ingredients),
   cookingSteps: recommended.cooking_steps,
   matchedFridgeItems: recommended.matched_fridge_items,
@@ -71,6 +72,18 @@ describe('scanReducer — SELECT_MEAL (picking an existing suggestion)', () => {
     assert.deepEqual(result.matchedFridgeItems, alternative.matched_fridge_items);
     assert.equal(result.checklist.length, 1);
     assert.equal(result.checklist[0].name, 'paneer');
+  });
+
+  // 2026-10-01 live bug: reasoning is MealPlan-level (the AI's explanation
+  // for its ORIGINAL recommendation), not per-suggestion — there's no
+  // "Paneer Tikka's own reasoning" to show. Leaving the old dish's
+  // reasoning in state left ChoiceCard showing a stale, wrong-dish
+  // description forever after switching (confirmed live: "Aloo Jeera is a
+  // quick, highly comforting..." still showing under a selected
+  // "Dal Tadka"). Must clear, not carry over.
+  it('clears reasoning — there is no per-suggestion reasoning, and the old dish text must not linger', () => {
+    const result = reducer(resultsState, { type: 'SELECT_MEAL', suggestion: alternative });
+    assert.equal(result.reasoning, '');
   });
 
   it('clears stale top-up suggestions (they are dish-specific) and marks a refresh pending', () => {
@@ -126,11 +139,18 @@ describe('scanReducer — free-text custom dish (REPLAN_START/SUCCESS/ERROR)', (
   it('REPLAN_SUCCESS for a genuinely new dish appends it to suggestions and makes it active', () => {
     const custom = meal({ name: 'Mushroom Risotto', recipe_ingredients: [ri({ name: 'mushroom' })] });
     const pending = reducer(resultsState, { type: 'REPLAN_START' });
-    const result = reducer(pending, { type: 'REPLAN_SUCCESS', suggestion: custom, topUpSuggestions: [{ name: 'Parmesan' }] });
+    const result = reducer(pending, {
+      type: 'REPLAN_SUCCESS', suggestion: custom,
+      reasoning: 'Mushroom Risotto makes great use of the cream and mushrooms already on hand.',
+      topUpSuggestions: [{ name: 'Parmesan' }],
+    });
 
     assert.equal(result.suggestions.length, 3);
     assert.equal(result.suggestions[2].name, 'Mushroom Risotto');
     assert.equal(result.recommendedMeal, 'Mushroom Risotto');
+    // Unlike SELECT_MEAL, /api/replan's custom-dish path DOES generate a
+    // real, dish-specific reasoning — must be carried through, not dropped.
+    assert.equal(result.reasoning, 'Mushroom Risotto makes great use of the cream and mushrooms already on hand.');
     assert.deepEqual(result.topUpSuggestions, [{ name: 'Parmesan' }]);
     assert.equal(result.replanPending, false);
     assert.equal(result.replanError, null);
@@ -138,7 +158,7 @@ describe('scanReducer — free-text custom dish (REPLAN_START/SUCCESS/ERROR)', (
 
   it('REPLAN_SUCCESS for a dish that already matches an existing suggestion replaces it rather than duplicating', () => {
     const updated = meal({ ...recommended, total_order_price_inr: 999 });
-    const result = reducer(resultsState, { type: 'REPLAN_SUCCESS', suggestion: updated, topUpSuggestions: [] });
+    const result = reducer(resultsState, { type: 'REPLAN_SUCCESS', suggestion: updated, reasoning: '', topUpSuggestions: [] });
 
     assert.equal(result.suggestions.length, 2);
     assert.equal(result.suggestions.find(s => s.name === recommended.name)?.total_order_price_inr, 999);

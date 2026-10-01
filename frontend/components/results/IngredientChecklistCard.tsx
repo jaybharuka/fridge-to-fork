@@ -74,7 +74,24 @@ function StatNumber({ target, className }: { target: number; className?: string 
       if (progress < 1) raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    // Safety net — confirmed live (2026-10-01 investigation, React fiber
+    // inspection on production): requestAnimationFrame can be paused
+    // indefinitely by the browser (backgrounded/hidden tab), which left
+    // this exact counter frozen on a STALE target forever after a dish
+    // switch — the new `target` prop reached the component correctly, but
+    // tick() never got a single frame to run. setTimeout still fires in a
+    // backgrounded tab (throttled, not paused), so this guarantees `value`
+    // reaches the correct, current `target` within `duration`ms of real
+    // time regardless of whether any rAF frame ran. Also makes rapid
+    // successive dish switches safe: each switch's effect cleanup clears
+    // BOTH the previous rAF and its setTimeout before the next one starts
+    // (React's normal effect-cleanup-before-rerun contract), so only the
+    // latest target's timer can ever fire.
+    const settle = setTimeout(() => setValue(target), duration);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(settle);
+    };
   }, [target]);
 
   return <span className={className}>{value}</span>;
