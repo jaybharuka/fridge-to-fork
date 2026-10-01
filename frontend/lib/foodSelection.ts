@@ -16,9 +16,19 @@ export interface Picks {
 
 export const MAX_QUANTITY = 20;
 
-/** The dish with the add-on groups Swiggy's cart revealed: now orderable, through the same picker as any other add-ons. */
+/**
+ * The dish after its add-ons were loaded from Swiggy's cart. Swiggy's cart refuses EVERY add-on request we could build
+ * (INVALID_ADDON, ~30 shapes, two restaurants, a nonsense control failed identically), so add-ons are never offered:
+ *  - all groups optional (the only case seen so far): orderable as listed, with a note that add-ons can't be set here;
+ *  - any group required (minAddons > 0): can't be ordered without an add-on, so it stays the "order it in the Swiggy app" dead end.
+ * Putting the groups back into `addonGroups` re-enables the picker once Swiggy accepts them.
+ */
 export function withLoadedOptions(result: FoodResult, addonGroups: AddonGroup[]): FoodResult {
-  return { ...result, customization: { ...result.customization, addonGroups, supported: true, optionsOnDemand: false } };
+  const required = addonGroups.some(g => g.min > 0);
+  return {
+    ...result,
+    customization: { ...result.customization, addonGroups: [], supported: !required, optionsOnDemand: false, addonsUnavailable: !required && addonGroups.length > 0 },
+  };
 }
 
 /** Start from Swiggy's default variant of each group (shown selected on screen), no add-ons, quantity 1. */

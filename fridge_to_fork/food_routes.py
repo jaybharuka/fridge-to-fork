@@ -65,12 +65,6 @@ class LoadOptionsRequest(BaseModel):
     restaurant_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
 
 
-class ProbeRequest(BaseModel):  # TEMPORARY diagnostic
-    address_id: Id
-    restaurant_id: Id
-    attempts: dict[str, dict] = Field(max_length=20)
-
-
 class CouponRequest(BaseModel):
     address_id: Id
     coupon_code: str = Field(min_length=1, max_length=64)
@@ -160,10 +154,6 @@ def make_router(get_token: Callable[[Request], str | None]) -> APIRouter:
     @router.post("/load-options")
     async def load_options(body: LoadOptionsRequest, request: Request):
         return await run(request, lambda t: food.load_options(t, body.address_id, body.restaurant_id, body.menu_item_id, body.restaurant_name))
-
-    @router.post("/probe-addon-shapes")  # TEMPORARY diagnostic, remove with the fix
-    async def probe_addon_shapes(body: ProbeRequest, request: Request):
-        return await run(request, lambda t: food.probe_addon_shapes(t, body.address_id, body.restaurant_id, body.attempts))
 
     @router.post("/coupon")
     async def coupon(body: CouponRequest, request: Request):

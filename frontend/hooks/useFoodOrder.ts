@@ -110,7 +110,8 @@ function reducer(state: FoodState, action: Action): FoodState {
     case 'OPTIONS_OK': {
       const results = state.results.map(r => (r.menuItemId === action.id ? withLoadedOptions(r, action.addonGroups) : r));
       const loaded = results.find(r => r.menuItemId === action.id);
-      return loaded ? { ...state, results, loadingOptionsId: null, openId: action.id, picks: initialPicks(loaded) } : { ...state, loadingOptionsId: null };
+      // a dish that still can't be ordered (a required add-on) stays closed: its card now says to use the Swiggy app
+      return loaded?.customization.supported ? { ...state, results, loadingOptionsId: null, openId: action.id, picks: initialPicks(loaded) } : { ...state, results, loadingOptionsId: null };
     }
     case 'OPTIONS_FAIL':
       return { ...state, loadingOptionsId: null, notice: action.notice, noticeTool: action.tool ?? null };
@@ -228,7 +229,7 @@ export function useFoodOrder() {
     }
   }, []);
 
-  /** Never leaves anything behind in the user's cart: the server empties it again before it replies, so there is no
+  /** Checks the dish's add-ons in Swiggy's cart. Never leaves anything behind in the user's cart: the server empties it again before it replies, so there is no
    *  abandon step. Closing the sheet mid-load just drops the reply (run.current moved on). */
   const loadOptions = useCallback(async (addressId: string, result: FoodResult) => {
     const id = run.current;

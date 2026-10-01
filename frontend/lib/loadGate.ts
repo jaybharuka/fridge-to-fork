@@ -1,4 +1,4 @@
-// Confirm-before-flush for "Choose options". Loading a dish's options empties the user's real Swiggy cart, so the
+// Confirm-before-flush for checking a dish's add-ons. Loading a dish's add-ons empties the user's real Swiggy cart, so the
 // picker asks first; the backend call (`load`) only ever runs from confirmGate, never from asking or cancelling.
 // Pure (no React, no network) so that is unit tested in plain Node: see loadGate.test.ts.
 

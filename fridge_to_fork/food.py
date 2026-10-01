@@ -157,7 +157,7 @@ def _customization(item: dict) -> dict:
         supported = False
     return {
         "format": fmt, "variantGroups": groups, "addonGroups": [a for a in addons if a["choices"]],
-        "supported": supported, "optionsOnDemand": options_on_demand,
+        "supported": supported, "optionsOnDemand": options_on_demand, "addonsUnavailable": False,
     }
 
 
@@ -567,28 +567,6 @@ async def load_options(token: str, address_id: str, restaurant_id: str, menu_ite
     if not groups:
         raise SwiggyError("options_unavailable", "Swiggy didn't list any options for this dish. Order it in the Swiggy app.", tool="get_food_cart")
     return {"addonGroups": groups, "cartCleared": cleared}
-
-
-async def probe_addon_shapes(token: str, address_id: str, restaurant_id: str, attempts: dict[str, dict]) -> dict:
-    """TEMPORARY diagnostic: send each caller-supplied cartItem to update_food_cart (flush before each and at the end) and
-    report what Swiggy said and what the cart then held. Remove with the fix."""
-    out = {}
-    async with _session(token) as session:
-        address = await _resolve_address(session, address_id)
-        try:
-            for label, cart_item in list(attempts.items())[:20]:
-                await _logged(session, "flush_food_cart")
-                try:
-                    update = await _call(session, "update_food_cart", restaurantId=restaurant_id, cartItems=[cart_item], addressId=address["id"])
-                    items = [i for i in _inner(await _call(session, "get_food_cart", addressId=address["id"])).get("items") or [] if isinstance(i, dict)]
-                    out[label] = {"update": {k: update.get(k) for k in ("statusCode", "statusMessage", "statusTitle", "titleMessage", "errorCodes", "successful")}, "items": [
-                        {k: v for k, v in i.items() if k in ("menu_item_id", "quantity", "variants", "addons", "subtotal", "total", "final_price")} for i in items]}
-                except SwiggyError as exc:
-                    out[label] = {"error": exc.message}
-        finally:
-            await _flush_quietly(session)
-    log.warning("[FOOD][diag] addon shapes: %s", json.dumps(out, ensure_ascii=False, default=str)[:6000])
-    return {"shapes": out}
 
 
 def _same_items(a: dict, b: dict) -> bool:

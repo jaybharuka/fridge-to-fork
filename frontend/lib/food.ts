@@ -38,6 +38,8 @@ export interface FoodCustomization {
   supported: boolean;
   /** true = Swiggy flagged add-ons but sent none; foodLoadOptions fetches them (one cart round-trip) and makes it orderable. */
   optionsOnDemand: boolean;
+  /** true = the dish has add-ons Swiggy's cart refuses (INVALID_ADDON, probed 2026-10-01), so it is ordered as listed, without them. */
+  addonsUnavailable: boolean;
 }
 
 export interface FoodResult {

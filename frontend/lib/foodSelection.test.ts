@@ -9,13 +9,13 @@ const restaurant = { id: 'r2', name: 'Biryani House', area: null, etaMinutes: 35
 const plain: FoodResult = {
   menuItemId: 'm-plain', name: 'Butter Chicken', price: 320, isVeg: false, imageUrl: null, rating: null, ratingCount: null, bestseller: false, available: true,
   restaurant: { ...restaurant, id: 'r1', name: 'Punjabi Tadka' },
-  customization: { format: null, variantGroups: [], addonGroups: [], supported: true, optionsOnDemand: false },
+  customization: { format: null, variantGroups: [], addonGroups: [], supported: true, optionsOnDemand: false, addonsUnavailable: false },
 };
 
 const bowl: FoodResult = {
   ...plain, menuItemId: 'm-v2', name: 'Butter Chicken Bowl', restaurant,
   customization: {
-    format: 'variantsV2', supported: true, optionsOnDemand: false,
+    format: 'variantsV2', supported: true, optionsOnDemand: false, addonsUnavailable: false,
     variantGroups: [{ groupId: 'g-size', name: 'Size', options: [
       { id: 'v-half', name: 'Half', price: 250, default: true, available: true },
       { id: 'v-full', name: 'Full', price: 420, default: false, available: true },
@@ -143,11 +143,26 @@ const loadedGroups = [{ groupId: '280938322', name: 'Upvas Add ons', min: 0, max
 
 describe('withLoadedOptions', () => {
   const loaded = withLoadedOptions(onDemand, loadedGroups);
-  it('makes the dish orderable through the ordinary add-on rules', () => {
+  it('lets a dish whose add-on groups are all optional be ordered as listed', () => {
     assert.equal(loaded.customization.supported, true);
     assert.equal(loaded.customization.optionsOnDemand, false);
-    assert.equal(pickProblem(loaded, initialPicks(loaded)), null); // optional group: orderable as is
+    assert.equal(loaded.customization.addonsUnavailable, true);
+    assert.equal(pickProblem(loaded, initialPicks(loaded)), null);
     assert.equal(pickProblem(onDemand, initialPicks(onDemand)) !== null, true); // and not before
+  });
+  it('never offers add-ons, because Swiggy refuses every one (INVALID_ADDON)', () => {
+    assert.deepEqual(loaded.customization.addonGroups, []);
+    assert.deepEqual(toSelection(loaded, initialPicks(loaded)).addons, []);
+  });
+  it('a required add-on group keeps the dish an "order it in the Swiggy app" dead end', () => {
+    const must = withLoadedOptions(onDemand, [{ ...loadedGroups[0], min: 1, max: 1 }]);
+    assert.equal(must.customization.supported, false);
+    assert.equal(must.customization.addonsUnavailable, false);
+    assert.match(pickProblem(must, initialPicks(must)) ?? '', /Swiggy app/);
+  });
+  it('one required group among optional ones is enough to block it', () => {
+    const mixed = withLoadedOptions(onDemand, [loadedGroups[0], { ...loadedGroups[0], groupId: 'g2', min: 1 }]);
+    assert.equal(mixed.customization.supported, false);
   });
   it('does not mutate the original result', () => {
     assert.equal(onDemand.customization.optionsOnDemand, true);
@@ -156,19 +171,5 @@ describe('withLoadedOptions', () => {
   it('keeps the dish, its price (rupees) and its restaurant', () => {
     assert.equal(loaded.price, 260);
     assert.equal(loaded.restaurant, onDemand.restaurant);
-  });
-  it('builds the cart request from the loaded groups with ids exactly as Swiggy sent them', () => {
-    const picks = toggleAddon(initialPicks(loaded), '280938322', '122782206', 7);
-    assert.deepEqual(toSelection(loaded, picks).addons, [{ group_id: '280938322', addon_id: '122782206', quantity: 1 }]);
-    assert.equal(toSelection(loaded, picks).format, null);
-  });
-  it('an out-of-stock add-on is refused even if a caller bypasses the disabled button', () => {
-    const picks = toggleAddon(initialPicks(loaded), '280938322', '116558510', 7);
-    assert.match(pickProblem(loaded, picks) ?? '', /Aloo Pattice.*out of stock/);
-  });
-  it('a loaded group that requires a pick blocks until one is made', () => {
-    const must = withLoadedOptions(onDemand, [{ ...loadedGroups[0], min: 1, max: 1 }]);
-    assert.match(pickProblem(must, initialPicks(must)) ?? '', /at least 1 from Upvas Add ons/);
-    assert.equal(pickProblem(must, toggleAddon(initialPicks(must), '280938322', '122782206', 1)), null);
   });
 });

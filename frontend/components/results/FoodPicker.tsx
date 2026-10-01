@@ -120,6 +120,7 @@ function DishCard({ result, picks, onOpen, loadingOptions, loadingThis, confirmi
               </div>
             );
           })}
+          {c.addonsUnavailable && <p className={styles.notice}>Add-ons for this dish can&apos;t be ordered here yet, so you&apos;ll get it as listed.</p>}
           <div className={styles.qtyRow}>
             <span className={styles.qtyLabel}>Quantity</span>
             <div className={styles.stepper}>
@@ -139,13 +140,13 @@ function DishCard({ result, picks, onOpen, loadingOptions, loadingThis, confirmi
             <span className={styles.oos}>Out of stock</span>
           ) : c.optionsOnDemand && confirming && !loadingOptions ? (
             <div className={styles.confirmDelete} style={{ maxWidth: 'none', alignItems: 'flex-start' }}>
-              <p className={styles.couponWhy} role="alert">Choosing options for this dish will clear your current Swiggy cart. Continue?</p>
+              <p className={styles.couponWhy} role="alert">Checking this dish&apos;s add-ons will clear your current Swiggy cart. Continue?</p>
               <button type="button" className={styles.dangerBtn} onClick={onConfirm}>Clear cart &amp; continue</button>
               <button type="button" className={styles.linkBtn} onClick={onCancelAsk}>Cancel</button>
             </div>
           ) : c.optionsOnDemand ? (
             <button type="button" className={styles.linkBtn} disabled={loadingOptions} aria-busy={loadingThis} onClick={onAsk}>
-              {loadingThis ? 'Loading options…' : 'Choose options'}
+              {loadingThis ? 'Checking add-ons…' : 'Choose this'}
             </button>
           ) : !c.supported ? (
             <span className={styles.skipped}>Needs options we can&apos;t set here — order it in the Swiggy app.</span>
