@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, useEffect, useRef, useState, type ReactNode, type TouchEvent } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import styles from './Sheet.module.css';
 
 interface SheetProps {
@@ -38,6 +39,16 @@ export const Sheet = forwardRef<HTMLDivElement, SheetProps>(function Sheet(
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
   const touchStartY = useRef(0);
+  // Internal ref for the focus trap — kept separate from the forwarded
+  // `ref` (already claimed by InstamartOrderSheet's focusIngredient
+  // scroll-into-view) and merged onto the same DOM node below.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(mounted, panelRef);
+  const setPanelRef = (node: HTMLDivElement | null) => {
+    (panelRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  };
 
   useEffect(() => {
     if (open) {
@@ -79,11 +90,12 @@ export const Sheet = forwardRef<HTMLDivElement, SheetProps>(function Sheet(
     <div className={styles.sheet}>
       <div className={`${styles.backdrop} ${visible ? styles.visible : ''}`} onClick={onClose} />
       <div
-        ref={ref}
+        ref={setPanelRef}
         className={`${styles.panel} ${visible ? styles.visible : ''}`}
         role="dialog"
         aria-label={ariaLabel}
         aria-modal="true"
+        tabIndex={-1}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
