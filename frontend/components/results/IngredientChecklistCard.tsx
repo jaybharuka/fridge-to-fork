@@ -145,11 +145,33 @@ export function IngredientChecklistCard({ checklist, toggleChecklistItem, onOpen
               tag = <span className={styles.rowTagWillOrder}>Will be ordered</span>;
             }
 
+            // ui-ux-pro-max audit, phase 2: this row was a bare onClick div —
+            // unreachable and unoperable by keyboard, with no indication of
+            // its checked state to a screen reader. role="button" +
+            // tabIndex + the Enter/Space handler fix that (WCAG 2.1.1, a
+            // Level A failure — the more serious issue). Note this does put
+            // a real <button> (ProductMatch, rendered only when unchecked)
+            // inside a role="button" ancestor, which strict ARIA tooling
+            // flags as nested-interactive; it stays reachable and operable
+            // for both mouse and keyboard either way (its own stopPropagation
+            // already keeps the two from fighting), and fixing the nesting
+            // itself would mean restructuring this row's DOM shape, which is
+            // out of this phase's layout/spacing/polish scope.
             return (
               <div
                 key={idx}
                 className={`${styles.row} ${ing.checked ? styles.checked : ''} ${ing.isStaple ? styles.isStaple : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={ing.checked}
+                aria-label={`${ing.name}, ${ing.checked ? 'checked off' : 'not checked off'}`}
                 onClick={() => toggleChecklistItem(idx)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleChecklistItem(idx);
+                  }
+                }}
               >
                 <span className={styles.rowCheckbox}>{ing.checked && <CircleCheck />}</span>
                 <div className={styles.rowInfo}>

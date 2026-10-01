@@ -121,6 +121,10 @@ export function Results({
 
   return (
     <div>
+      {/* The skeletons this covers (ChecklistSkeleton/ChoiceSkeleton) are
+          aria-hidden — without this, a screen-reader user gets total
+          silence for the several seconds step2 is still streaming. */}
+      <p className="sr-only" aria-live="polite">{contentPending ? 'Loading your recipe…' : ''}</p>
       <div className={styles.resultStickyHeader}>
         <StickySummaryBar
           visible={state.checklist.length > 0}

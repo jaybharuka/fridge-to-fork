@@ -38,7 +38,7 @@ export function ChecklistSkeleton() {
 
 export function ChoiceSkeleton() {
   return (
-    <div className={styles.card}>
+    <div className={styles.card} aria-hidden="true">
       <div className={styles.skeletonButtons}>
         <div className={`${styles.skeletonBox} ${styles.skeletonBtn}`} />
         <div className={`${styles.skeletonBox} ${styles.skeletonBtn}`} />
