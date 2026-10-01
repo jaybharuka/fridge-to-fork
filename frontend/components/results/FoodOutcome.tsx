@@ -43,7 +43,9 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onT
   if (outcome.status === 'placed') {
     const amount = total(outcome.total);
     return (
-      <div className={styles.centered}>
+      // role="status" + aria-live="polite" (ui-ux-pro-max audit phase 4):
+      // matches InstamartOutcome.tsx's identical fix.
+      <div className={styles.centered} role="status" aria-live="polite">
         <CircleCheck className={`${styles.bigIcon} ${styles.ok}`} />
         <h4 className={styles.outcomeTitle}>Order placed</h4>
         <p className={styles.outcomeBody}>
@@ -62,7 +64,7 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onT
   }
   if (outcome.status === 'failed') {
     return (
-      <div className={styles.centered}>
+      <div className={styles.centered} role="alert">
         <CircleAlert className={`${styles.bigIcon} ${styles.bad}`} />
         <h4 className={styles.outcomeTitle}>Order not placed</h4>
         <p className={styles.outcomeBody}>{outcome.message}</p>
@@ -74,7 +76,7 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onT
   }
   // unknown / partial / pending: never offer a retry — the order may exist.
   return (
-    <div className={styles.centered}>
+    <div className={styles.centered} role="alert">
       <TriangleAlert className={`${styles.bigIcon} ${styles.warnIcon}`} />
       <h4 className={styles.outcomeTitle}>Please check the Swiggy app</h4>
       <p className={styles.outcomeBody}>{outcome.message}</p>

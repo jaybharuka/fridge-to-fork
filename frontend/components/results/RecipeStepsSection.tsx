@@ -19,11 +19,22 @@ export function RecipeStepsSection({ steps }: RecipeStepsSectionProps) {
   return (
     <div className={`${styles.recipeChecklistCard} ${styles.contentFadeIn}`}>
       <div className={styles.recipeStepsBlock}>
-        <button type="button" className={styles.recipeStepsToggle} onClick={() => setExpanded(e => !e)}>
+        {/* aria-expanded/aria-hidden (ui-ux-pro-max audit phase 4): a
+            standard expand/collapse control with neither — a screen-reader
+            user couldn't tell whether the steps were currently shown. The
+            list stays in the DOM either way (collapsed via max-height, not
+            display:none, for the slide transition), so aria-hidden is what
+            actually keeps it out of the accessibility tree while closed. */}
+        <button
+          type="button"
+          className={styles.recipeStepsToggle}
+          onClick={() => setExpanded(e => !e)}
+          aria-expanded={expanded}
+        >
           <BookOpen /> How to make it
           <ChevronDown className={`${styles.recipeStepsChevron} ${expanded ? styles.rotated : ''}`} />
         </button>
-        <ol className={`${styles.recipeStepsList} ${expanded ? '' : styles.collapsed}`}>
+        <ol className={`${styles.recipeStepsList} ${expanded ? '' : styles.collapsed}`} aria-hidden={!expanded}>
           {steps.map((step, i) => (
             <li key={i}>
               <span className={styles.recipeStepNum}>{i + 1}</span>

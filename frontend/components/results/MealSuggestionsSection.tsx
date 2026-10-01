@@ -113,7 +113,11 @@ export function MealSuggestionsSection({
           </button>
         </div>
       )}
-      {error && <div className={styles.customDishError}>{error}</div>}
+      {/* role="alert" (ui-ux-pro-max audit phase 4): matches the
+          role="alert"/role="status" pair InstamartSearchBox.tsx already
+          uses for the identical situation — without it, a screen-reader
+          user got no indication the custom-dish request failed. */}
+      {error && <div className={styles.customDishError} role="alert">{error}</div>}
     </div>
   );
 }
