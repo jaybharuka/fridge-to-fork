@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { FoodResult } from './food.ts';
-import { initialPicks, pickProblem, setQuantity, setVariant, toggleAddon, toSelection, withLoadedOptions } from './foodSelection.ts';
+import { initialPicks, pickProblem, setQuantity, setVariant, toggleAddon, toSelection, withLoadedOptions, isPlaceholderGroup } from './foodSelection.ts';
 
 const restaurant = { id: 'r2', name: 'Biryani House', area: null, etaMinutes: 35, etaRange: null, distanceKm: null, rating: 4.1, costForTwo: null, offer: null, open: true };
 
@@ -171,5 +171,59 @@ describe('withLoadedOptions', () => {
   it('keeps the dish, its price (rupees) and its restaurant', () => {
     assert.equal(loaded.price, 260);
     assert.equal(loaded.restaurant, onDemand.restaurant);
+  });
+});
+
+// Burger King's "Chicken Makhani Burst Burger", as Swiggy's cart listed it (live, 2026-10-02): the required group is only
+// "the burger you picked"; the rest are optional extras.
+const bkGroups = [
+  { groupId: '293053117', name: 'Selected Burger - Chicken Makhani Burst Burger', min: 1, max: 1, choices: [{ id: 'c0', name: 'Selected - Chicken Makhani Burst Burger', price: 0, available: true }] },
+  { groupId: '293053118', name: 'Tastes Best with Cheese', min: 0, max: 1, choices: [{ id: 'c1', name: 'Single Cheese Slice', price: 25, available: true }, { id: 'c2', name: 'Double Cheese Slice', price: 50, available: true }] },
+  { groupId: '293053119', name: 'Choose Your Side (Any)', min: 0, max: 1, choices: [{ id: 'c3', name: 'Fries (R)', price: 95, available: true }, { id: 'c4', name: 'Chicken Wings Fried (2pcs)', price: 109, available: false }] },
+];
+const placeholder = bkGroups[0];
+
+describe('a required group that is only a placeholder', () => {
+  it('is recognised: one choice, free, in stock', () => {
+    assert.equal(isPlaceholderGroup(placeholder), true);
+  });
+  it('is NOT one when the choice costs anything, even a rupee', () => {
+    assert.equal(isPlaceholderGroup({ ...placeholder, choices: [{ ...placeholder.choices[0], price: 1 }] }), false);
+  });
+  it('is NOT one when the price is unknown (not assumed free)', () => {
+    assert.equal(isPlaceholderGroup({ ...placeholder, choices: [{ ...placeholder.choices[0], price: null }] }), false);
+  });
+  it('is NOT one when the only choice is out of stock', () => {
+    assert.equal(isPlaceholderGroup({ ...placeholder, choices: [{ ...placeholder.choices[0], available: false }] }), false);
+  });
+  it('is NOT one when there is a real choice to make, even if both are free (a size pick)', () => {
+    const sizes = { groupId: 'sz', name: 'Size', min: 1, max: 1, choices: [{ id: 's', name: 'Regular', price: 0, available: true }, { id: 'l', name: 'Large', price: 0, available: true }] };
+    assert.equal(isPlaceholderGroup(sizes), false);
+  });
+  it('an empty group is not a placeholder (and does not crash)', () => {
+    assert.equal(isPlaceholderGroup({ ...placeholder, choices: [] }), false);
+  });
+});
+
+describe('withLoadedOptions with a placeholder group', () => {
+  it("makes Burger King's burger orderable as listed", () => {
+    const burger = withLoadedOptions(onDemand, bkGroups);
+    assert.equal(burger.customization.supported, true);
+    assert.equal(burger.customization.addonsUnavailable, true);
+    assert.equal(pickProblem(burger, initialPicks(burger)), null);
+    assert.deepEqual(toSelection(burger, initialPicks(burger)).addons, []); // the placeholder is left unselected, as in the real cart test
+  });
+  it('a placeholder alone is enough, with nothing optional to mention', () => {
+    const only = withLoadedOptions(onDemand, [placeholder]);
+    assert.equal(only.customization.supported, true);
+  });
+  it('still blocks when a genuinely required group sits next to the placeholder', () => {
+    const size = { groupId: 'sz', name: 'Size', min: 1, max: 1, choices: [{ id: 's', name: 'Regular', price: 0, available: true }, { id: 'l', name: 'Large', price: 40, available: true }] };
+    const blocked = withLoadedOptions(onDemand, [placeholder, size]);
+    assert.equal(blocked.customization.supported, false);
+    assert.match(pickProblem(blocked, initialPicks(blocked)) ?? '', /Swiggy app/);
+  });
+  it('still blocks a single required choice that costs money', () => {
+    assert.equal(withLoadedOptions(onDemand, [{ ...placeholder, choices: [{ ...placeholder.choices[0], price: 20 }] }]).customization.supported, false);
   });
 });

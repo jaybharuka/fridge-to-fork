@@ -17,14 +17,28 @@ export interface Picks {
 export const MAX_QUANTITY = 20;
 
 /**
+ * Swiggy models "the item you picked" as a required add-on group with one free choice (Burger King: "Selected Burger -
+ * Chicken Makhani Burst Burger" / "Selected - Chicken Makhani Burst Burger", ₹0). It isn't a decision. Deliberately
+ * narrow: exactly one choice, priced exactly 0 (an unknown price is not assumed free) and in stock; anything else, such as
+ * two free sizes, a ₹10 choice or an out-of-stock one, is a real requirement.
+ */
+export function isPlaceholderGroup(group: AddonGroup): boolean {
+  const [only] = group.choices;
+  return group.choices.length === 1 && only.price === 0 && only.available;
+}
+
+/**
  * The dish after its add-ons were loaded from Swiggy's cart. Swiggy's cart refuses EVERY add-on request we could build
  * (INVALID_ADDON, ~30 shapes, two restaurants, a nonsense control failed identically), so add-ons are never offered:
  *  - all groups optional (the only case seen so far): orderable as listed, with a note that add-ons can't be set here;
- *  - any group required (minAddons > 0): can't be ordered without an add-on, so it stays the "order it in the Swiggy app" dead end.
+ *  - a required group with real choices (minAddons > 0, e.g. a size): can't be ordered without a pick, so it stays the
+ *    "order it in the Swiggy app" dead end;
+ *  - a required group that is only a placeholder (see isPlaceholderGroup) doesn't count: a real Burger King cart with it
+ *    unselected reviewed with no blockers (canCheckout true, 2026-10-02), though no order has been placed that way.
  * Putting the groups back into `addonGroups` re-enables the picker once Swiggy accepts them.
  */
 export function withLoadedOptions(result: FoodResult, addonGroups: AddonGroup[]): FoodResult {
-  const required = addonGroups.some(g => g.min > 0);
+  const required = addonGroups.some(g => g.min > 0 && !isPlaceholderGroup(g));
   return {
     ...result,
     customization: { ...result.customization, addonGroups: [], supported: !required, optionsOnDemand: false, addonsUnavailable: !required && addonGroups.length > 0 },
