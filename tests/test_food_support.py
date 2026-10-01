@@ -55,6 +55,26 @@ class ReportProblemTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(out["report"]["mailto"])
             self.assertTrue(out["report"]["body"])
 
+    async def test_a_summary_that_is_a_plain_string_is_the_body_not_a_crash(self):
+        out = await self.report(FakeSession({"report_error": envelope({"mailto": REPORT["mailto"], "summary": "Tool: place_food_order"})}))
+        self.assertEqual(out["report"], {"mailto": REPORT["mailto"], "subject": None, "body": "Tool: place_food_order"})
+
+    async def test_an_odd_summary_is_logged_by_type_and_the_mailto_still_works(self):
+        for odd in (["x"], 7, True):
+            s = FakeSession({"report_error": envelope({"mailto": REPORT["mailto"], "summary": odd})})
+            with self.subTest(type(odd).__name__), self.assertLogs("uvicorn.error", level="WARNING") as logs:
+                out = await self.report(s)
+            self.assertEqual(out["report"], {"mailto": REPORT["mailto"], "subject": None, "body": None})
+            self.assertIn(type(odd).__name__, "\n".join(logs.output))
+
+    async def test_a_dict_summary_with_non_text_fields_does_not_crash(self):
+        out = await self.report(FakeSession({"report_error": envelope({"mailto": REPORT["mailto"], "summary": {"subject": 5, "body": None}})}))
+        self.assertEqual(out["report"], {"mailto": REPORT["mailto"], "subject": None, "body": None})
+
+    async def test_a_string_summary_alone_is_enough_to_send(self):
+        out = await self.report(FakeSession({"report_error": envelope({"summary": "Tool: place_food_order"})}))
+        self.assertEqual(out["report"]["body"], "Tool: place_food_order")
+
     async def test_a_response_with_nothing_to_send_is_an_error(self):
         with self.assertRaises(SwiggyError):
             await self.report(FakeSession({"report_error": envelope({})}))

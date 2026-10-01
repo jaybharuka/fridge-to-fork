@@ -504,7 +504,20 @@ async def _prepare_report(
     if not (isinstance(mailto, str) and mailto.lower().startswith("mailto:")):
         # Only ever hand the browser a real mailto: link, whatever the tool returned.
         mailto = None
-    summary = data.get("summary") or {}
-    if not mailto and not summary.get("body"):
+    subject, body = _report_summary(data.get("summary"))
+    if not mailto and not body:
         raise SwiggyError("tool_error", "Swiggy didn't return a report to send.")
-    return {"report": {"mailto": mailto, "subject": summary.get("subject"), "body": summary.get("body")}}
+    return {"report": {"mailto": mailto, "subject": subject, "body": body}}
+
+
+def _report_summary(summary) -> tuple[str | None, str | None]:
+    """The docs say `summary` is {subject, body}; a live Food call returned something that crashed `.get`, so a plain string
+    (taken as the body) is accepted too, and anything else is logged by type and treated as absent."""
+    if isinstance(summary, str):
+        return None, summary or None
+    if isinstance(summary, dict):
+        text = lambda v: v if isinstance(v, str) and v else None  # noqa: E731
+        return text(summary.get("subject")), text(summary.get("body"))
+    if summary is not None:
+        log.warning("[SWIGGY] report_error summary has an unexpected type: %s", type(summary).__name__)
+    return None, None
