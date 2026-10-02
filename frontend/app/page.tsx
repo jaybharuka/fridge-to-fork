@@ -20,6 +20,7 @@ import { PhotoScanScreen } from '@/components/loading/PhotoScanScreen';
 import { AppHeader } from '@/components/results/AppHeader';
 import { Results } from '@/components/results/Results';
 import { Toast } from '@/components/results/Toast';
+import { showsPhotoScan } from '@/lib/scanView';
 
 // Replaces startScan()/resetToLanding()/handleEvent()'s DOM orchestration
 // (templates/index.html:4033-4041, 4543-4549, 4614-4624) with phase-driven
@@ -238,10 +239,7 @@ export default function Home() {
   // reveal/settle beat rather than being treated as "step1 never fired"):
   // an error before step1 means no reveal will ever run, so the screen must
   // give way to the error card.
-  const showPhotoScan =
-    state.hasPhoto &&
-    !photoDetectionRevealed &&
-    (state.phase === 'photo-scanning' || state.step1Received);
+  const showPhotoScan = showsPhotoScan(state.hasPhoto, photoDetectionRevealed, state.phase, state.step1Received);
   // "Has the user actually seen results yet" — drives ScanStatusCard's
   // inline-strip vs. full-page error variant. `phase === 'results'` alone
   // misses an error that lands after the reveal finished but before
