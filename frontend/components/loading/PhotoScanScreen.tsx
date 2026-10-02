@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Check, CircleAlert } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { DetectedIngredient } from '@/lib/types';
+import { scanBarPercent } from '@/lib/scanView';
+import { useElapsed } from './usePlanningProgress';
 import styles from './loading.module.css';
 
 // Real-world latency on the deployed backend is a Render cold start (can
@@ -9,10 +11,9 @@ import styles from './loading.module.css';
 // landing in the 15-60s range — the original 35s threshold (ported from
 // templates/index.html:2231) fired well inside normal scan time and read
 // as a false alarm. Two thresholds now: a soft, reassuring notice once
-// something genuinely unusual is happening, and a hard one only once it's
-// long enough to actually look like a stall.
+// something genuinely unusual is happening. (There used to be a hard 90s
+// notice too, but the backend now ends a scan at 60s with an error card.)
 const SOFT_NOTICE_MS = 60000;
-const HARD_NOTICE_MS = 90000;
 
 // Ported from templates/index.html:2415-2419 (PHOTO_SCAN_SUB_MESSAGES),
 // extended to cover a full 60s before the soft notice without visibly
@@ -60,7 +61,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
   const [revealedCount, setRevealedCount] = useState(0);
   const [statusText, setStatusText] = useState('Scanning your fridge...');
   const [statusComplete, setStatusComplete] = useState(false);
-  const [noticeLevel, setNoticeLevel] = useState<'none' | 'soft' | 'hard'>('none');
+  const [noticeLevel, setNoticeLevel] = useState<'none' | 'soft'>('none');
   // Same delayed-unmount pattern as LoadingOverlay: drop the .show class
   // first, let the .4s opacity transition play, unmount after. Without it
   // the handoff to the results thumbnail is a jump cut, not a crossfade.
@@ -86,6 +87,9 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
 
   const names = (detectedIngredients ?? []).filter(i => i.name && i.name.trim() !== '');
   const scanStopped = detectedIngredients !== null;
+  // Restarts on retry (scanStopped goes back to false). The bar is gone with the screen on an error, so it can't freeze.
+  const elapsed = useElapsed(visible && !scanStopped);
+  const barPercent = scanBarPercent(elapsed, scanStopped);
 
   // Reset per-scan state whenever a scan (re)starts — initial mount, and
   // retryPhotoScan() resubmitting the same photos (lines 2549-2558), which
@@ -126,11 +130,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
   useEffect(() => {
     if (!visible || scanStopped) return;
     const soft = setTimeout(() => setNoticeLevel('soft'), SOFT_NOTICE_MS);
-    const hard = setTimeout(() => setNoticeLevel('hard'), HARD_NOTICE_MS);
-    return () => {
-      clearTimeout(soft);
-      clearTimeout(hard);
-    };
+    return () => clearTimeout(soft);
   }, [visible, scanStopped]);
 
   // Staggered detected-items reveal — showDetectionChips()
@@ -195,6 +195,9 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
           </div>
         )}
 
+        <div className={styles.photoScanBar} role="progressbar" aria-label="Estimated scan progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(barPercent)}>
+          <div className={styles.photoScanBarFill} style={{ width: `${barPercent}%` }} />
+        </div>
         <p className={`${styles.photoScanStatus} ${statusComplete ? styles.complete : ''}`}>{statusText}</p>
         <p className={styles.photoScanSubStatus} style={{ opacity: subFading ? 0 : 1 }}>
           {PHOTO_SCAN_SUB_MESSAGES[subIndex]}
@@ -219,20 +222,17 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
         </div>
 
         <div
-          className={`${styles.photoScanTimeoutState} ${noticeLevel === 'none' ? styles.hidden : styles.visible} ${noticeLevel === 'hard' ? styles.hard : styles.soft}`}
+          className={`${styles.photoScanTimeoutState} ${noticeLevel === 'none' ? styles.hidden : styles.visible} ${styles.soft}`}
         >
-          {noticeLevel === 'hard' && <CircleAlert size={26} />}
           <p className={styles.photoScanTimeoutHeading}>
-            {noticeLevel === 'hard' ? 'This is taking longer than usual' : 'Still scanning, almost there'}
+            Still scanning, almost there
           </p>
           <p className={styles.photoScanTimeoutSub}>
-            {noticeLevel === 'hard'
-              ? 'This is unusual. You can keep waiting or try again.'
-              : 'A thorough scan can take a little while. Feel free to keep waiting.'}
+            A thorough scan can take a little while. Feel free to keep waiting.
           </p>
           <button
             type="button"
-            className={noticeLevel === 'hard' ? styles.photoScanRetryBtn : styles.photoScanRetryBtnSubtle}
+            className={styles.photoScanRetryBtnSubtle}
             onClick={onRetry}
           >
             Try again

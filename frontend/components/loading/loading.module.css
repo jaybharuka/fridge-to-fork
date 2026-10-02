@@ -200,21 +200,12 @@
 .photoScanTimeoutState.hidden { display: none; }
 .photoScanTimeoutState.visible { opacity: 1; transform: translateY(0); }
 /* soft: calm, no alert icon, no accent color on the copy — reads as
-   reassurance, not a problem. hard: the original warning treatment. */
-.photoScanTimeoutState.hard svg { color: #FC8019; margin-bottom: 4px; }
+   reassurance, not a problem. */
 .photoScanTimeoutState.soft .photoScanTimeoutHeading { color: rgba(255, 255, 255, 0.75); }
 .photoScanTimeoutHeading {
   font-family: var(--font-heading); font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
 }
 .photoScanTimeoutSub { font-size: 12px; color: rgba(255, 255, 255, 0.5); line-height: 1.5; }
-.photoScanRetryBtn {
-  margin-top: 6px; height: 40px; padding: 0 22px; border-radius: 999px;
-  background: #FC8019; color: #fff; border: none; font-weight: 600; font-size: 13px;
-  cursor: pointer; font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-}
-.photoScanRetryBtn:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
-.photoScanRetryBtn:active { transform: translateY(0) scale(.98); }
 /* Same "Try again" action during the soft notice, deliberately quieter —
    a text-style link rather than a filled button, so it doesn't compete
    with the reassuring tone. */
@@ -233,3 +224,8 @@
   .loadingStage.active .loadingStageLabel, .loadingStage.done .loadingStageIcon { animation: none; }
   .loadingBarFill { transition: none; }
 }
+
+/* Estimated fridge-scan progress (time-based; see scanBarPercent). */
+.photoScanBar { width: min(280px, 80%); height: 4px; margin: 14px auto 2px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.12); }
+.photoScanBarFill { height: 100%; border-radius: 4px; background: #FC8019; transition: width 0.5s linear; }
+@media (prefers-reduced-motion: reduce) { .photoScanBarFill { transition: none; } }

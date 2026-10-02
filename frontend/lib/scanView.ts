@@ -13,3 +13,18 @@ import type { ScanState } from '../hooks/scanReducer';
 export function showsOnlyErrorCard(phase: ScanState['phase'], resultsAlreadyShown: boolean): boolean {
   return phase === 'error' && !resultsAlreadyShown;
 }
+
+/** Fridge-scan bar. An elapsed-time ESTIMATE (Gemini reports no progress): eases toward 90% (half-life 14s, calibrated on real
+ *  step-1 durations: median 21s, p90 ~45s, none past 48s) and never reaches it; only the real step1 event (`done`) shows 100. */
+export const SCAN_BAR_CEILING = 90;
+export const SCAN_BAR_HALF_LIFE_MS = 14000;
+export function scanBarPercent(elapsedMs: number, done: boolean): number {
+  if (done) return 100;
+  return SCAN_BAR_CEILING * (1 - Math.pow(0.5, Math.max(0, elapsedMs) / SCAN_BAR_HALF_LIFE_MS));
+}
+
+/** Whether the fridge-photo scan screen (with its bar) is up: from the tap until its reveal ends. An error before step1 never
+ *  sets step1Received, so the screen, and the bar with it, gives way to the error card. */
+export function showsPhotoScan(hasPhoto: boolean, revealed: boolean, phase: ScanState['phase'], step1Received: boolean): boolean {
+  return hasPhoto && !revealed && (phase === 'photo-scanning' || step1Received);
+}
