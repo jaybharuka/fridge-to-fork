@@ -39,7 +39,8 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
     const remaining = MAX_PHOTOS - photos.length;
     const toAdd = Array.from(files).slice(0, Math.max(remaining, 0));
     for (const file of toAdd) {
-      await addPhoto(file);
+      // Stop at the first photo that fails: the likely cause is memory pressure, and the next one would only repeat it.
+      if (!(await addPhoto(file))) break;
     }
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (galleryInputRef.current) galleryInputRef.current.value = '';
