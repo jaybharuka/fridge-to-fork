@@ -55,10 +55,10 @@ export default function Home() {
   // Recreated per scan — resetResultTabs() (templates/index.html:3565).
   const [recipeDotDismissed, setRecipeDotDismissed] = useState(false);
 
-  const photos = usePhotoUpload();
   const { state, startScan, toggleChecklistItem, reset, restore, selectMeal, replanCustomDish } = useScanStream();
   const { fetchVideos } = useYoutubeVideos();
   const toast = useToast();
+  const photos = usePhotoUpload(toast.show);
   const auth = useAuth();
   const connected = auth.status === 'connected';
 
