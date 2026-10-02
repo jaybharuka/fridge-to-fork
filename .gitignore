@@ -60,3 +60,6 @@ gcp-credentials*.json
 !frontend/public/logo-source.png
 !frontend/scripts/
 !frontend/scripts/**
+
+# Design rationale screenshots are kept on purpose (see docs/design-proposals/README.md)
+!docs/design-proposals/*.png

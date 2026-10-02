@@ -1,0 +1,97 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Rubik:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* the app's real tokens (globals.css) */
+.light{--bg:#FFFFFF;--bg-secondary:#F8F8F8;--bg-card:#FFFFFF;--border:#E4E4E4;--text:#1A1A1A;--text-2:#6B6B6B;--orange:#FC8019;--orange-light:#FFF3E8;--green:#1BA672;--green-dim:rgba(27,166,114,.12);--green-border:rgba(27,166,114,.3);--sh2:0 4px 12px rgba(0,0,0,.10);--sh1:0 2px 8px rgba(0,0,0,.06);--bgrgb:255,255,255;--page:#E9E9EC}
+.dark{--bg:#0F0F0F;--bg-secondary:#1A1A1A;--bg-card:#1E1E1E;--border:#2A2A2A;--text:#F5F5F5;--text-2:#A0A0A0;--orange:#FC8019;--orange-light:rgba(252,128,25,.12);--green:#34D399;--green-dim:rgba(52,211,153,.12);--green-border:rgba(52,211,153,.3);--sh2:0 4px 14px rgba(0,0,0,.4);--sh1:0 2px 8px rgba(0,0,0,.3);--bgrgb:15,15,15;--page:#050505}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Nunito Sans',sans-serif;background:#888;padding:24px;display:grid;grid-template-columns:repeat(2,390px);gap:28px 28px;width:max-content}
+h2{grid-column:1/-1;font:700 15px 'Rubik';color:#fff;background:#222;padding:8px 12px;border-radius:8px}
+.frame{width:390px;min-height:290px;background:var(--bg);color:var(--text);border-radius:14px;overflow:hidden;position:relative;border:1px solid #0003}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.row{display:flex;align-items:center}
+/* content stub below the bar, for depth context */
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg)}
+.tab{flex:1;text-align:center;padding:12px 0;font:600 14px 'Nunito Sans';color:var(--text-2);position:relative}
+.tab.on{color:var(--orange)}.tab.on:after{content:"";position:absolute;left:12%;right:12%;bottom:-1px;height:2px;background:var(--orange)}
+.stub{padding:14px 16px;background:var(--bg)}
+.card{height:92px;border-radius:16px;background:linear-gradient(135deg,#2b2b2b,#111);color:#fff;padding:14px;font:800 20px 'Rubik'}
+.card small{display:block;font:600 12px 'Nunito Sans';opacity:.7;margin-top:4px}
+.logo{width:20px;height:20px;border-radius:5px;background:#FC8019;display:grid;place-items:center;color:#fff;font:800 11px Rubik;flex-shrink:0}
+.circle{width:36px;height:36px;border-radius:50%;background:var(--bg-secondary);border:1px solid var(--border);display:grid;place-items:center;color:var(--text-2)}
+.circle svg{width:16px;height:16px}
+
+/* ---- CURRENT (phone width: wordmark hidden, chip collapsed, 4 identical elements) ---- */
+.cur{height:56px;border-bottom:1px solid var(--border);padding:0 16px;gap:6px;background:rgba(var(--bgrgb),.85)}
+.cur .back{width:44px;height:44px;display:grid;place-items:center;color:var(--text-2);margin-left:-10px}
+.cur .chip{height:28px;padding:0 8px;border-radius:99px;color:var(--green);background:var(--green-dim);border:1px solid var(--green-border);display:grid;place-items:center}
+.cur .chip svg{width:14px;height:14px}
+.cur .sp{flex:1}
+
+/* ---- A: Refined (restyle, 4 -> 3 elements, wordmark always on) ---- */
+.A{height:60px;padding:0 12px;gap:4px;background:rgba(var(--bgrgb),.9);box-shadow:var(--sh2);position:relative;z-index:2}
+.A .ghost{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--text-2);position:relative}
+.A .ghost:hover{background:var(--orange-light);color:var(--orange)}
+.A .brand{display:flex;align-items:center;gap:8px;margin-left:2px;font:700 17px 'Rubik'}
+.A .brand .logo{width:28px;height:28px;border-radius:8px;font-size:13px}
+.A .sp{flex:1}
+.A .dot{position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid var(--bg)}
+
+/* ---- B: Branded + grouped tools ---- */
+.B{height:64px;padding:0 12px;gap:6px;background:linear-gradient(180deg,var(--bg),var(--bg-secondary));box-shadow:var(--sh1);position:relative;z-index:2}
+.B:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--orange),#ffb066 55%,transparent)}
+.B .ghost{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--text-2)}
+.B .lock{display:flex;align-items:center;gap:9px;margin-left:2px}
+.B .lock .logo{width:34px;height:34px;border-radius:10px;font-size:15px;box-shadow:0 3px 8px rgba(252,128,25,.35)}
+.B .lock b{display:block;font:800 16px/1.1 'Rubik'}
+.B .lock i{display:flex;align-items:center;gap:5px;font:600 11px 'Nunito Sans';font-style:normal;color:var(--green);margin-top:3px}
+.B .lock i:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}
+.B .sp{flex:1}
+.B .pill{display:flex;height:38px;border-radius:99px;background:var(--bg-card);border:1px solid var(--border);box-shadow:var(--sh1);overflow:hidden}
+.B .pill button{width:38px;display:grid;place-items:center;color:var(--text-2)}
+.B .pill button+button{border-left:1px solid var(--border)}
+.B .pill button:hover{background:var(--orange-light);color:var(--orange)}
+
+/* ---- C: Centered brand + one account menu (shown open) ---- */
+.C{height:56px;padding:0 12px;background:rgba(var(--bgrgb),.92);box-shadow:var(--sh2);position:relative;z-index:3;justify-content:space-between}
+.C .ghost{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--text-2)}
+.C .brand{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;font:700 17px 'Rubik'}
+.C .brand .logo{width:26px;height:26px;border-radius:8px;font-size:12px}
+.C .acct{width:40px;height:40px;border-radius:50%;background:var(--orange-light);color:var(--orange);display:grid;place-items:center;position:relative;border:1px solid rgba(252,128,25,.3)}
+.C .acct .dot{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:var(--green);border:2px solid var(--bg)}
+.C .menu{position:absolute;right:10px;top:54px;width:236px;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,.28);padding:6px;z-index:5}
+.C .menu .st{display:flex;align-items:center;gap:8px;padding:10px 12px;font:700 13px 'Nunito Sans';color:var(--green)}
+.C .menu .st:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--green)}
+.C .menu .it{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;font:600 14px 'Nunito Sans'}
+.C .menu .it svg{color:var(--text-2)}
+.C .menu hr{border:0;border-top:1px solid var(--border);margin:4px 6px}
+.C .menu .seg{display:flex;margin:6px 8px 8px;background:var(--bg-secondary);border-radius:99px;padding:3px}
+.C .menu .seg span{flex:1;text-align:center;padding:6px 0;border-radius:99px;font:700 12px 'Nunito Sans';color:var(--text-2)}
+.C .menu .seg span.on{background:var(--bg-card);color:var(--text);box-shadow:var(--sh1)}
+.C .stub{min-height:190px}
+</style></head><body>
+<script>
+const I={
+ back:'<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>',
+ check:'<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+ pack:'<svg viewBox="0 0 24 24"><path d="M11 21.7a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/></svg>',
+ fork:'<svg viewBox="0 0 24 24"><path d="M3 2v7a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6a2 2 0 0 0 2 2h3Zm0 0v7"/></svg>',
+ moon:'<svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+ sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+ user:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'};
+const logo='<span class="logo">F</span>';
+const tabs='<div class="tabs"><div class="tab on">Order</div><div class="tab">Recipe</div></div>';
+const stub=(t)=>`<div class="stub"><div class="card">Tomato Omelette<small>For 2 people · 25 min</small></div></div>`;
+const bars={
+ cur:t=>`<div class="row cur"><span class="back">${I.back}</span>${logo}<span class="sp"></span><span class="chip">${I.check}</span><span class="circle">${I.pack}</span><span class="circle">${I.fork}</span><span class="circle">${t=='dark'?I.moon:I.sun}</span></div>`,
+ A:t=>`<div class="row A"><button class="ghost">${I.back}</button><div class="brand">${logo}Fridge to Fork</div><span class="sp"></span><button class="ghost">${I.pack}<span class="dot"></span></button><button class="ghost">${t=='dark'?I.moon:I.sun}</button></div>`,
+ B:t=>`<div class="row B"><button class="ghost">${I.back}</button><div class="lock">${logo}<div><b>Fridge to Fork</b><i>Connected</i></div></div><span class="sp"></span><div class="pill"><button>${I.pack}</button><button>${I.fork}</button><button>${t=='dark'?I.moon:I.sun}</button></div></div>`,
+ C:t=>`<div class="row C"><button class="ghost">${I.back}</button><div class="brand">${logo}Fridge to Fork</div><span class="acct">${I.user}<span class="dot"></span></span><div class="menu"><div class="st">Connected to Swiggy</div><div class="it">${I.pack}Instamart orders</div><div class="it">${I.fork}Food orders</div><hr><div class="seg"><span ${t=='light'?'class="on"':''}>Light</span><span ${t=='dark'?'class="on"':''}>Dark</span></div></div></div>`};
+const titles={cur:'CURRENT (390px phone: wordmark hidden, 4 identical elements, status chip looks like a button but is not one)',A:'A  Refined: same structure, restyled and decluttered (wordmark always on; the two order buttons merge into one "Orders" icon with a green connected dot)',B:'B  Branded lockup + grouped tools (logo tile + wordmark + "Connected" subline on the left; the three tools in one pill on the right; orange accent line)',C:'C  Centered brand + one account menu (shown open): back chevron, centered wordmark, one avatar button holding status, orders and the theme switch'};
+for(const k of ['cur','A','B','C']){
+  document.body.insertAdjacentHTML('beforeend',`<h2>${titles[k]}</h2>`);
+  for(const t of ['dark','light']) document.body.insertAdjacentHTML('beforeend',`<div class="frame ${t}">${bars[k](t)}${tabs}${stub()}</div>`);
+}
+</script></body></html>
