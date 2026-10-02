@@ -799,7 +799,7 @@ def signed_bearer() -> dict:
     from datetime import datetime, timedelta, timezone
 
     exp = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
-    return {"Authorization": f"Bearer {a._issue_bearer('swiggy-tok', exp)}"}
+    return {"Authorization": f"Bearer {a._seal_token('swiggy-tok', exp)}"}
 
 
 class RouteTests(unittest.TestCase):
