@@ -638,6 +638,10 @@ async def auth_logout(request: Request):
 # Scan endpoint
 # ---------------------------------------------------------------------------
 
+# A hung Gemini vision call must not hang the whole scan (see the step1 timeout in /api/scan).
+STEP1_TIMEOUT_SECONDS = 60.0
+
+
 @app.post("/api/scan")
 async def scan(
     request: Request,
@@ -694,10 +698,10 @@ async def scan(
                 try:
                     fridge = await asyncio.wait_for(
                         asyncio.to_thread(identify_ingredients, tmp_paths, target_dish or ""),
-                        timeout=60.0,  # hard limit — a hung Gemini call must not hang the whole scan
+                        timeout=STEP1_TIMEOUT_SECONDS,  # hard limit — a hung Gemini call must not hang the whole scan
                     )
                 except asyncio.TimeoutError:
-                    print(f"[STEP1 TIMEOUT] identify_ingredients exceeded 60s ({time.time() - t_vision:.2f}s), continuing with empty fridge")
+                    print(f"[STEP1 TIMEOUT] identify_ingredients exceeded {STEP1_TIMEOUT_SECONDS:g}s ({time.time() - t_vision:.2f}s), stopping the scan")
                     vision_timed_out = True
                     fridge = FridgeContents(ingredients=[])
                 except Exception as e:
@@ -719,6 +723,12 @@ async def scan(
                     ],
                     **({"timed_out": True} if vision_timed_out else {}),
                 })
+                if vision_timed_out:
+                    # Stop here. Planning on an empty fridge produced a plan that looked real ("9 of 17 ingredients" is
+                    # just the staples) and told the user to order things they already had, rendered under the error
+                    # (2026-10-02 live incident), and burned Gemini/Swiggy calls on a plan nobody could trust. The client
+                    # turns this step1 into the honest "scan didn't complete" error; the recipe-only flow never gets here.
+                    return
 
             # ── Step 2: Meal planning ───────────────────────────────────────
             if target_dish:

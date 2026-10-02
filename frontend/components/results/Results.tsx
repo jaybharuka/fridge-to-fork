@@ -16,6 +16,7 @@ import { ChoiceCard } from './ChoiceCard';
 import { ChecklistSkeleton, ChoiceSkeleton } from './ResultsSkeleton';
 import { PlanningProgress } from '../loading/PlanningProgress';
 import { ScanStatusCard } from './ScanStatusCard';
+import { showsOnlyErrorCard } from '@/lib/scanView';
 import { FoodOrderSheet } from './FoodOrderSheet';
 import { InstamartOrderSheet } from './InstamartOrderSheet';
 import { RecipeStepsSection } from './RecipeStepsSection';
@@ -118,6 +119,21 @@ export function Results({
   const contentPending = !state.awaitingChoice && !state.scanError;
 
   const cookTime = recSuggestion?.prep_time_minutes ? `${recSuggestion.prep_time_minutes} min` : null;
+
+  // A scan that failed before results ever showed is the error card and nothing else: whatever the stream delivered first
+  // (e.g. a plan made without a fridge) must not render behind it. See lib/scanView.ts.
+  if (showsOnlyErrorCard(state.phase, resultsAlreadyShown)) {
+    return (
+      <div className="wrap">
+        <ScanStatusCard
+          result={state.scanOutcome}
+          resultsAlreadyShown={resultsAlreadyShown}
+          onRetry={onResetToLanding}
+          onConnectClick={onResultCardConnectClick}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
