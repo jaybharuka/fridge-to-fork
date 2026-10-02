@@ -454,7 +454,7 @@ button.brand:hover { opacity: 0.8; }
    (markup), 762-786 (CSS). */
 .mealCards { display: flex; flex-direction: column; gap: 14px; }
 .mealCard { background: var(--swiggy-surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; opacity: 0; animation: fadeSlideUp .35s ease forwards; transition: box-shadow .2s ease; }
-.mealCard:hover { box-shadow: var(--shadow); }
+.mealCard:hover { box-shadow: var(--shadow-lift); }
 .mealHeaderBar { background: var(--swiggy-orange); color: #fff; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
 .mealHeaderBar svg { width: 14px; height: 14px; }
 .mealBody { padding: 14px; }
@@ -470,7 +470,7 @@ button.brand:hover { opacity: 0.8; }
 
 /* Switching the active dish — 2026-10-01 feature. */
 .mealCardClickable { cursor: pointer; }
-.mealCardClickable:hover { box-shadow: var(--shadow); border-color: var(--swiggy-orange); }
+.mealCardClickable:hover { box-shadow: var(--shadow-lift); border-color: var(--swiggy-orange); }
 .mealCardClickable:focus-visible { outline: 2px solid var(--swiggy-orange); outline-offset: 2px; }
 .mealCardActive { border-color: var(--swiggy-orange); }
 .mealCardActive .mealHeaderBar { background: var(--swiggy-orange); }

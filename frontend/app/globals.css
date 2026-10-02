@@ -55,6 +55,10 @@
   --shadow-2: 0 4px 12px rgba(0,0,0,0.10);  /* raised: dropdown, popover, hovered card */
   --shadow-3: 0 16px 40px rgba(0,0,0,0.12); /* sheet / modal */
   --shadow-4: 0 24px 60px rgba(0,0,0,0.20); /* hero / lightbox-level overlay */
+  /* Lift (phase 6): hovered/raised cards. From Swiggy's design doc: a soft shadow that falls below the card only (the -20px
+     spread keeps it off the sides), ink-tinted. Additive: --shadow-1..4 are untouched. Dark mode reuses --shadow-2, since a
+     tinted soft shadow is invisible on a dark surface. */
+  --shadow-lift: rgba(40, 44, 63, 0.15) 0 15px 40px -20px;
 
   --grey-50: var(--bg-secondary);
   --grey-100: #F0F0F0;
@@ -134,6 +138,7 @@
   --shadow-2: 0 4px 14px rgba(0,0,0,0.4);
   --shadow-3: 0 16px 40px rgba(0,0,0,0.5);
   --shadow-4: 0 24px 60px rgba(0,0,0,0.6);
+  --shadow-lift: var(--shadow-2);
   --bg-rgb: 15,15,15;
 
   --grey-50: var(--bg-secondary);
