@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useReducer } from 'react';
+import { useCallback, useReducer, useState } from 'react';
 import { authHeaders } from '../lib/auth';
 import { BACKEND_URL } from '../lib/backend';
+import { createScanGuard } from '../lib/scanGuard';
 import { readSSEStream } from '../lib/sse';
 import type { ChecklistItem, DetectedIngredient, MealSuggestion, TopUpSuggestion } from '../lib/types';
 // State/reducer live in their own pure module (no React, no fetch-only
@@ -24,10 +25,13 @@ export { initialState, reducer };
 
 export function useScanStream() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // One guard for the scan and the replans: reset() abandons all of them, so nothing late reaches the reducer.
+  const [guard] = useState(createScanGuard);
 
   const startScan = useCallback(
     async (mode: 'photo' | 'recipe', opts: { files?: File[]; targetDish: string; servings: number }) => {
       const { files, targetDish, servings } = opts;
+      const { gen, signal } = guard.begin();
       dispatch({ type: 'SCAN_START', hasPhoto: mode === 'photo' && !!files?.length });
       const form = new FormData();
       if (mode === 'photo' && files?.length) {
@@ -38,14 +42,17 @@ export function useScanStream() {
       if (targetDish) form.append('target_dish', targetDish);
       form.append('servings', String(servings));
       try {
-        const res = await fetch(`${BACKEND_URL}/api/scan`, { method: 'POST', body: form, credentials: 'include', headers: await authHeaders() });
+        const res = await fetch(`${BACKEND_URL}/api/scan`, { method: 'POST', body: form, credentials: 'include', headers: await authHeaders(), signal });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        await readSSEStream(res, ev => dispatch(ev));
+        await readSSEStream(res, ev => {
+          if (guard.isCurrent(gen)) dispatch(ev);
+        });
       } catch {
-        dispatch({ type: 'error', message: 'Something went wrong. Try again.' });
+        // An aborted scan (back button, or superseded by a newer one) is not an error to show.
+        if (guard.isCurrent(gen)) dispatch({ type: 'error', message: 'Something went wrong. Try again.' });
       }
     },
-    []
+    [guard]
   );
 
   const toggleChecklistItem = useCallback((index: number) => {
@@ -53,8 +60,9 @@ export function useScanStream() {
   }, []);
 
   const reset = useCallback(() => {
+    guard.cancel(); // stop the in-flight scan/replan first, so none of its late events can undo the reset
     dispatch({ type: 'RESET' });
-  }, []);
+  }, [guard]);
 
   const restore = useCallback(
     (payload: { recommendedMeal: string; reasoning: string; checklist: ChecklistItem[]; topUpSuggestions: TopUpSuggestion[] }) => {
@@ -73,6 +81,7 @@ export function useScanStream() {
   const selectMeal = useCallback(
     async (suggestion: MealSuggestion, detectedIngredients: DetectedIngredient[], servings: number) => {
       dispatch({ type: 'SELECT_MEAL', suggestion });
+      const gen = guard.current();
       try {
         const res = await fetch(`${BACKEND_URL}/api/replan`, {
           method: 'POST',
@@ -87,12 +96,12 @@ export function useScanStream() {
         });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const body = await res.json();
-        dispatch({ type: 'top_up', suggestions: body.top_up_suggestions ?? [] });
+        if (guard.isCurrent(gen)) dispatch({ type: 'top_up', suggestions: body.top_up_suggestions ?? [] });
       } catch {
-        dispatch({ type: 'REPLAN_TOP_UP_FAILED' });
+        if (guard.isCurrent(gen)) dispatch({ type: 'REPLAN_TOP_UP_FAILED' });
       }
     },
-    []
+    [guard]
   );
 
   // Free-text "or tell us what you'd like to make instead" — an arbitrary
@@ -101,6 +110,7 @@ export function useScanStream() {
   const replanCustomDish = useCallback(
     async (dishName: string, detectedIngredients: DetectedIngredient[], servings: number) => {
       dispatch({ type: 'REPLAN_START' });
+      const gen = guard.current();
       try {
         const res = await fetch(`${BACKEND_URL}/api/replan`, {
           method: 'POST',
@@ -121,12 +131,12 @@ export function useScanStream() {
           total_order_price_inr: body.total_order_price_inr ?? 0,
           matched_fridge_items: body.matched_fridge_items ?? [],
         };
-        dispatch({ type: 'REPLAN_SUCCESS', suggestion, reasoning: body.reasoning ?? '', topUpSuggestions: body.top_up_suggestions ?? [] });
+        if (guard.isCurrent(gen)) dispatch({ type: 'REPLAN_SUCCESS', suggestion, reasoning: body.reasoning ?? '', topUpSuggestions: body.top_up_suggestions ?? [] });
       } catch {
-        dispatch({ type: 'REPLAN_ERROR', message: "Couldn't plan that dish. Please try again." });
+        if (guard.isCurrent(gen)) dispatch({ type: 'REPLAN_ERROR', message: "Couldn't plan that dish. Please try again." });
       }
     },
-    []
+    [guard]
   );
 
   return { state, startScan, toggleChecklistItem, reset, restore, selectMeal, replanCustomDish };

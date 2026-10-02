@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, type CSSProperties } from 'react';
+import { BackButton } from '@/components/shared/BackButton';
 import { easedProgress, useElapsed } from './usePlanningProgress';
 import styles from './loading.module.css';
 
@@ -7,6 +8,8 @@ interface LoadingOverlayProps {
   visible: boolean;
   hasPhoto: boolean;
   headlineText: string;
+  /** Leaves the request: the caller aborts it and resets to the landing screen. */
+  onBack: () => void;
 }
 
 interface Stage {
@@ -52,7 +55,7 @@ function makeParticles(): Particle[] {
 // fridge illustration for photo scans before PhotoScanScreen takes over).
 // Ported from templates/index.html:1886-1905 (markup), 1307-1664 (CSS),
 // 2235-2409 (particle field + staged checklist + show/hide mechanics).
-export function LoadingOverlay({ visible, hasPhoto, headlineText }: LoadingOverlayProps) {
+export function LoadingOverlay({ visible, hasPhoto, headlineText, onBack }: LoadingOverlayProps) {
   const [shouldRender, setShouldRender] = useState(visible);
   const [shown, setShown] = useState(false);
   const [headlineEntered, setHeadlineEntered] = useState(false);
@@ -129,6 +132,7 @@ export function LoadingOverlay({ visible, hasPhoto, headlineText }: LoadingOverl
 
   return (
     <div className={`${styles.loadingOverlay} ${shown ? styles.show : ''}`}>
+      <BackButton onDark onClick={onBack} label="Cancel and go back" />
       <div className={styles.loadingParticles}>
         {particles.map((p, i) => (
           <div

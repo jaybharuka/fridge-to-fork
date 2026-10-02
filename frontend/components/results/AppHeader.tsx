@@ -5,6 +5,7 @@ import { FOOD_ORDERING_ENABLED } from '@/lib/features';
 import { openOrders } from '@/lib/ordersUi';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { BackButton } from '@/components/shared/BackButton';
 import styles from './results.module.css';
 
 const SPIN_MS = 300;
@@ -18,13 +19,15 @@ interface AppHeaderProps {
    *  start a new dish" case). Optional so AppHeader still renders fine
    *  wherever a reset genuinely doesn't apply. */
   onLogoClick?: () => void;
+  /** Shown as a left chevron before the logo when given: the explicit "start over" control once a scan is under way. */
+  onBack?: () => void;
 }
 
 // Ported from templates/index.html:1767-1776 (markup), 186-203 (CSS),
 // 2120-2141, 2149-2158 (toggleTheme/applyTheme behavior). The icon swap is
 // a conditional element instead of the old outerHTML replace + a fresh
 // lucide.createIcons() call — React just re-renders it.
-export function AppHeader({ onLogoClick }: AppHeaderProps) {
+export function AppHeader({ onLogoClick, onBack }: AppHeaderProps) {
   const { theme, toggle } = useTheme();
   const { status } = useAuth();
   const [spinning, setSpinning] = useState(false);
@@ -45,6 +48,7 @@ export function AppHeader({ onLogoClick }: AppHeaderProps) {
   return (
     <header className={styles.appHeader}>
       <div className={styles.appHeaderInner}>
+        {onBack && <BackButton onClick={onBack} label="Back to home, start over" />}
         {onLogoClick ? (
           <button type="button" className={styles.brand} aria-label="Fridge to Fork — back to home" onClick={onLogoClick}>
             {brandContent}
