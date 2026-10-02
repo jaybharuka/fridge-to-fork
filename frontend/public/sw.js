@@ -5,8 +5,9 @@
 // assets are cached here.
 //
 // Bump CACHE_VERSION when the cached asset list below changes, to evict
-// the old cache on the next activate.
-const CACHE_VERSION = "f2f-shell-v1";
+// the old cache on the next activate. Every path below MUST exist: cache.addAll
+// rejects if any one 404s, which fails the whole install (v1 listed a removed /icon.svg).
+const CACHE_VERSION = "f2f-shell-v2";
 
 // Explicit app-shell assets, pre-cached on install. Small and static by
 // hand — this isn't meant to enumerate every route, just the icons/
@@ -14,7 +15,6 @@ const CACHE_VERSION = "f2f-shell-v1";
 const SHELL_ASSETS = [
   "/manifest.webmanifest",
   "/favicon.ico",
-  "/icon.svg",
   "/apple-icon.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
