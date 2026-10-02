@@ -26,15 +26,15 @@ class TestBearerAuth(unittest.TestCase):
 
     def test_valid_bearer_authenticates(self):
         exp = _exp(timedelta(days=1))
-        r = client.get("/auth/status", headers={"Authorization": f"Bearer {a._issue_bearer('tok', exp)}"})
+        r = client.get("/auth/status", headers={"Authorization": f"Bearer {a._seal_token('tok', exp)}"})
         self.assertEqual(r.json(), {"authenticated": True, "expires_at": exp})
 
     def test_expired_bearer_rejected(self):
-        tok = a._issue_bearer("tok", _exp(timedelta(seconds=-5)))
+        tok = a._seal_token("tok", _exp(timedelta(seconds=-5)))
         self.assertFalse(client.get("/auth/status", headers={"Authorization": f"Bearer {tok}"}).json()["authenticated"])
 
     def test_garbage_and_tampered_bearer_rejected(self):
-        good = a._issue_bearer("tok", _exp(timedelta(days=1)))
+        good = a._seal_token("tok", _exp(timedelta(days=1)))
         for bad in ("garbage", good[:-2] + "xx", ""):
             r = client.get("/auth/status", headers={"Authorization": f"Bearer {bad}"})
             self.assertFalse(r.json()["authenticated"], bad)
@@ -49,7 +49,7 @@ class TestBearerAuth(unittest.TestCase):
         self.assertEqual(r.json()["error"]["code"], "auth_required")
 
     def test_instamart_route_with_valid_bearer_passes_the_auth_gate(self):
-        tok = a._issue_bearer("swiggy-tok", _exp(timedelta(days=1)))
+        tok = a._seal_token("swiggy-tok", _exp(timedelta(days=1)))
         with patch.object(instamart_orders, "list_orders", AsyncMock(return_value={"orders": [], "hasMore": False})) as fn:
             r = client.post("/api/instamart/orders", json={}, headers={"Authorization": f"Bearer {tok}"})
         self.assertTrue(r.json()["ok"])
@@ -65,7 +65,7 @@ class TestBearerAuth(unittest.TestCase):
         from itsdangerous import TimestampSigner
         import base64, json
         exp = _exp(timedelta(days=1))
-        raw = base64.b64encode(json.dumps({"access_token": "tok", "expires_at": exp}).encode())
+        raw = base64.b64encode(json.dumps({a.SESSION_TOKEN_KEY: a._seal_token("tok", exp)}).encode())
         cookie = TimestampSigner(a._SECRET_KEY).sign(raw).decode()
         c = TestClient(a.app, cookies={"session": cookie})
         body = c.get("/auth/session-token").json()
@@ -75,11 +75,21 @@ class TestBearerAuth(unittest.TestCase):
         r = client.get("/auth/status", headers={"Authorization": f"Bearer {body['token']}"})
         self.assertTrue(r.json()["authenticated"])
 
+    def test_an_old_plaintext_cookie_session_no_longer_authenticates(self):
+        # Sessions from before the token was sealed (raw access_token in the cookie) must not be honoured: re-login.
+        from itsdangerous import TimestampSigner
+        import base64, json
+        raw = base64.b64encode(json.dumps({"access_token": "tok", "expires_at": _exp(timedelta(days=1))}).encode())
+        cookie = TimestampSigner(a._SECRET_KEY).sign(raw).decode()
+        c = TestClient(a.app, cookies={"session": cookie})
+        self.assertFalse(c.get("/auth/status").json()["authenticated"])
+        self.assertEqual(c.get("/auth/session-token").json(), {"authenticated": False})
+
     def test_cors_preflight_allows_authorization_header(self):
         r = client.options(
             "/api/order",
             headers={
-                "Origin": "https://fridge-to-fork-cyan.vercel.app",
+                "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": "authorization",
             },

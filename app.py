@@ -28,7 +28,6 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from google import genai
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
-from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -53,6 +52,7 @@ from fridge_to_fork.step2_meal_planner import (
     plan_meals_stream,
 )
 from fridge_to_fork.features import FOOD_MOVED_MESSAGE
+from fridge_to_fork import token_vault
 from fridge_to_fork.food_routes import make_router as make_food_router
 from fridge_to_fork.instamart_routes import make_router as make_instamart_router
 from fridge_to_fork.models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
@@ -104,15 +104,26 @@ app.add_middleware(
     https_only=True,
 )
 
-# FRONTEND_ORIGIN: the deployed frontend's origin (e.g. Vercel URL), unset
-# in local dev where next.config.js proxies same-origin instead.
+# FRONTEND_ORIGIN: the deployed frontend's origin (the Vercel URL). Unset means local dev only: never "*". A missing or
+# mistyped value used to silently open CORS to every site; now it breaks cross-origin calls loudly instead.
+_LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def _allowed_origins(frontend_origin: str | None) -> list[str]:
+    origin = (frontend_origin or "").strip().rstrip("/")
+    return [origin] if origin else list(_LOCAL_DEV_ORIGINS)
+
+
 _frontend_origin = os.environ.get("FRONTEND_ORIGIN", "")
+if not _frontend_origin.strip():
+    print("[CORS] FRONTEND_ORIGIN is not set: only localhost:3000 may call this API cross-origin")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_frontend_origin] if _frontend_origin else ["*"],
-    allow_credentials=bool(_frontend_origin),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins(_frontend_origin),
+    allow_credentials=True,
+    # Exactly what the frontend sends (GET/POST/OPTIONS preflight; Content-Type and the Authorization bearer).
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 SWIGGY_AUTH_BASE = "https://mcp.swiggy.com"
@@ -178,39 +189,30 @@ def _safe_next_path(next_param: str | None) -> str:
     return next_param
 
 
-_bearer_signer = URLSafeTimedSerializer(_SECRET_KEY, salt="f2f-bearer")
+# The Swiggy token is only ever stored or sent sealed (token_vault: encrypted, authenticated, time-limited). The session
+# cookie holds the sealed blob under "swiggy"; /auth/session-token hands the same blob to the page as its bearer.
+SESSION_TOKEN_KEY = "swiggy"
 
 
-def _issue_bearer(access_token: str, expires_at: str) -> str:
-    return _bearer_signer.dumps({"t": access_token, "exp": expires_at})
+def _seal_token(access_token: str, expires_at: str) -> str:
+    return token_vault.seal(access_token, expires_at, _SECRET_KEY)
 
 
-def _valid_pair(token: str | None, expires_at: str | None) -> tuple[str, str] | None:
-    if not token or not expires_at:
-        return None
-    try:
-        if datetime.fromisoformat(expires_at) > datetime.now(timezone.utc):
-            return token, expires_at
-    except ValueError:
-        pass
-    return None
+def _unseal(blob: str | None) -> tuple[str, str] | None:
+    return token_vault.unseal(blob, _SECRET_KEY, _SESSION_MAX_AGE)
 
 
 def _session_auth(request: Request) -> tuple[str, str] | None:
-    return _valid_pair(request.session.get("access_token"), request.session.get("expires_at"))
+    return _unseal(request.session.get(SESSION_TOKEN_KEY))
 
 
 def _auth(request: Request) -> tuple[str, str] | None:
-    """(swiggy_access_token, expires_at) from `Authorization: Bearer <signed>`
+    """(swiggy_access_token, expires_at) from `Authorization: Bearer <sealed>`
     (direct cross-origin calls, where the host-only session cookie isn't
     sent), else from the session cookie. None if neither is valid/unexpired."""
     header = request.headers.get("authorization", "")
     if header[:7].lower() == "bearer ":
-        try:
-            data = _bearer_signer.loads(header[7:].strip(), max_age=_SESSION_MAX_AGE)
-            pair = _valid_pair(data.get("t"), data.get("exp"))
-        except (BadSignature, AttributeError):
-            pair = None
+        pair = _unseal(header[7:].strip())
         if pair:
             return pair
     return _session_auth(request)
@@ -601,8 +603,7 @@ async def auth_callback(request: Request, code: str = "", state: str = ""):
     expires_in = token_data.get("expires_in", 5 * 24 * 60 * 60)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
 
-    request.session["access_token"] = token_data["access_token"]
-    request.session["expires_at"] = expires_at
+    request.session[SESSION_TOKEN_KEY] = _seal_token(token_data["access_token"], expires_at)
 
     return RedirectResponse(next_path)
 
@@ -615,12 +616,13 @@ async def auth_status(request: Request):
 
 @app.get("/auth/session-token")
 async def auth_session_token(request: Request):
-    """Cookie-only, same-origin (proxied) — hands the frontend a signed bearer
-    for its direct cross-origin /api calls. Swiggy issues no refresh token, so
-    expiry means re-authorization, never a silent refresh."""
+    """Cookie-only, same-origin (proxied) — hands the frontend an encrypted bearer
+    for its direct cross-origin /api calls. The page never sees the Swiggy token
+    itself. Swiggy issues no refresh token, so expiry means re-authorization,
+    never a silent refresh."""
     auth = _session_auth(request)
     body = (
-        {"authenticated": True, "token": _issue_bearer(*auth), "expires_at": auth[1]}
+        {"authenticated": True, "token": request.session[SESSION_TOKEN_KEY], "expires_at": auth[1]}
         if auth
         else {"authenticated": False}
     )
@@ -629,8 +631,7 @@ async def auth_session_token(request: Request):
 
 @app.get("/auth/logout")
 async def auth_logout(request: Request):
-    request.session.pop("access_token", None)
-    request.session.pop("expires_at", None)
+    request.session.pop(SESSION_TOKEN_KEY, None)
     return RedirectResponse("/")
 
 
@@ -842,8 +843,7 @@ async def scan(
 
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 401:
-                request.session.pop("access_token", None)
-                request.session.pop("expires_at", None)
+                request.session.pop(SESSION_TOKEN_KEY, None)
                 yield _sse({"type": "auth_required", "message": "Session expired, reconnect Swiggy"})
             else:
                 yield _sse({"type": "error", "message": f"Order service error: {exc.response.status_code}"})

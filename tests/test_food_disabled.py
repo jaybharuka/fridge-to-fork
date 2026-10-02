@@ -28,7 +28,7 @@ client = TestClient(a.app)
 
 def bearer() -> dict:
     exp = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
-    return {"Authorization": f"Bearer {a._issue_bearer('swiggy-tok', exp)}"}
+    return {"Authorization": f"Bearer {a._seal_token('swiggy-tok', exp)}"}
 
 
 def order_dish(headers=None):
