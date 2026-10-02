@@ -1,0 +1,49 @@
+.root { position: relative; }
+
+.trigger {
+  position: relative; width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer;
+  border-radius: 50%; color: var(--orange); background: var(--orange-light); border: 1px solid var(--orange-border);
+  transition: background .2s ease, transform .15s ease;
+}
+.trigger svg { width: 18px; height: 18px; }
+.trigger:hover, .triggerOpen { background: var(--orange-border); }
+.trigger:active { transform: scale(.96); }
+.trigger:focus-visible, .item:focus-visible, .seg:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.dot {
+  position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--green); border: 2px solid var(--bg);
+}
+
+.panel {
+  position: absolute; right: 0; top: calc(100% + 10px); width: 236px; z-index: 40; padding: 6px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-3);
+  animation: menuIn .14s ease-out;
+}
+@keyframes menuIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.status { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.statusOn { color: var(--green); }
+.statusOn::before { background: var(--green); }
+
+.item {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--text-primary); background: none; border: none; text-align: left;
+}
+.item svg { width: 18px; height: 18px; color: var(--text-secondary); flex-shrink: 0; }
+.item:hover { background: var(--bg-secondary); }
+.rule { border: 0; border-top: 1px solid var(--border); margin: 4px 6px; }
+
+.segment { display: flex; margin: 6px 8px 8px; padding: 3px; background: var(--bg-secondary); border-radius: 999px; }
+.seg {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 700; color: var(--text-secondary); background: none; border: none;
+  transition: background .2s ease, color .2s ease;
+}
+.seg svg { width: 14px; height: 14px; }
+.segOn { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel { animation: none; }
+  .trigger { transition: none; }
+}
