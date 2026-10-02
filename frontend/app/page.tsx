@@ -22,6 +22,8 @@ import { Results } from '@/components/results/Results';
 import { Toast } from '@/components/results/Toast';
 import { showsPhotoScan } from '@/lib/scanView';
 
+const DEFAULT_SERVINGS = 2;
+
 // Replaces startScan()/resetToLanding()/handleEvent()'s DOM orchestration
 // (templates/index.html:4033-4041, 4543-4549, 4614-4624) with phase-driven
 // rendering: useScanStream owns the phase, this owns what each phase shows.
@@ -41,7 +43,7 @@ export default function Home() {
   const [restoredResults] = useState<ResultsSnapshot | null>(() => (restoredOrder ? null : consumeResultsSnapshot()));
 
   const [targetDish, setTargetDish] = useState(() => restoredResults?.targetDish ?? '');
-  const [servings, setServings] = useState(() => restoredResults?.servings ?? 2);
+  const [servings, setServings] = useState(() => restoredResults?.servings ?? DEFAULT_SERVINGS);
   const [tab, setTab] = useState<'order' | 'recipe'>(() => restoredResults?.tab ?? 'order');
   // Gates the handoff from PhotoScanScreen to Results. Deliberately NOT
   // derived from `phase`: the photo-scan screen goes up the instant Get
@@ -90,6 +92,15 @@ export default function Home() {
     setOrderSheetOpen(false);
     setRecipeDotDismissed(false);
   }, [reset, photos]);
+
+  // The back chevron means "start over": on top of the reset above, the typed dish and the servings go back to their
+  // defaults too, so the landing page is genuinely fresh. Not folded into handleResetToLanding itself: the error card's
+  // "Try again" and the logo reuse that one, and a retry should keep what the user typed.
+  const handleBackToLanding = useCallback(() => {
+    handleResetToLanding();
+    setTargetDish('');
+    setServings(DEFAULT_SERVINGS);
+  }, [handleResetToLanding]);
 
   const handleTabChange = useCallback((next: 'order' | 'recipe') => {
     if (next === 'recipe') setRecipeDotDismissed(true);
@@ -253,7 +264,7 @@ export default function Home() {
 
   return (
     <div>
-      <AppHeader onLogoClick={handleResetToLanding} />
+      <AppHeader onLogoClick={handleResetToLanding} onBack={showLanding ? undefined : handleBackToLanding} />
 
       <main id="main-content">
       {!connected ? (
@@ -276,6 +287,7 @@ export default function Home() {
         visible={state.phase === 'loading'}
         hasPhoto={state.hasPhoto}
         headlineText={targetDish ? `Looking up ${targetDish}` : 'Finding your recipe'}
+        onBack={handleBackToLanding}
       />
 
       <PhotoScanScreen
@@ -284,6 +296,7 @@ export default function Home() {
         detectedIngredients={state.step1Received ? state.detectedIngredients : null}
         onRevealComplete={() => setPhotoDetectionRevealed(true)}
         onRetry={handleGetRecipe}
+        onBack={handleBackToLanding}
       />
 
       {showResults && (

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import type { DetectedIngredient } from '@/lib/types';
 import { scanBarPercent } from '@/lib/scanView';
+import { BackButton } from '@/components/shared/BackButton';
 import { useElapsed } from './usePlanningProgress';
 import styles from './loading.module.css';
 
@@ -48,13 +49,15 @@ interface PhotoScanScreenProps {
    *  page.tsx uses to trigger the transition-to-results morph (Task 7). */
   onRevealComplete: () => void;
   onRetry: () => void;
+  /** Leaves the scan: the caller aborts the request and resets to the landing screen. */
+  onBack: () => void;
 }
 
 // Shown instead of the dark LoadingOverlay for photo scans — the user's own
 // fridge photo with a scan-line sweep, then a staggered reveal of detected
 // ingredients below it. Ported from templates/index.html:1912-1936
 // (markup), 1325-1546 (CSS), 2445-2624 (behavior).
-export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRevealComplete, onRetry }: PhotoScanScreenProps) {
+export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRevealComplete, onRetry, onBack }: PhotoScanScreenProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [subIndex, setSubIndex] = useState(0);
   const [subFading, setSubFading] = useState(false);
@@ -175,6 +178,7 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
 
   return (
     <div className={`${styles.photoScanScreen} ${shown ? styles.show : ''}`}>
+      <BackButton onDark onClick={onBack} label="Cancel scan and go back" />
       <div className={styles.photoScanContent}>
         <div className={styles.photoScanContainer}>
           <img className={styles.fridgePhotoPreview} src={photoUrls[activeIndex] ?? photoUrls[0]} alt="Your fridge" />
