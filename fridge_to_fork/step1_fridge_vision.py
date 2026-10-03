@@ -18,8 +18,6 @@ import io
 import itertools
 import json
 import os
-import re
-import threading
 import time
 from pathlib import Path
 from typing import Union
@@ -32,6 +30,7 @@ from PIL import Image, ImageEnhance
 from rich.console import Console
 from rich.table import Table
 
+from . import gemini_resilience as resilience
 from .gemini_keys import load_api_keys
 from .ingredient_matching import dedupe_detections, is_blocked_detection, passes_confidence
 from .models import FridgeContents, Ingredient
@@ -89,6 +88,10 @@ def _dedupe(models: list[str | None]) -> list[str]:
 # this project's actual keys the same way gemini-3.1-pro-preview was.
 VISION_MODEL_FALLBACK_CHAIN = _dedupe([
     os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash"),
+    # Google's own suggested replacement for 2.5-flash (named in its "no longer available to new users" 404s, which
+    # projects created recently get). Verified 2026-10-03 to answer on all four of this app's projects; occasionally
+    # 503 "high demand", which the fallback handles.
+    "gemini-3.8-flash",
     "gemini-flash-latest",
     "gemini-flash-lite-latest",
     "gemini-3.1-pro-preview",
@@ -450,6 +453,9 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
             # items covers any realistically busy fridge with real margin,
             # not just enough for the two photos that happened to fail.
             max_output_tokens=8192,
+            # Thinking is on by default for these models and was the main reason this call timed out (504 at 25s); off,
+            # the same call takes ~9s. Extraction from a photo doesn't need it. See gemini_resilience.thinking_config_for.
+            thinking_config=resilience.thinking_config_for(model),
             # timeout is PER ATTEMPT, not a shared budget across retries (confirmed against the
             # google-genai SDK's own source, _api_client.py: _request_once() receives this same
             # value on every call _retry() makes) — so worst case for ONE model in the fallback
@@ -491,45 +497,10 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
     return items if isinstance(items, list) else []
 
 
-# How a failed Gemini call should change what we try next. A TIMEOUT (504 / read timeout) is the model being slow on
-# Google's side, not a problem with one key or project: the same model timed out on two different projects' keys in
-# the 2026-10-03 incident, burning 25s each and the whole 60s scan budget before a working model was even tried. So a
-# timeout moves on to the NEXT MODEL and marks this one cold for a while; only QUOTA errors (429) rotate keys, and
-# OVERLOADED (503) gets a second key before moving on.
-TIMEOUT, QUOTA, OVERLOADED, OTHER = "timeout", "quota", "overloaded", "other"
-MODEL_COOLDOWN_SECONDS = 600.0
-MAX_OVERLOADED_PER_MODEL = 2
-_now = time.monotonic  # patchable in tests
-_cold_until: dict[str, float] = {}
-_cold_lock = threading.Lock()
+# What each kind of failure means for what is tried next lives in gemini_resilience.py (shared with the planner):
+# timeouts move to the next MODEL and mark the slow one cold, quota errors rotate keys, 404 "no longer available" pairs
+# are skipped for hours.
 _scan_counter = itertools.count()
-
-
-def _failure_kind(exc: Exception) -> str:
-    text = f"{type(exc).__name__} {exc}"
-    lowered = text.lower()
-    if "timeout" in type(exc).__name__.lower() or "DEADLINE_EXCEEDED" in text or "timed out" in lowered or re.search(r"\b504\b", text):
-        return TIMEOUT
-    if "RESOURCE_EXHAUSTED" in text or re.search(r"\b429\b", text):
-        return QUOTA
-    if "UNAVAILABLE" in text or re.search(r"\b503\b", text):
-        return OVERLOADED
-    return OTHER
-
-
-def _mark_cold(model: str) -> None:
-    with _cold_lock:
-        _cold_until[model] = _now() + MODEL_COOLDOWN_SECONDS
-
-
-def _clear_cold(model: str) -> None:
-    with _cold_lock:
-        _cold_until.pop(model, None)
-
-
-def _is_cold(model: str) -> bool:
-    with _cold_lock:
-        return _cold_until.get(model, 0.0) > _now()
 
 
 def _rotate_for_scan(clients: list) -> list:
@@ -544,36 +515,22 @@ def _rotate_for_scan(clients: list) -> list:
 def _call_gemini_vision_with_fallback(
     clients: list[tuple[str, "genai.Client"]], image_bytes: bytes, prompt: str, model: str | None = None
 ) -> list[dict]:
-    """Walks VISION_MODEL_FALLBACK_CHAIN (an explicit `model` override first, if given), strongest first.
-
-    Per model, by failure kind (see _failure_kind): quota -> the next key (each project has its own quota);
-    overloaded -> the next key, but only MAX_OVERLOADED_PER_MODEL times; timeout -> straight to the next model, and this
-    one is skipped for MODEL_COOLDOWN_SECONDS (so the second pass of a scan, and the next scans, don't pay for it
-    again); anything else -> the next key. A cold model is skipped unless every model is cold. Returns [] only if
-    every attempt fails.
+    """Walks VISION_MODEL_FALLBACK_CHAIN (an explicit `model` override first, if given), strongest first, following the
+    rules in gemini_resilience (see its docstring). Returns [] only if every attempt fails.
     `clients` is a list of (label, Client) pairs; the label (never the key value) is what gets logged."""
     chain = _dedupe([model, *VISION_MODEL_FALLBACK_CHAIN]) if model else VISION_MODEL_FALLBACK_CHAIN
-    warm = [m for m in chain if not _is_cold(m)]
-    for chain_model in (warm or chain):
-        overloaded = 0
-        for key_label, client in clients:
+    for chain_model, model_clients in resilience.attempt_plan(chain, clients):
+        attempt = resilience.ModelAttempt()
+        for key_label, client in model_clients:
             try:
                 result = _call_gemini_vision(image_bytes, prompt, client, chain_model)
-                _clear_cold(chain_model)
+                resilience.note_success(chain_model)
                 if len(clients) > 1 or key_label != "key1":
                     console.print(f"[green][Gemini] {chain_model} succeeded on {key_label}[/green]")
                 return result
             except Exception as e:
-                kind = _failure_kind(e)
-                print(f"[Gemini] {chain_model} on {key_label} failed ({kind}): {type(e).__name__}: {e}")
-                if kind == TIMEOUT:
-                    _mark_cold(chain_model)
-                    print(f"[Gemini] {chain_model} timed out: trying the next model, and skipping it for {MODEL_COOLDOWN_SECONDS:g}s")
+                if resilience.note_failure(chain_model, key_label, e, attempt) == resilience.NEXT_MODEL:
                     break
-                if kind == OVERLOADED:
-                    overloaded += 1
-                    if overloaded >= MAX_OVERLOADED_PER_MODEL:
-                        break
     return []
 
 
