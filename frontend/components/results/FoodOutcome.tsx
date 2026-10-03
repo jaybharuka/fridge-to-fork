@@ -56,7 +56,7 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onT
         </p>
         {outcome.notice && <p className={styles.warn}>{outcome.notice}</p>}
         <p className={styles.hint}>Track it here or in the Swiggy app.</p>
-        {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy — it&apos;s worth a glance in the app.</p>}
+        {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy, so it&apos;s worth a glance in the app.</p>}
         {outcome.orderIds[0] && <button type="button" className={styles.primary} onClick={() => onTrack(outcome.orderIds[0])}>Track order</button>}
         <button type="button" className={outcome.orderIds[0] ? styles.secondary : styles.primary} onClick={onClose}>Done</button>
       </div>

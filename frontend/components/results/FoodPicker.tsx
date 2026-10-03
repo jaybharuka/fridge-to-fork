@@ -149,7 +149,7 @@ function DishCard({ result, picks, onOpen, loadingOptions, loadingThis, confirmi
               {loadingThis ? 'Checking add-ons…' : 'Choose this'}
             </button>
           ) : !c.supported ? (
-            <span className={styles.skipped}>Needs options we can&apos;t set here — order it in the Swiggy app.</span>
+            <span className={styles.skipped}>Needs options we can&apos;t set here. Order it in the Swiggy app.</span>
           ) : (
             <button type="button" className={styles.linkBtn} disabled={blocked} onClick={onOpen}>
               {c.variantGroups.length > 0 || c.addonGroups.length > 0 ? 'Choose & customize' : 'Choose this'}

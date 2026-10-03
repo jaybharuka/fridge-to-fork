@@ -154,7 +154,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             {state.notice && <p className={styles.notice}>{state.notice}</p>}
             {state.address && state.address.id && (
               <p className={styles.address}>
-                Delivering to <strong>{state.address.label}</strong> — {state.address.addressLine}{' '}
+                Delivering to <strong>{state.address.label}</strong>, {state.address.addressLine}{' '}
                 <button type="button" className={styles.linkBtn} onClick={() => setAddressOpen(true)}>Change</button>
               </p>
             )}
@@ -195,7 +195,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             >
               {addOnsSearching ? 'Searching add-ons…' : count === 0 ? 'Pick at least one item' : `Review cart · ${count} item${count === 1 ? '' : 's'} · about ${formatInr(amount)}`}
             </button>
-            <p className={styles.hint}>Nothing is ordered yet — you&apos;ll review the real cart next.</p>
+            <p className={styles.hint}>Nothing is ordered yet. You&apos;ll review the real cart next.</p>
           </>
         ) : state.review ? (
           <>

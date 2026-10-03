@@ -430,7 +430,7 @@ def _outcome(
 MAX_PAYMENT_POLL_SECONDS = 300
 _PAYMENT_FAILED_STATES = {"failed", "cancelled", "cart_changed", "refund-initiated"}
 _PAYMENT_MESSAGES = {
-    "cancelled": "The payment was cancelled. If money was debited it will be refunded — check the Swiggy app.",
+    "cancelled": "The payment was cancelled. If money was debited it will be refunded. Check the Swiggy app.",
     "refund-initiated": "The payment couldn't be completed and a refund has started. Check the Swiggy app.",
     "cart_changed": "Prices or stock changed while paying, so the order wasn't placed. Review your cart and order again.",
 }

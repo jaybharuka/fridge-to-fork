@@ -46,7 +46,7 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
           {payOnDelivery && outcome.total ? <>Pay {outcome.total} on delivery. </> : !payOnDelivery ? <>Payment received. </> : null}
           Track it here or in the Swiggy app.
         </p>
-        {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy — it&apos;s worth a glance in the app.</p>}
+        {!outcome.verified && <p className={styles.hint}>We couldn&apos;t double-check it with Swiggy, so it&apos;s worth a glance in the app.</p>}
         {outcome.orderIds[0] && (
           <button type="button" className={styles.primary} onClick={() => onTrack(outcome.orderIds[0])}>Track order</button>
         )}

@@ -72,7 +72,7 @@ function IngredientRow({ focused, result, choice, removable, onPick, onQuantity,
           </div>
         </div>
       ) : (
-        <p className={styles.skipped}>{result.note ?? 'Skipped — not in this order'}</p>
+        <p className={styles.skipped}>{result.note ?? 'Skipped, not in this order'}</p>
       )}
 
       <div className={styles.actions}>
@@ -124,7 +124,7 @@ interface PickerProps {
 
 export function InstamartPicker({ results, choices, extras, focusIngredient, onPick, onQuantity, onRemoveExtra }: PickerProps) {
   if (results.length === 0) {
-    return <p className={styles.none}>Nothing is missing from your recipe — add extras below if you like.</p>;
+    return <p className={styles.none}>Nothing is missing from your recipe. Add extras below if you like.</p>;
   }
   return (
     <div className={styles.list}>

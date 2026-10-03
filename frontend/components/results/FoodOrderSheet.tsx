@@ -145,7 +145,7 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
             {noticeReport}
             {state.address && (
               <p className={styles.address}>
-                Delivering to <strong>{state.address.label}</strong> — {state.address.addressLine}{' '}
+                Delivering to <strong>{state.address.label}</strong>, {state.address.addressLine}{' '}
                 <button type="button" className={styles.linkBtn} onClick={() => setAddressOpen(true)}>Change</button>
               </p>
             )}
@@ -171,7 +171,7 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
                 {problem ? 'Finish your choices to continue' : `Review cart · ${state.picks.quantity} × ${openResult.name}`}
               </button>
             )}
-            <p className={styles.hint}>Nothing is ordered yet — you&apos;ll review the real cart next.</p>
+            <p className={styles.hint}>Nothing is ordered yet. You&apos;ll review the real cart next.</p>
           </>
         ) : state.review ? (
           <>

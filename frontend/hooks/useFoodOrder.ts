@@ -255,7 +255,7 @@ export function useFoodOrder() {
       const d = describe(e);
       if (run.current !== id) return;
       if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
-      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.`, tool: d.tool });
+      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved. Review the cart again.`, tool: d.tool });
       dispatch({ type: 'COUPON_FAIL', notice: d.message, unusableCode: COUPON_UNUSABLE.has(d.code) ? code : undefined, tool: COUPON_UNUSABLE.has(d.code) ? null : d.tool });
     }
   }, []);
@@ -291,7 +291,7 @@ export function useFoodOrder() {
       const d = describe(e);
       if (d.authNeeded) return dispatch({ type: 'FAIL', message: d.message, authNeeded: true });
       if (d.code === 'payment_unavailable' || d.code === 'checkout_in_progress') return dispatch({ type: 'REVIEW_NOTICE', notice: d.message });
-      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved — review the cart again.`, tool: d.tool });
+      if (REVIEW_AGAIN.has(d.code)) return dispatch({ type: 'BACK', notice: `${d.message} Your choices are saved. Review the cart again.`, tool: d.tool });
       // No response at all (dropped connection): the order may or may not exist — never invite a blind retry.
       const ambiguous = d.code === 'network' || d.code === 'unexpected_response';
       dispatch({ type: 'PLACE_OK', outcome: ambiguous ? UNKNOWN_OUTCOME : { ...UNKNOWN_OUTCOME, status: 'failed', message: d.message } });

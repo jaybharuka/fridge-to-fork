@@ -31,6 +31,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import gemini_resilience as resilience
+from . import prompt_rules
 from .gemini_keys import load_api_keys
 from .ingredient_matching import dedupe_detections, is_blocked_detection, passes_confidence
 from .models import FridgeContents, Ingredient
@@ -147,23 +148,24 @@ def _fallback_fridge_contents() -> FridgeContents:
 # number right but forgets to set the flag (or vice versa) — see its
 # docstring for why the number and the flag are each other's check, not
 # either one used alone.
-_EXTENDED_FIELDS_BLOCK = """EXTENDED FIELDS — include these on every item too:
+_EXTENDED_FIELDS_BLOCK = """EXTENDED FIELDS - include these on every item too:
 - "category": one of "produce", "dairy", "grain_legume", "condiment_sauce", "cooked_food", "packaged_other"
 - "estimated_quantity": for discrete/countable items, {"type": "count", "value": <integer>, "unit": "<piece/packet/carton/etc>"};
   for liquids, bulk, or anything in an opaque container, {"type": "level", "value": "<full/half/low/unknown>", "unit": null}.
-  Always approximate — never invent a precise weight or volume (never "247g", never "1.5L") you could not actually measure from a photo.
+  Always approximate - never invent a precise weight or volume (never "247g", never "1.5L") you could not actually measure from a photo.
 - "state": one of "fresh", "packaged", "cooked", "opened", "unknown"
 - "needs_confirmation": true if you cannot confidently identify the EXACT product/variety, false otherwise
 - "possible_matches": if needs_confirmation is true and a small number of specific identities are plausible, list 2-3 (e.g. ["moong dal", "toor dal", "masoor dal"]); otherwise []
 
-CRITICAL — NEVER FABRICATE WHAT YOU CANNOT READ:
+CRITICAL - NEVER FABRICATE WHAT YOU CANNOT READ:
 If a packaged item's brand or exact product/variety is not clearly legible, report ONLY the generic category term
 you CAN actually see (e.g. "dal", not "Tata Sampann Moong Dal 500g"; "cooking oil", not a specific brand or variety),
 set needs_confirmation: true, and list possible_matches if a few specific candidates are plausible. Guessing a
-specific brand, variety, or size you cannot actually read is worse than reporting the generic term — never do it,
+specific brand, variety, or size you cannot actually read is worse than reporting the generic term - never do it,
 even if a specific-sounding guess would otherwise score higher on your own confidence scale."""
 
 
+@prompt_rules.styled
 def _build_wide_scan_prompt(dish_name: str = "") -> str:
     """Pass 1 — broad, zone-by-zone scan for everything visible, primed
     with Indian-fridge-specific context (dabbas, plastic-bagged produce,
@@ -176,15 +178,15 @@ def _build_wide_scan_prompt(dish_name: str = "") -> str:
 
 Your task: Identify every single food item visible in this fridge photo.
 
-SCANNING APPROACH — scan zone by zone:
+SCANNING APPROACH - scan zone by zone:
 
-ZONE 1 — TOP SHELF: What is on the top shelf? Look carefully at every container, box, and item.
-ZONE 2 — MIDDLE SHELVES: Scan each shelf left to right. Look inside transparent containers if possible.
-ZONE 3 — LOWER SHELVES AND DRAWERS: Check crisper drawers, lower shelves, any visible produce.
-ZONE 4 — DOOR COMPARTMENTS: Scan every door shelf top to bottom. Bottles, jars, condiments, packets.
-ZONE 5 — VISIBLE CONTAINERS: Any dabba, tiffin box, or covered container — what might it contain based on context?
+ZONE 1 - TOP SHELF: What is on the top shelf? Look carefully at every container, box, and item.
+ZONE 2 - MIDDLE SHELVES: Scan each shelf left to right. Look inside transparent containers if possible.
+ZONE 3 - LOWER SHELVES AND DRAWERS: Check crisper drawers, lower shelves, any visible produce.
+ZONE 4 - DOOR COMPARTMENTS: Scan every door shelf top to bottom. Bottles, jars, condiments, packets.
+ZONE 5 - VISIBLE CONTAINERS: Any dabba, tiffin box, or covered container - what might it contain based on context?
 
-INDIAN FRIDGE CONTEXT — you will commonly see:
+INDIAN FRIDGE CONTEXT - you will commonly see:
 - Dabbas and tiffin boxes containing cooked dal, sabzi, rice, roti
 - Pressure cooker or steel pots with leftover food
 - Plastic bags containing vegetables like coriander, mint, green chillies
@@ -196,7 +198,7 @@ INDIAN FRIDGE CONTEXT — you will commonly see:
 WHAT TO REPORT:
 - Every food item you can identify with reasonable certainty
 - Fresh vegetables and fruits even if in plastic bags
-- Dairy items — milk, curd/yogurt, paneer, butter, cheese
+- Dairy items - milk, curd/yogurt, paneer, butter, cheese
 - Cooked food in containers if identifiable
 - Condiments and sauces if identifiable
 - Packaged items if you can read or infer the label
@@ -233,6 +235,7 @@ Return ONLY a JSON array, no explanation:
 If nothing identifiable: []"""
 
 
+@prompt_rules.styled
 def _build_deep_scan_prompt(already_found: list[str]) -> str:
     """Pass 2 — told explicitly what Pass 1 already found, and asked to
     hunt specifically for what a first pass commonly misses (door
@@ -247,12 +250,12 @@ Already identified in first pass: {found_str}
 Your job now: Find everything that was MISSED in the first pass.
 
 Focus specifically on:
-1. DOOR SHELVES — every single bottle, jar, packet, and container on the door
-2. LOWER DRAWERS — crisper drawers, vegetable compartments at the bottom
-3. BACK OF SHELVES — items pushed to the back that might have been overlooked
-4. SMALL ITEMS — lemons, green chillies, ginger pieces, garlic that are easy to miss
-5. PACKAGED ITEMS — any carton, packet, or wrapper with identifiable contents
-6. CONTAINERS — steel dabbas, plastic containers, glass jars — what do they likely contain?
+1. DOOR SHELVES - every single bottle, jar, packet, and container on the door
+2. LOWER DRAWERS - crisper drawers, vegetable compartments at the bottom
+3. BACK OF SHELVES - items pushed to the back that might have been overlooked
+4. SMALL ITEMS - lemons, green chillies, ginger pieces, garlic that are easy to miss
+5. PACKAGED ITEMS - any carton, packet, or wrapper with identifiable contents
+6. CONTAINERS - steel dabbas, plastic containers, glass jars - what do they likely contain?
 
 Do NOT repeat items already found: {found_str}
 
@@ -709,7 +712,7 @@ def display_fridge_contents(contents: FridgeContents) -> None:
         conf_color = "green" if ing.confidence >= 0.8 else "yellow" if ing.confidence >= 0.5 else "red"
         table.add_row(
             ing.name,
-            ing.quantity or "—",
+            ing.quantity or "-",
             f"[{conf_color}]{ing.confidence:.0%}[/{conf_color}]",
         )
 

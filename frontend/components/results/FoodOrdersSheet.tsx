@@ -85,7 +85,7 @@ function LiveStatus({ order }: { order: FoodOrderRow | null }) {
           </div>
         )}
         {live.notes.map(n => <p key={n} className={styles.meta}>{n}</p>)}
-        {live.failed && <p className={styles.couponWhy}>Live updates paused — reopen this screen to refresh.</p>}
+        {live.failed && <p className={styles.couponWhy}>Live updates paused. Reopen this screen to refresh.</p>}
       </div>
     </div>
   );
@@ -198,7 +198,7 @@ function Panel({ initialOrderId, initialAddressId, onClose }: { initialOrderId: 
         <>
           {list.address && (
             <p className={styles.address}>
-              Showing orders for <strong>{list.address.label}</strong> — {list.address.addressLine}{' '}
+              Showing orders for <strong>{list.address.label}</strong>, {list.address.addressLine}{' '}
               <button type="button" className={styles.linkBtn} onClick={() => setAddressOpen(true)}>Change</button>
             </p>
           )}

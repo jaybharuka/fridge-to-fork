@@ -30,7 +30,7 @@ interface ReviewProps {
 
 /** The real Instamart cart, exactly as Swiggy will bill it. Items are read-only: editing goes back a step. */
 export function InstamartReview({ review, adjustments, coupons, appliedCoupon, couponBusy, paymentKey, disabled, onSelectPayment, onApplyCoupon }: ReviewProps) {
-  const where = [review.address.label, review.address.text].filter(Boolean).join(' — ');
+  const where = [review.address.label, review.address.text].filter(Boolean).join(', ');
   return (
     <div>
       <p className={styles.address}>Delivering to <strong>{where || 'your saved address'}</strong></p>

@@ -25,7 +25,7 @@ interface ReviewProps {
 
 /** The real Food cart, exactly as Swiggy will bill it. Items are read-only: editing goes back a step. */
 export function FoodReview({ review, coupons, appliedCoupon, couponBusy, paymentKey, disabled, onSelectPayment, onApplyCoupon }: ReviewProps) {
-  const where = [review.address.label, review.address.text].filter(Boolean).join(' — ');
+  const where = [review.address.label, review.address.text].filter(Boolean).join(', ');
   const restaurant = [review.restaurant.name, review.restaurant.area].filter(Boolean).join(' · ');
   return (
     <div>
@@ -60,7 +60,7 @@ export function FoodReview({ review, coupons, appliedCoupon, couponBusy, payment
             </span>
           </div>
         ))}
-        <div className={styles.billTotal}><span>To pay</span><span>{review.total !== null ? formatInr(review.total) : '—'}</span></div>
+        <div className={styles.billTotal}><span>To pay</span><span>{review.total !== null ? formatInr(review.total) : 'N/A'}</span></div>
       </div>
 
       <p className={styles.sectionLabel}>Pay with</p>

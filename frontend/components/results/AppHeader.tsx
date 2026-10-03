@@ -32,7 +32,7 @@ export function AppHeader({ onLogoClick, onBack }: AppHeaderProps) {
           {onBack && <BackButton onClick={onBack} label="Back to home, start over" />}
         </div>
         {onLogoClick ? (
-          <button type="button" className={styles.brand} aria-label="Fridge to Fork — back to home" onClick={onLogoClick}>
+          <button type="button" className={styles.brand} aria-label="Fridge to Fork, back to home" onClick={onLogoClick}>
             {brandContent}
           </button>
         ) : (

@@ -28,6 +28,7 @@ from rich.table import Table
 
 from . import db
 from . import gemini_resilience as resilience
+from . import prompt_rules
 from .gemini_keys import load_api_keys
 from .ingredient_matching import matches_any, recipe_item_in_fridge
 from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
@@ -569,7 +570,7 @@ def _fallback_meal_plan(
         if not suggestions:
             suggestions.append(MealSuggestion(
                 name="Order Food",
-                description="You have limited usable ingredients — ordering a ready dish is recommended.",
+                description="You have limited usable ingredients, so ordering a ready dish is recommended.",
                 can_cook_now=False,
                 missing_ingredients=["pantry staples: salt, oil, spices, flour"],
                 cuisine="Any",
@@ -587,16 +588,16 @@ def _fallback_meal_plan(
 # ---------------------------------------------------------------------------
 
 _RECIPE_RULES = """\
-RECIPE INGREDIENTS — for the suggested dish, return every single
+RECIPE INGREDIENTS - for the suggested dish, return every single
 ingredient needed to cook it. Do not decide "have" vs "missing" and do not
-compare against the fridge contents — a separate process (not you)
+compare against the fridge contents - a separate process (not you)
 determines that from the category you assign below plus the fridge scan.
 
-INGREDIENT CATEGORY — classify each ingredient into exactly one of:
+INGREDIENT CATEGORY - classify each ingredient into exactly one of:
 - "staple": something virtually every Indian household always has on
   hand (salt, oil, water, ghee, butter, sugar, common ground/whole
   spices, basic aromatics like onion/garlic/ginger/green chilli). Be
-  generous here — these get pre-checked for the user, who can still
+  generous here - these get pre-checked for the user, who can still
   uncheck ones they're personally out of.
 - "specialty": ingredients specific to this dish that cannot be assumed
   present (e.g. kasuri methi, a particular dal, paneer, coconut milk,
@@ -605,14 +606,14 @@ INGREDIENT CATEGORY — classify each ingredient into exactly one of:
   fresh (fresh vegetables other than onion/tomato/garlic/ginger, fresh
   herbs, fresh meat/fish, fresh paneer, lemon/lime).
 Misclassifying a specialty or perishable ingredient as a staple means the
-user won't be reminded to buy it — only use "staple" for things that are
+user won't be reminded to buy it - only use "staple" for things that are
 genuinely always in the kitchen, regardless of this specific dish.
 
-QUANTITIES — scale every ingredient's quantity to the requested number
+QUANTITIES - scale every ingredient's quantity to the requested number
 of servings (see below), and include the unit in the same field, e.g.
 "200g", "2 medium", "1 tsp".
 
-PRICES — every ingredient must include a realistic estimated_price_inr
+PRICES - every ingredient must include a realistic estimated_price_inr
 as a plain integer in Indian Rupees, for the quantity listed. Never
 null, never "--", never omit this field.
 """
@@ -627,14 +628,14 @@ Suggest 3 to 5 meals inspired by what's available. For each meal, give a
 complete recipe per the RECIPE INGREDIENTS rules above.
 
 Also return a complete ingredient list for cooking each suggested dish for {servings} people
-with exact quantities, SCALED to {servings} servings — do not use a fixed base-recipe amount
+with exact quantities, SCALED to {servings} servings - do not use a fixed base-recipe amount
 regardless of the number of people. Work out the per-serving amount and multiply it by
 {servings}. Example: if a base recipe for 2 people needs "1 cup rice", for {servings} people
 that becomes roughly "{servings_half} cups rice" (i.e. 0.5 cup per person x {servings}). Apply
 that same scaling logic to every quantity. Be specific: "2 medium onions", "200ml fresh cream",
 "3 cloves garlic", "1 tsp cumin seeds".
 
-Also return clear step-by-step cooking instructions as a numbered "cooking_steps" array — one
+Also return clear step-by-step cooking instructions as a numbered "cooking_steps" array - one
 imperative sentence per step (e.g. "Heat oil in a pan over medium heat", "Add chopped onions
 and saute until golden"), enough steps to actually cook the dish start to finish. This is the
 recipe itself, so it must be complete and followable, not a summary. prep_time_minutes must be
@@ -677,14 +678,14 @@ Give a complete recipe for "{target_dish}" per the RECIPE INGREDIENTS
 rules above.
 
 Also return a complete ingredient list for cooking "{target_dish}" for {servings} people
-with exact quantities, SCALED to {servings} servings — do not use a fixed base-recipe amount
+with exact quantities, SCALED to {servings} servings - do not use a fixed base-recipe amount
 regardless of the number of people. Work out the per-serving amount and multiply it by
 {servings}. Example: if a base recipe for 2 people needs "1 cup rice", for {servings} people
 that becomes roughly "{servings_half} cups rice" (i.e. 0.5 cup per person x {servings}). Apply
 that same scaling logic to every quantity. Be specific: "2 medium onions", "200ml fresh cream",
 "3 cloves garlic", "1 tsp cumin seeds".
 
-Also return clear step-by-step cooking instructions as a numbered "cooking_steps" array — one
+Also return clear step-by-step cooking instructions as a numbered "cooking_steps" array - one
 imperative sentence per step (e.g. "Heat oil in a pan over medium heat", "Add chopped onions
 and saute until golden"), enough steps to actually cook "{target_dish}" start to finish. This
 is the recipe itself, so it must be complete and followable, not a summary. prep_time_minutes
@@ -819,6 +820,7 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
     raise RuntimeError(f"{model} failed after {max_retries} attempts")  # unreachable safeguard
 
 
+@prompt_rules.styled
 def _build_plan_prompt(fridge: FridgeContents, target_dish: Optional[str], servings: int) -> str:
     ingredient_list = "\n".join(
         f"- {ing.name}" + (f" ({ing.quantity})" if ing.quantity else "")
@@ -938,7 +940,7 @@ delivery platform.
 
 The user is planning to make: {meal_name}
 Their fridge contains: {ingredient_list}
-Ingredients already missing for this dish (being ordered separately —
+Ingredients already missing for this dish (being ordered separately -
 never suggest these here): {missing_ingredients}
 AI decision: {decision}
 
@@ -1041,12 +1043,12 @@ def generate_top_up_suggestions(
 
     ingredient_list = ", ".join(ing.name for ing in fridge.ingredients) or "(nothing detected)"
     missing_ingredients = ", ".join(meal.missing_ingredients) if meal and meal.missing_ingredients else "(none)"
-    prompt = _TOP_UP_PROMPT.format(
+    prompt = prompt_rules.append_rule(_TOP_UP_PROMPT.format(
         meal_name=meal.name if meal else "this meal",
         ingredient_list=ingredient_list,
         missing_ingredients=missing_ingredients,
         decision=decision.value,
-    )
+    ))
 
     chain = _dedupe([model, *TEXT_MODEL_FALLBACK_CHAIN]) if model else TEXT_MODEL_FALLBACK_CHAIN
 
@@ -1108,14 +1110,14 @@ def display_meal_plan(plan: MealPlan) -> None:
 
     for s in plan.suggestions:
         ready = "[green]Yes[/green]" if s.can_cook_now else "[red]No[/red]"
-        missing = ", ".join(s.missing_ingredients) if s.missing_ingredients else "—"
+        missing = ", ".join(s.missing_ingredients) if s.missing_ingredients else "-"
         table.add_row(s.name, s.cuisine, str(s.prep_time_minutes), ready, missing)
 
     console.print(table)
 
     color = decision_colors[plan.decision]
     label = decision_labels[plan.decision]
-    rec_name = plan.recommended_meal.name if plan.recommended_meal else "—"
+    rec_name = plan.recommended_meal.name if plan.recommended_meal else "-"
 
     console.print(
         Panel(
