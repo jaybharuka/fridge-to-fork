@@ -27,6 +27,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from . import db
+from . import gemini_resilience as resilience
 from .gemini_keys import load_api_keys
 from .ingredient_matching import matches_any, recipe_item_in_fridge
 from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
@@ -56,6 +57,12 @@ _TEXT_CALL_HTTP_OPTIONS = types.HttpOptions(
     timeout=25_000,
     retry_options=types.HttpRetryOptions(attempts=1, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
 )
+
+
+def _text_config(model: str) -> types.GenerateContentConfig:
+    """Thinking is turned down for the models that accept it (see gemini_resilience.thinking_config_for): the planner's
+    prompts are templated JSON, and thinking was a large part of why one plan took 250s on 2026-10-03."""
+    return types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS, thinking_config=resilience.thinking_config_for(model))
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +463,7 @@ def _dedupe(models: list[str | None]) -> list[str]:
 # (non-404) traffic against this key during that same audit.
 TEXT_MODEL_FALLBACK_CHAIN = _dedupe([
     os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash"),
+    "gemini-3.8-flash",
     "gemini-2.5-flash-lite",
     "gemini-flash-latest",
     "gemini-flash-lite-latest",
@@ -777,14 +785,14 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
     exactly one ("result", MealPlan) before returning. Raises the last
     exception if all attempts fail, same as the non-streaming version.
     """
-    max_retries = 3
+    max_retries = 2
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
         try:
             full_text = ""
             for chunk in client.models.generate_content_stream(
                 model=model, contents=prompt,
-                config=types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS),
+                config=_text_config(model),
             ):
                 if chunk.text:
                     full_text += chunk.text
@@ -800,8 +808,10 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
             return
 
         except Exception as e:
-            console.print(f"[yellow]{model} attempt {attempt} failed:[/yellow] {type(e).__name__}: {e}")
-            if attempt == max_retries:
+            console.print(f"[yellow]{model} attempt {attempt} failed:[/yellow] {type(e).__name__}: {str(e)[:160]}")
+            # A timeout, quota, overload or 404 is the caller's loop's to handle (next model / next key). Repeating it
+            # here is what made one slow model cost 3 x 25s per key.
+            if attempt == max_retries or not resilience.is_retryable_in_place(e):
                 raise
             time.sleep(backoff)
             backoff *= 2
@@ -854,21 +864,21 @@ def plan_meals_stream(
     # Model-first/key-second, same reasoning as vision's
     # _call_gemini_vision_with_fallback: try the strongest available model
     # on every key before ever settling for a weaker model.
-    for chain_model in chain:
-        for key_label, key_client in clients:
+    for chain_model, model_clients in resilience.attempt_plan(chain, clients):
+        attempt = resilience.ModelAttempt()
+        for key_label, key_client in model_clients:
             try:
                 for kind, payload in _call_text_model_with_retry_stream(key_client, chain_model, prompt):
                     if kind == "partial":
                         yield ("partial", payload)
                     else:
+                        resilience.note_success(chain_model)
                         console.print(f"[green][OK] Meal planning succeeded with model: {chain_model} on {key_label}[/green]")
                         yield ("result", _enrich_recipe_ingredients(payload, fridge))
                         return
             except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} quota exhausted, trying next...[/yellow]")
-                else:
-                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} failed with: {e}, trying next...[/yellow]")
+                if resilience.note_failure(chain_model, key_label, e, attempt) == resilience.NEXT_MODEL:
+                    break
 
     console.print("[yellow][WARNING] All Gemini text models quota exhausted, using fallback[/yellow]")
     yield ("result", _enrich_recipe_ingredients(_fallback_meal_plan(fridge, target_dish), fridge))
@@ -1044,13 +1054,14 @@ def generate_top_up_suggestions(
 
     # Model-first/key-second, same reasoning as vision's
     # _call_gemini_vision_with_fallback and plan_meals_stream above.
-    for chain_model in chain:
-        for key_label, client in clients:
+    for chain_model, model_clients in resilience.attempt_plan(chain, clients):
+        attempt = resilience.ModelAttempt()
+        for key_label, client in model_clients:
             print(f"[TOP_UP] Attempting with model: {chain_model} on {key_label}")
             try:
                 response = client.models.generate_content(
                     model=chain_model, contents=prompt,
-                    config=types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS),
+                    config=_text_config(chain_model),
                 )
                 suggestions = _parse_top_up_response(response.text)
                 suggestions = [
@@ -1059,13 +1070,12 @@ def generate_top_up_suggestions(
                 ]
                 print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
                 if suggestions:
+                    resilience.note_success(chain_model)
                     console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model} on {key_label}[/green]")
                     return suggestions[:5]
             except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} quota exhausted, trying next...[/yellow]")
-                else:
-                    console.print(f"[yellow][WARNING] {chain_model} on {key_label} top-up failed with: {e}, trying next...[/yellow]")
+                if resilience.note_failure(chain_model, key_label, e, attempt) == resilience.NEXT_MODEL:
+                    break
 
     console.print("[yellow][WARNING] All Gemini models failed for top-up suggestions, skipping[/yellow]")
     return []
