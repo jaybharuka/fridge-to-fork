@@ -16,7 +16,7 @@ track_order, get_order_details):
 import re
 
 from . import instamart
-from .instamart import InstamartError, _call, _num, log
+from .instamart import InstamartError, _call, _num, _order_type_diag, log
 
 MIN_POLL_SECONDS = 10  # the docs' floor: never poll a tracking tool faster than it asks
 MAX_POLL_SECONDS = 60
@@ -79,7 +79,8 @@ def _describe_orders(data) -> str:
         f"isActive={sorted({str(o.get('isActive')) for o in orders})} createdAt={[o.get('createdAt') for o in orders][:10]} "
         f"first_order_fields={ {k: type(v).__name__ for k, v in first.items()} } "
         f"first_deliveryAddress_fields={sorted(address) if isinstance(address, dict) else type(address).__name__} "
-        f"orderIds={[str(o.get('orderId')) for o in orders][:10]}"
+        f"orderIds={[str(o.get('orderId')) for o in orders][:10]} "
+        f"{_order_type_diag(data)}"  # TEMPORARY: which orderType Swiggy puts on real orders
     )
 
 
