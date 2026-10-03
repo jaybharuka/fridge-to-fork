@@ -447,15 +447,19 @@ button.brand:hover { opacity: 0.8; }
 .mealCardActive { border-color: var(--swiggy-orange); }
 .mealCardActive .mealHeaderBar { background: var(--swiggy-orange); }
 
-.customDishRow { display: flex; gap: 8px; margin-top: 14px; }
+/* "Want something else?" label + the free-text dish box. Form controls don't inherit the page font, so the input and the
+   Go button set it explicitly (the input was rendering in Arial). The placeholder is kept short on purpose: it has to
+   fit the ~186px left for text at 320px next to the Go button without clipping. */
+.customDishLabel { display: block; margin-top: 18px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.customDishRow { display: flex; gap: 8px; margin-top: 8px; }
 .customDishInput {
   flex: 1; min-width: 0; background: var(--swiggy-surface); border: 1px solid var(--border); border-radius: 12px;
-  padding: 10px 14px; font-size: 14px; color: var(--swiggy-text);
+  padding: 10px 14px; font-family: inherit; font-size: 14px; color: var(--swiggy-text);
 }
 .customDishInput:disabled { opacity: .6; }
 .customDishBtn {
   flex-shrink: 0; background: var(--swiggy-orange); color: #fff; border: none; border-radius: 12px;
-  padding: 0 18px; font-size: 14px; font-weight: 600; min-width: 56px;
+  padding: 0 18px; font-family: inherit; font-size: 14px; font-weight: 600; min-width: 56px;
   display: flex; align-items: center; justify-content: center;
 }
 .customDishBtn:disabled { opacity: .5; }
