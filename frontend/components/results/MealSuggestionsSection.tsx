@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Star, Clock, Globe, Check, Loader2 } from 'lucide-react';
 import type { MealSuggestion } from '@/lib/types';
 import styles from './results.module.css';
@@ -35,6 +35,7 @@ export function MealSuggestionsSection({
   error,
 }: MealSuggestionsSectionProps) {
   const [customDish, setCustomDish] = useState('');
+  const customDishId = useId();
 
   const submitCustomDish = () => {
     const trimmed = customDish.trim();
@@ -93,11 +94,14 @@ export function MealSuggestionsSection({
       </div>
 
       {onCustomDish && (
+        <>
+        <label className={styles.customDishLabel} htmlFor={customDishId}>Want something else?</label>
         <div className={styles.customDishRow}>
           <input
+            id={customDishId}
             type="text"
             className={styles.customDishInput}
-            placeholder="Or tell us what you'd like to make instead"
+            placeholder="Type any dish, e.g. Poha"
             value={customDish}
             disabled={pending}
             onChange={e => setCustomDish(e.target.value)}
@@ -112,6 +116,7 @@ export function MealSuggestionsSection({
             {pending ? <Loader2 className={styles.spin} /> : 'Go'}
           </button>
         </div>
+        </>
       )}
       {/* role="alert" (ui-ux-pro-max audit phase 4): matches the
           role="alert"/role="status" pair InstamartSearchBox.tsx already
