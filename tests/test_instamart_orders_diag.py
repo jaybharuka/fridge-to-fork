@@ -6,7 +6,7 @@ Run: python -m unittest tests.test_instamart_orders_diag
 
 import unittest
 
-from fridge_to_fork import instamart_orders
+from fridge_to_fork import instamart, instamart_orders
 from tests.test_instamart import ADDRESSES, FakeSession, envelope, using
 from tests.test_instamart_orders import ORDERS
 
@@ -32,6 +32,7 @@ class OrdersDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("first_deliveryAddress_fields=['addressLine']", text)
         self.assertIn("orderIds=['IM-1001', 'IM-0900']", text)
         self.assertIn("parsed: kept=2 with_address_id=1", text)
+        self.assertIn("orderTypes=['None']", text)  # these fixtures carry no orderType: the field is logged either way
         self.assertNotIn("get_orders returned nothing", text)  # no probe when there are orders
         for private in ("MG Road", "Bengaluru", "Tomato", "Somewhere unsaved", "9876543210"):
             self.assertNotIn(private, text)
@@ -56,6 +57,46 @@ class OrdersDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         out, text = await run(s)
         self.assertEqual(out["orders"], [])
         self.assertIn("probe failed", text)
+
+
+TYPED = {"orders": [{"orderId": "A-1", "orderType": "DASH", "status": "DELIVERED", "isActive": False, "createdAt": "2026-09-29T05:16:30.000Z",
+                     "deliveryAddress": {"addressLine": "MG Road, Bengaluru", "phoneNumber": "9876543210"}}], "hasMore": False}
+
+
+class OrderTypeDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
+    """Temporary log-only diagnostics: the real orderType Swiggy puts on orders, with no effect on what the app does."""
+
+    async def test_the_history_probe_logs_each_orders_type(self):
+        s = FakeSession({"get_orders": [envelope(EMPTY), envelope(TYPED)], "get_addresses": envelope(ADDRESSES)})
+        out, text = await run(s)
+        self.assertEqual(out["orders"], [])  # still the filtered answer: behaviour unchanged
+        self.assertIn("orderTypes=['DASH']", text)
+        self.assertIn("('DASH', 'DELIVERED', False, '2026-09-29T05:16:30.000Z')", text)
+        for private in ("MG Road", "9876543210"):
+            self.assertNotIn(private, text)
+
+    async def test_the_checkout_check_logs_an_unfiltered_probe_when_the_filtered_call_is_empty(self):
+        s = FakeSession({"get_orders": [envelope(EMPTY), envelope(TYPED)]})
+        with using(s), self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            ids = await instamart._active_order_ids(s)
+        text = "\n".join(logs.output)
+        self.assertEqual(ids, set())  # the verification result is unchanged
+        self.assertEqual([c[1] for c in s.calls], [{"orderType": "INSTAMART", "activeOnly": True, "count": 10}, {"activeOnly": True, "count": 10}])
+        self.assertIn("checkout check, no orderType, activeOnly=True: orderTypes=['DASH']", text)
+
+    async def test_no_probe_when_the_filtered_call_already_sees_orders(self):
+        s = FakeSession({"get_orders": [envelope(TYPED)]})
+        with self.assertLogs("uvicorn.error", level="WARNING"):
+            ids = await instamart._active_order_ids(s)
+        self.assertEqual(ids, {"A-1"})
+        self.assertEqual(len(s.calls), 1)
+
+    async def test_a_failing_checkout_probe_never_breaks_the_check(self):
+        s = FakeSession({"get_orders": [envelope(EMPTY), envelope(success=False, error="nope")]})
+        with self.assertLogs("uvicorn.error", level="WARNING") as logs:
+            ids = await instamart._active_order_ids(s)
+        self.assertEqual(ids, set())
+        self.assertIn("checkout check probe failed", "\n".join(logs.output))
 
 
 if __name__ == "__main__":

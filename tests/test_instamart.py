@@ -197,6 +197,11 @@ class InstamartCase(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         instamart._attempts.clear()
         instamart._inflight.clear()
+        # the log-only orderType probe makes an extra get_orders call that would consume scripted responses meant for the
+        # before/after verification; it has its own tests in test_instamart_orders_diag
+        patcher = patch.object(instamart, "_log_unfiltered_active_orders", new=AsyncMock())
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
 
 # --------------------------------------------------------------------------- envelope
