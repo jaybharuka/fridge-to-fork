@@ -95,7 +95,7 @@ function LiveStatus({ order }: { order: OrderSummary | null }) {
           <a className={styles.linkBtn} href={`https://www.google.com/maps?q=${t.riderLocation.lat},${t.riderLocation.lng}`} target="_blank" rel="noopener noreferrer">See rider on map</a>
         )}
         {live.notes.map(n => <p key={n} className={styles.meta}>{n}</p>)}
-        {live.failed && <p className={styles.couponWhy}>Live updates paused — reopen this screen to refresh.</p>}
+        {live.failed && <p className={styles.couponWhy}>Live updates paused. Reopen this screen to refresh.</p>}
       </div>
     </div>
   );

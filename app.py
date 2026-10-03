@@ -678,7 +678,7 @@ async def scan(
                 yield _sse({"type": "progress", "step": 1, "message": "Preparing your recipe…"})
                 fridge = FridgeContents(
                     ingredients=[],
-                    raw_description="No fridge scan yet — every ingredient starts as missing until you check off what you have.",
+                    raw_description="No fridge scan yet. Every ingredient starts as missing until you check off what you have.",
                 )
                 yield _sse({
                     "type": "step1",
@@ -717,7 +717,7 @@ async def scan(
                     "ingredients": [
                         {
                             "name": i.name,
-                            "quantity": i.quantity or "—",
+                            "quantity": i.quantity or "",
                             "confidence": round(i.confidence * 100),
                         }
                         for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)
@@ -938,7 +938,7 @@ async def scan_vision_only(file: UploadFile = File(...)):
             "ingredients": [
                 {
                     "name": i.name,
-                    "quantity": i.quantity or "—",
+                    "quantity": i.quantity or "",
                     "confidence": round(i.confidence * 100),
                 }
                 for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)

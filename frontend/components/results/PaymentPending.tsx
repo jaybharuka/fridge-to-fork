@@ -13,7 +13,7 @@ export function PaymentPending({ bridgeUrl, onClose }: { bridgeUrl: string; onCl
       <a className={styles.primary} style={{ display: 'block', textDecoration: 'none' }} href={bridgeUrl} target="_blank" rel="noopener noreferrer">
         <ExternalLink style={{ width: 16, height: 16, verticalAlign: '-3px' }} /> Open payment page
       </a>
-      <p className={styles.hint}>Waiting for your payment… If you&apos;ve already paid, you can close this — check the Swiggy app for the order.</p>
+      <p className={styles.hint}>Waiting for your payment… If you&apos;ve already paid, you can close this. Check the Swiggy app for the order.</p>
       <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
     </div>
   );

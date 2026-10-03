@@ -30,7 +30,7 @@ export function CouponSection({ coupons, appliedCoupon, couponBusy, disabled, ed
       {coupons.filter && <p className={styles.hint} style={{ textAlign: 'left', margin: '-4px 0 8px 0' }}>{filterNote(coupons.filter)}</p>}
       {appliedCoupon && (
         <p className={styles.couponApplied} role="status">
-          {appliedCoupon.code} applied{appliedCoupon.savings ? ` — you save ${formatInr(appliedCoupon.savings)}` : ''}. To try a different coupon, go back with {editLabel} and rebuild the cart.
+          {appliedCoupon.code} applied{appliedCoupon.savings ? `, you save ${formatInr(appliedCoupon.savings)}` : ''}. To try a different coupon, go back with {editLabel} and rebuild the cart.
         </p>
       )}
       <ul className={styles.coupons}>

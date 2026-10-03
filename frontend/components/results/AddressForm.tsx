@@ -95,7 +95,7 @@ export function AddressForm({ busy, error, onSubmit, onCancel }: AddressFormProp
         <span className={styles.meta}>
           {coords
             ? 'Saved on this device only, to show the rider on the map while tracking. Only use it if you’re at this address right now.'
-            : 'Optional. Only use it if you’re at this address right now — it lets us show the rider on the map while tracking.'}
+            : 'Optional. Only use it if you’re at this address right now, so we can show the rider on the map while tracking.'}
         </span>
         {geoMessage && <span className={styles.couponWhy}>{geoMessage}</span>}
       </div>
