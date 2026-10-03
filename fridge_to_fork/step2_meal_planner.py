@@ -27,6 +27,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from . import db
+from .gemini_keys import load_api_keys
 from .ingredient_matching import matches_any, recipe_item_in_fridge
 from .models import Decision, FridgeContents, Ingredient, MealPlan, MealSuggestion, RecipeIngredient
 
@@ -468,11 +469,7 @@ TEXT_MODEL_FALLBACK_CHAIN = _dedupe([
 # project, not per key. Kept as its own copy here rather than shared with
 # step1 — this codebase already keeps step1/step2 self-contained (e.g.
 # _dedupe itself is defined independently in both files).
-TEXT_API_KEYS = _dedupe([
-    os.environ.get("GOOGLE_API_KEY"),
-    os.environ.get("GOOGLE_API_KEY_2"),
-    os.environ.get("GOOGLE_API_KEY_3"),
-])
+TEXT_API_KEYS = load_api_keys()
 
 
 def _build_text_clients() -> list[tuple[str, genai.Client]]:
