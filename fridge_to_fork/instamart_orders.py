@@ -4,7 +4,7 @@ Order history, live delivery status and order details for Instamart (POST mcp.sw
 Written against Swiggy's reference docs (reference/instamart/get_orders, get_delivery_status,
 track_order, get_order_details):
 
-  get_orders(orderType, activeOnly, count)     -> data.orders[] (address is text only, no id)
+  get_orders(activeOnly, count)                -> data.orders[] (address is text only, no id)
   get_delivery_status(orderId, addressId)      -> ETA + delivered/cancelled flags, pollIntervalSec
   track_order(orderId, lat, lng)               -> rich tracking; lat/lng are REQUIRED and Swiggy
                                                   offers no source for them (get_addresses omits
@@ -84,21 +84,13 @@ def _describe_orders(data) -> str:
     )
 
 
-async def _probe_without_order_type(session) -> str:
-    """Diagnostic only, run when INSTAMART came back empty: does get_orders with no orderType (Swiggy's own default)
-    list anything? Logged, never shown."""
-    try:
-        return _describe_orders(await _call(session, "get_orders", activeOnly=False, count=10))
-    except InstamartError as exc:
-        return f"probe failed: {exc.code} {exc.message}"
-
-
 async def list_orders(token: str, active_only: bool = False) -> dict:
     async with instamart._session(token) as session:
-        data = await _call(session, "get_orders", orderType="INSTAMART", activeOnly=active_only, count=10)
-        log.warning("[INSTAMART][diag] get_orders (orderType=INSTAMART activeOnly=%s count=10): %s", active_only, _describe_orders(data))
-        if not (data.get("orders") or []):
-            log.warning("[INSTAMART][diag] get_orders returned nothing; raw data=%.300r | same call with no orderType: %s", data, await _probe_without_order_type(session))
+        # No orderType on purpose: Swiggy files Instamart orders under orderType "DASH", so asking for "INSTAMART" returned
+        # nothing (2026-10-06 diagnostic: both real orders came back 'DASH' only when the argument was left out). The
+        # unfiltered call is the one proven live and survives Swiggy renaming the type; the type of each order is still logged.
+        data = await _call(session, "get_orders", activeOnly=active_only, count=10)
+        log.warning("[INSTAMART][diag] get_orders (activeOnly=%s count=10): %s", active_only, _describe_orders(data))
         try:
             saved = (await _call(session, "get_addresses")).get("addresses") or []
         except InstamartError as exc:

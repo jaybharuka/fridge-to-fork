@@ -53,11 +53,11 @@ def session(**over) -> FakeSession:
 
 
 class OrderListTests(unittest.IsolatedAsyncioTestCase):
-    async def test_orders_are_normalized_and_asked_for_by_type(self):
+    async def test_orders_are_normalized_and_asked_for_without_an_order_type(self):
         s = session()
         with using(s):
             out = await instamart_orders.list_orders("tok", active_only=False)
-        self.assertEqual(s.args("get_orders"), {"orderType": "INSTAMART", "activeOnly": False, "count": 10})
+        self.assertEqual(s.args("get_orders"), {"activeOnly": False, "count": 10})
         first, second = out["orders"]
         self.assertEqual((first["orderId"], first["status"], first["totalAmount"], first["paymentMethod"]), ("IM-1001", "Out for delivery", 136.0, "Cash"))
         self.assertEqual(first["items"], [{"name": "Tomato Hybrid", "quantity": 2}])
