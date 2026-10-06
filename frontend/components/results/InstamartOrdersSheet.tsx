@@ -40,14 +40,12 @@ function OrderList({ orders, onPick }: { orders: OrderSummary[]; onPick: (id: st
           {rows.map(o => (
             <li key={o.orderId}>
               <button type="button" className={styles.orderRow} onClick={() => onPick(o.orderId)}>
-                <span className={styles.couponBody}>
+                <span className={styles.orderHead}>
                   <span className={styles.orderTitle}>Order {o.orderId}</span>
-                  <span className={styles.meta}>{[when(o.createdAt), itemsLine(o)].filter(Boolean).join(' · ')}</span>
-                </span>
-                <span className={styles.orderSide}>
-                  <StatusChip status={o.status} />
                   {o.totalAmount !== null && <span className={styles.lineTotal}>{formatInr(o.totalAmount)}</span>}
                 </span>
+                <span className={styles.meta}>{[when(o.createdAt), itemsLine(o)].filter(Boolean).join(' · ')}</span>
+                <StatusChip status={o.status} />
               </button>
             </li>
           ))}
