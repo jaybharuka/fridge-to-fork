@@ -175,7 +175,7 @@ Dry-run order simulation and a console entry point (`fridge-to-fork`) remain for
 - **CORS is locked to one origin.** `FRONTEND_ORIGIN` is the only allowed cross-origin caller. If it is unset, only `http://localhost:3000` and `http://127.0.0.1:3000` are allowed, and a startup log line says so. There is never a wildcard. Methods and headers are limited to what the frontend sends (`GET`, `POST`, `OPTIONS`; `Authorization`, `Content-Type`).
 - **Session cookie:** `SameSite=None`, `Secure`, five day lifetime.
 - **Money safety:** orders require a separate explicit confirmation, are re-validated server side, and are idempotent per reviewed cart (see [Swiggy integration](#6-swiggy-integration)).
-- **Problem reports** sent to Swiggy contain identifiers only, never personal data.
+- **Problem reports** contain identifiers and fixed text only. The app never adds names, phone numbers, addresses or order status text. The one free-text part is the optional note the user types themselves.
 
 ## 8. Progressive web app
 
@@ -238,7 +238,7 @@ fridge-to-fork/
 │   │                               # Command-line entry point and dry-run simulation
 │   └── swiggy_live_mcp.py          # Legacy stdio MCP stub, unused by the running app
 ├── templates/index.html            # Legacy vanilla-JS page. Retired, not served
-├── tests/                          # Backend tests (34 test files) and eval harnesses
+├── tests/                          # Backend tests (35 test files) and eval harnesses
 ├── scripts/                        # Developer scripts (SSE scan runner, live checks)
 ├── docs/                           # Design proposals and implementation plans
 ├── Dockerfile                      # Backend image
@@ -320,7 +320,7 @@ pytest --continue-on-collection-errors
 cd frontend && npm test
 ```
 
-**Backend.** `tests/` holds 34 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 16 test files (141 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
+**Backend.** `tests/` holds 35 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 17 test files (145 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
 
 **Known failures.** The backend suite is not fully green, and contributors should know before running it:
 
@@ -328,7 +328,7 @@ cd frontend && npm test
 - `tests/test_step3_order_router.py` fails at import (`order_dish_from_swiggy` no longer exists in `step3_order_router.py`).
 - 7 tests in `tests/test_step2_meal_planner.py` fail: their mocked Gemini responses no longer reach the planner, which falls through its model chain instead.
 
-The last full run was 638 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
+The last full run was 645 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
 
 ## 14. Deployment
 
@@ -342,6 +342,6 @@ Step-by-step instructions, including the Vercel proxy and cross-origin details, 
 
 - **Swiggy has no refresh token.** Sessions last five days, then the user reconnects.
 - **Orders are real.** On a connected production account, checkout places real orders with real charges. Food ordering was enabled before an end-to-end real Food order had been verified, and can be switched off with `FOOD_ORDERING_ENABLED`.
-- **Instamart order history** is read from Swiggy's `get_orders`, which only returns the last 15 days. A fix for the order-type filter the history request uses is in progress, so history can currently come back empty for real accounts.
+- **Instamart order history** is read from Swiggy's `get_orders`, which only returns the last 15 days, so an empty list means no recent orders, not none ever. Swiggy files Instamart orders under the order type `DASH`, so the history request sends no order type and the type of each order is logged.
 - **Free-tier infrastructure.** The Render free plan spins down when idle, so the first request after a quiet period can be slow. Gemini's free tier is quota-limited per project, which is why the key pool exists.
 - **No server-side token revocation** (see [Security](#7-security)).
