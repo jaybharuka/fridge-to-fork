@@ -1,227 +1,347 @@
 # Fridge to Fork
 
-Fridge to Fork is an AI kitchen assistant: tell it what you want to eat, optionally show it your fridge, and it gives you a full recipe with a checklist of what you need — then hands off to deterministic, staged Swiggy flows (Instamart for whatever's missing, Food for the finished dish) that show you the real cart before any money moves.
+**Scan your fridge. Get a recipe you can actually make. Order only what's missing, straight through Swiggy.**
 
-GitHub: https://github.com/jaybharuka/fridge-to-fork
+Fridge to Fork is an AI kitchen assistant. Type a dish or photograph your fridge, and it builds a full recipe, works out exactly which ingredients you already have, and then hands off to deterministic, staged Swiggy flows: **Instamart** for the ingredients you're missing and **Swiggy Food** for the finished dish. You always see the real cart, the real total and the real payment options before any money moves.
+
+- Live app: https://fridge-to-fork-cyan.vercel.app
+- Backend API: https://fridge-to-fork-j584.onrender.com (`/health`)
+- Source: https://github.com/jaybharuka/fridge-to-fork
 
 ```
-[Dish name] + [optional Fridge Photo]
-        -> Gemini generates the recipe (ingredients, quantities, steps)
-        -> Deterministic matching marks pantry staples + fridge-photo items as "have"
-        -> You check off anything else you already have
-        -> Swiggy Instamart (missing items) or Swiggy Food (the dish): staged search -> cart -> review -> checkout -> tracking
+Dish name and/or fridge photo
+   -> Gemini Vision identifies what is in the fridge
+   -> Gemini plans the recipe (ingredients, quantities, steps)
+   -> Deterministic matching marks pantry staples and fridge items as "have"
+   -> "6 of 9 ingredients, 3 to order"
+   -> Swiggy Instamart (missing items) or Swiggy Food (the dish):
+      search -> cart -> review -> checkout -> live tracking
 ```
 
 ---
 
-## 1. What this is
+## Contents
 
-A FastAPI backend with a single mobile web page (`templates/index.html`), styled after the Swiggy/Instamart app (white background, orange accent, no dark theme). There's one flow: type a dish, optionally scan your fridge, get a real recipe with a checklist, decide for yourself what you're missing, and order it.
+1. [What it does](#1-what-it-does)
+2. [Architecture](#2-architecture)
+3. [The app, screen by screen](#3-the-app-screen-by-screen)
+4. [AI pipeline](#4-ai-pipeline)
+5. [Gemini resilience](#5-gemini-resilience)
+6. [Swiggy integration](#6-swiggy-integration)
+7. [Security](#7-security)
+8. [Progressive web app](#8-progressive-web-app)
+9. [Tech stack](#9-tech-stack)
+10. [Project structure](#10-project-structure)
+11. [Local development](#11-local-development)
+12. [Configuration reference](#12-configuration-reference)
+13. [Testing](#13-testing)
+14. [Deployment](#14-deployment)
+15. [Known limitations](#15-known-limitations)
 
-There is no separate pantry/inventory tab or database — that entire feature was removed. Nothing is guessed on your behalf beyond pantry staples and whatever your fridge photo actually shows; everything else is a manual checkbox.
+---
 
-## 2. The flow
+## 1. What it does
 
-- Text input for a target dish ("Dal Makhani", "Biryani", etc.), a servings picker (1–10), and a **Get Recipe** button that works with no photo at all.
-- A secondary **Scan Fridge** button (camera or gallery) is optional — if you skip it, every non-staple ingredient just starts unchecked.
-- The pipeline streams live over Server-Sent Events: a 3-step progress bar (vision → planner → order), then a recipe card with:
-  - Dish name, cuisine, prep time, and a numbered "How to make it" recipe (collapsible).
-  - An ingredient checklist, Instamart-style: checkbox, name, quantity per row.
-    - **Pantry staples** (salt, oil, onions, rice, spices, etc. — see `_STAPLES` in `step2_meal_planner.py`) are pre-checked as "have," greyed out, and tagged `Staple`.
-    - **Fridge-photo matches** (fuzzy-matched against whatever the scan detected) are pre-checked and tagged `📷 in fridge`.
-    - Everything else starts unchecked. Tap any row to toggle it either way — the app never assumes you're out of something, and never assumes you have something it didn't actually detect.
-- A **"What do you want to do?"** card shows two equal, un-ranked options — there's no AI recommendation or "best choice" badge:
-  - **Order missing items from Instamart** — the unchecked ingredients, searched, carted and reviewed through the staged Instamart flow.
-  - **Order the dish from Swiggy** — the finished dish, searched, customized, carted and reviewed through the staged Food flow.
-- A **Top Up** row suggests small Instamart add-ons (as Instamart-style product cards with an emoji placeholder and an Add button) that pair well with the meal — filtered so nothing already on your missing-items list gets suggested twice.
-- Prices are computed throughout (`estimated_price_inr` on every ingredient) but are not shown anywhere in the UI by design — they stay in the data, not on screen.
+- **Starts from a dish or a fridge.** Search for a dish (with live suggestions and a popular-dishes shelf), or photograph your fridge and let vision identify what is in it. You can do both.
+- **Builds a real recipe.** A dish name, cuisine, prep time, a fully quantified ingredient list scaled to your servings, numbered cooking steps and a how-to video.
+- **Knows what you have, and what you don't.** Pantry staples and anything the scan actually saw are marked as "have" by deterministic matching in Python, not by asking a model to guess. The result reads like "6 of 9 ingredients, 3 to order".
+- **Orders what's missing.** The unchecked ingredients go through a staged Instamart flow, and the finished dish can go through a staged Swiggy Food flow. Neither flow lets a model pick tools or report success.
+- **Keeps you in control.** Nothing is added to a cart or ordered until you review the real cart and press place order. Order history and live tracking are one tap away.
 
-## 3. The pipeline: Vision → Meal Planner → Staged Swiggy flows
+## 2. Architecture
 
-**Step 1, Vision (`fridge_to_fork/step1_fridge_vision.py`)** — optional.
-Sends the fridge photo to Gemini with a strict JSON prompt and gets back a list of ingredients, each with a rough quantity and a 0–1 confidence score, plus a one-paragraph description of the fridge. Tries a chain of models (`gemini-2.5-flash` down through `gemini-3.1-pro-preview` — see `VISION_MODEL_FALLBACK_CHAIN`) so one model's exhausted quota doesn't stop the request, and falls back to a small hardcoded ingredient list if every model fails. If you don't take a photo, this step is skipped entirely and the ingredient list is just empty.
+The app is two deployables that talk to each other across origins.
 
-**Step 2, Meal Planner (`fridge_to_fork/step2_meal_planner.py`)**
-Given a target dish (and optionally what the fridge scan found, used only for inspiration), Gemini returns a complete recipe: description, cuisine, prep time, a fully-quantified ingredient list scaled to the requested servings, a numbered cooking method, and a price estimate per ingredient. Gemini is **not** asked to decide what you already have — that classification is done deterministically in Python afterwards:
-- `_is_pantry_staple()` fuzzy-matches each ingredient against a hardcoded staples list.
-- `_fuzzy_ingredient_match()` fuzzy-matches each ingredient against whatever the fridge photo actually detected (handles plurals, "fresh"/"chopped" etc., and British/American spelling variants like chilli/chili).
+```
+                   +--------------------------------------+
+                   |  Browser / installed PWA              |
+                   +---------+--------------------+-------+
+                             |                    |
+          pages, /auth/*     |                    | /api/* (scan and order streams,
+          (same origin)      |                    |  Instamart, Food, images)
+                             v                    | cross-origin, Authorization: Bearer
+              +--------------------------+        |
+              |  Next.js frontend         |        |
+              |  Vercel   (frontend/)     |        |
+              |  rewrites /auth/* ------- | ----+  |
+              +--------------------------+     |  |
+                                               v  v
+                          +--------------------------------------------+
+                          |  FastAPI backend   (Render, app.py)         |
+                          |  SSE scan pipeline, OAuth 2.1 + PKCE,       |
+                          |  staged Instamart and Food flows            |
+                          +----+-----------------+----------------+----+
+                               |                 |                |
+                               v                 v                v
+                       +--------------+  +---------------+  +----------------+
+                       | Gemini API   |  | Swiggy MCP    |  | Unsplash,      |
+                       | vision+plan  |  | Instamart and |  | YouTube        |
+                       | (key pools)  |  | Food servers  |  | (images,videos)|
+                       +--------------+  +---------------+  +----------------+
+```
 
-There is no cook/order_groceries/order_dish AI decision anymore — the app just reports what's missing and lets you choose how to handle it. A separate `generate_top_up_suggestions()` call produces up to 3 upsell items, filtered against the missing-ingredients list with the same fuzzy matcher so nothing gets suggested twice.
+- **Frontend:** a Next.js 16 (App Router, React 19, TypeScript) app in `frontend/`, deployed on Vercel. It has no server logic of its own.
+- **Backend:** a FastAPI app (`app.py`) in a Docker container on Render. It owns the AI pipeline, the Swiggy OAuth session and every Swiggy call.
+- **Why `/auth/*` is proxied but `/api/*` is not.** Vercel rewrites `/auth/*` to the backend, so the Swiggy OAuth session cookie is set on the frontend's own origin. Long-running calls (the scan stream and the order flows) go straight from the browser to Render, because a serverless proxy is the wrong place for a streaming connection. A host-only cookie cannot reach another origin, so the page fetches a short-lived **sealed bearer** from `/auth/session-token` and sends it in an `Authorization` header on those direct calls. It is held in memory only.
+- **CORS** is locked to the real frontend origin (`FRONTEND_ORIGIN`). There is no wildcard and no fallback to one. See [Security](#7-security).
+- `templates/index.html` is the original vanilla-JS page. It is **retired and no longer served**: `GET /` on the backend redirects to the frontend. It remains in the repository for reference only.
 
-**Step 3, Staged ordering (no AI in the loop)**
-Neither flow lets a model pick tools or report success. Both are deterministic MCP call sequences written against Swiggy's documented tool schemas, exposed as staged endpoints so the user confirms before any real money moves, with the shared transport, address, payment-classification and checkout-guard logic in `fridge_to_fork/swiggy_common.py`:
+## 3. The app, screen by screen
 
-- **Groceries: `fridge_to_fork/instamart.py`** (`/api/instamart/*`): `search` (real products, prices and photos, read-only), `cart` (clears the cart, adds the user's picks by `spinId`/`skuId`, returns the real `get_cart` review), `coupon`, `checkout` (only after a separate "Place order": re-checks address and total, checks `get_orders` before and after, idempotent per reviewed cart, UPI via a payment page and polling), plus orders, live tracking, addresses and "Report a problem".
-- **The dish: `fridge_to_fork/food.py`** (`/api/food/*`): `search` (`search_restaurants` + `search_menu`, only open restaurants), `cart` (flushes the cart, adds the chosen dish with its variants and add-ons, then verifies Swiggy's cart is exactly what was picked before offering it), `coupon`, `checkout` (`place_food_order`, documented as not idempotent, so the same guards as Instamart), `payment-status`, `orders` / `order-status` / `order-details` (live tracking) and `report` ("Report a problem" via Swiggy's `report_error`, identifiers only). `fridge_to_fork/features.py`'s `FOOD_ORDERING_ENABLED` is its kill switch.
+**Landing.** A hero, a dish search box with live suggestions, a servings picker (1 to 8), a popular-dishes shelf, and a fridge photo area (up to three photos, camera or gallery). Photos are downscaled in the browser to at most 1200 px on the long edge and re-encoded as JPEG before upload, using native decoder downscaling where the browser supports it, which keeps memory use low for large phone photos. **Get Recipe** works with no photo at all.
 
-The old Gemini/Google ADK agent that used to order the dish (it invented order IDs and read success out of free text) has been deleted. `swiggy_agent.py` now only simulates orders for the CLI's `--dry-run` and refuses real ones; `POST /api/order` only handles `cook`.
+**Scan and planning screens.** A full-screen photo scan screen shows the scan line, a progress bar and detected ingredients as they arrive. Recipe planning has its own progress view. Both are fed by Server-Sent Events from the backend (`progress`, `step1`, `step2`, `awaiting_user_choice`, `top_up`, `complete`, plus `auth_required` and `error`), and both can be backed out of. A stalled or failed scan lands on a clear, retryable error state.
 
-## 4. Smart Cart
+**Results.** A dish hero photo, a sticky summary bar ("6 of 9 ingredients, 3 to order"), and two tabs:
 
-The Smart Cart modal is the legacy (vanilla page) version of the shared "add these items to Instamart" flow used both by the recipe checklist's missing-items button and by each Top Up suggestion's Add button.
+- **Order** holds the ingredient checklist. Staples and fridge matches are pre-checked and labelled; tap any row to override. Each missing ingredient previews its real Instamart match. Below it are two equal choices, **Order missing items from Instamart** and **Order the dish from Swiggy**, with no AI "best choice" badge. Top Up suggestions, your usual Instamart items and a "Report a problem" path sit alongside.
+- **Recipe** holds the numbered method and a how-to video carousel.
 
-- `openSmartCart(items)` (in `templates/index.html`) checks `/auth/status`.
-- Not connected: shows a preview list and a "Connect Swiggy to order" button, plus a manual fallback that opens Instamart's search page.
-- Connected: groceries now use the staged Instamart flow below. `/api/cart-fill` and the agent-based grocery path were removed, so this legacy modal's connected mode no longer works — the Next.js frontend's order sheet replaces it.
+**Ordering sheets.** Both flows are bottom sheets driven by the real Swiggy cart: pick products or a dish (with variants and add-ons), review items and totals, choose cash on delivery or UPI, place the order, then follow it. Instamart and Food each have their own order history and live tracking sheet.
 
-## 5. Tech stack
+**Header and account menu.** One control in the header opens the account menu: connection status, **Instamart orders**, **Food orders** (while Food ordering is enabled) and a light/dark theme switch. Every deep screen has a consistent back button. The app defaults to a dark theme and follows the stored or system preference.
+
+**Other pages.** About, FAQ, Contact and a design-system reference page.
+
+## 4. AI pipeline
+
+All Gemini work happens on the backend in `fridge_to_fork/`.
+
+**Step 1, vision (`step1_fridge_vision.py`)** is optional. It sends the fridge photos to Gemini with a strict JSON prompt that walks the fridge zone by zone, and gets back ingredients with rough quantities and 0 to 1 confidence scores. With no photo, the step is skipped.
+
+**Step 2, meal planner (`step2_meal_planner.py`)** takes the target dish (and, only as inspiration, what the scan found) and returns a complete recipe scaled to the requested servings, with a price estimate per ingredient. Gemini is **not** asked what you already have. That classification is deterministic:
+
+- A pantry-staple check compares each ingredient against a staples list.
+- A strict ingredient matcher (`ingredient_matching.py`) compares each ingredient with what the scan actually detected: two names are the same ingredient only when their head nouns agree, and the matcher handles plurals, preparation words ("fresh", "chopped") and regional spellings (chilli/chili, capsicum/bell pepper).
+
+A separate `generate_top_up_suggestions()` call proposes a few Instamart add-ons, filtered against the missing list with the same matcher so nothing is suggested twice. Dish autocomplete (`/api/dish-suggestions`) uses its own Gemini key so typing never competes with scans for quota.
+
+**Model chains.** Each chain is tried in order, per key. The first entry is configurable.
+
+| Step | Chain (in order) |
+|---|---|
+| Vision | `GEMINI_VISION_MODEL` (default `gemini-2.5-flash`), `gemini-3.8-flash`, `gemini-flash-latest`, `gemini-flash-lite-latest`, `gemini-3.1-pro-preview` |
+| Planner | `GEMINI_TEXT_MODEL` (default `gemini-2.5-flash`), `gemini-3.8-flash`, `gemini-2.5-flash-lite`, `gemini-flash-latest`, `gemini-flash-lite-latest`, `gemini-3.1-pro-preview` |
+
+**Multi-key rotation.** `gemini_keys.py` reads `GOOGLE_API_KEY` plus `GOOGLE_API_KEY_2` through `GOOGLE_API_KEY_9`, skipping blanks and duplicate values. Vision and planner calls try every configured key for a model before moving to a weaker one. Gemini's free-tier daily quota is scoped **per Google Cloud project**, not per key, so extra keys only add headroom when they belong to separate projects. The live deployment runs keys from four independent projects.
+
+**Prompt style.** `prompt_rules.py` appends one shared style rule to every prompt (vision, planning, top-up) so generated copy never uses em dashes. The prompts themselves are free of them as well.
+
+**Streaming and limits.** `/api/scan` streams its progress over SSE. The vision step has a hard 60 second ceiling, and each individual Gemini call is capped at 15 seconds for vision and top-up and 18 seconds for the meal plan (overridable with `GEMINI_VISION_TIMEOUT_SECONDS`, `GEMINI_PLAN_TIMEOUT_SECONDS` and `GEMINI_TOP_UP_TIMEOUT_SECONDS`), so one hung call can never hold a scan hostage. Every successful call logs its duration as `[TIMING] gemini_call <step> <model> on <key>: <seconds>s`.
+
+## 5. Gemini resilience
+
+`gemini_resilience.py` is the shared policy both fallback loops use. Each failure says something different about what to try next, so each is handled differently:
+
+| Failure | What it means | Reaction |
+|---|---|---|
+| Timeout (504, deadline exceeded) | The model is slow on Google's side, not a key problem | Move to the **next model** and skip the slow model for 10 minutes |
+| Quota (429, resource exhausted) | This project's quota is spent | Try the **next key** (each project has its own quota) |
+| Overloaded (503, high demand) | Transient | Next key once, then the **next model** after two overloaded answers |
+| Unavailable (404 "no longer available to new users") | Google has withheld the model from that key's project | Never retry that model and key pair; skip it for 6 hours |
+| Anything else (for example malformed JSON) | One-off | Retry in place, then the next key |
+
+If every model is on cooldown, all are tried anyway, so a total outage still gets a real attempt.
+
+**Thinking mode is tuned for speed.** These calls are structured extraction and templated JSON, which do not benefit from long reasoning. `thinking_config_for()` turns thinking off for `gemini-2.5-flash` variants (a vision call that used to time out now answers in about 9 seconds) and sets the lowest thinking level for non-Pro `gemini-3.x` models. Aliases such as `gemini-flash-latest` and Pro models keep their defaults, because what an alias points at can change and an unsupported setting would be rejected.
+
+## 6. Swiggy integration
+
+The app talks to Swiggy's MCP servers directly, with one deterministic client per product. There is no agent framework and no model in the ordering path. Each flow is a fixed sequence of calls written against Swiggy's documented tool schemas.
+
+**Transport** (`swiggy_common.py`). A streamable-HTTP MCP session opened with the user's bearer token. Every tool result goes through one envelope reader (`{success, data | error}`; domain failures arrive as HTTP 200 with `success: false`), so nothing is inferred from free text.
+
+**Auth.** `app.py` implements OAuth 2.1 with PKCE itself, registering the app with Swiggy through Dynamic Client Registration (no client ID to configure). `/auth/login` redirects to Swiggy with a code challenge, `/auth/callback` exchanges the code for an access token, `/auth/status` reports validity, and `/auth/logout` clears the session. Swiggy issues a five day access token and **no refresh token**, so the token is the whole session. An expired or rejected token maps to `auth_required` and the app asks the user to reconnect rather than retrying in the background.
+
+**Instamart** (`instamart.py`, mounted at `/api/instamart/*`):
+
+- `search` finds real products, prices and photos (read-only).
+- `cart` clears the cart, adds the user's picks by `spinId` and `skuId`, and returns Swiggy's own `get_cart` review.
+- `coupon` applies a code and confirms the total actually changed.
+- `checkout` runs only after a separate place-order tap. It re-checks the address and total, is idempotent per reviewed cart, supports cash on delivery and UPI (a payment page with status polling), and cross-checks Swiggy's order list before and after.
+- Also: saved addresses, "usual items", order history, order details, live tracking and "Report a problem".
+
+**Swiggy Food** (`food.py`, mounted at `/api/food/*`): restaurant and menu search (open restaurants only), a cart that is flushed and rebuilt with the chosen dish, variants and add-ons and then **verified against Swiggy's cart before it is offered**, coupons, checkout (documented as not idempotent, so it uses the same guards), payment status, order history, tracking and "Report a problem". It is enabled by the `FOOD_ORDERING_ENABLED` switch in `features.py` and `frontend/lib/features.ts`, which is also its kill switch.
+
+**Checkout guards** (shared in `swiggy_common.py`): a replay cache keyed by idempotency key, one in-flight order per account, a re-check of the total the user reviewed, and an `unknown` outcome that never offers a retry when an order may already exist.
+
+Dry-run order simulation and a console entry point (`fridge-to-fork`) remain for command-line use only. They do not touch Swiggy.
+
+## 7. Security
+
+- **The Swiggy token is never stored or sent in plaintext.** `token_vault.py` seals it with Fernet (AES-128-CBC with an HMAC-SHA256 integrity tag and an issue timestamp), keyed from `SECRET_KEY`. The same sealed blob is what the session cookie holds and what `/auth/session-token` hands the page as its bearer. A tampered, expired, too-old or wrongly keyed blob simply fails to open.
+- **`SECRET_KEY` is required in production.** It signs the session cookie and also keys the token encryption. Set a long random value. The code ships a development fallback (`dev-secret-fallback-change-in-prod`) which is for local use only and must never reach production. Rotating `SECRET_KEY` invalidates every session, so each user reconnects once.
+- **No server-side revocation.** The app is stateless by design (the host has an ephemeral disk), so a sealed token stays valid until it expires. Logging out clears the cookie and the in-memory bearer.
+- **CORS is locked to one origin.** `FRONTEND_ORIGIN` is the only allowed cross-origin caller. If it is unset, only `http://localhost:3000` and `http://127.0.0.1:3000` are allowed, and a startup log line says so. There is never a wildcard. Methods and headers are limited to what the frontend sends (`GET`, `POST`, `OPTIONS`; `Authorization`, `Content-Type`).
+- **Session cookie:** `SameSite=None`, `Secure`, five day lifetime.
+- **Money safety:** orders require a separate explicit confirmation, are re-validated server side, and are idempotent per reviewed cart (see [Swiggy integration](#6-swiggy-integration)).
+- **Problem reports** contain identifiers and fixed text only. The app never adds names, phone numbers, addresses or order status text. The one free-text part is the optional note the user types themselves.
+
+## 8. Progressive web app
+
+Fridge to Fork is installable. A web manifest (`app/manifest.ts`, served at `/manifest.webmanifest`) declares the app name, a standalone display mode, theme colours, and 192 px, 512 px and maskable icons, so browsers offer **Add to Home Screen** and launch it without browser chrome.
+
+A deliberately small service worker (`frontend/public/sw.js`, registered by `ServiceWorkerRegister`) caches the **app shell only**:
+
+- It pre-caches the icons and manifest, and serves Next.js's content-hashed `/_next/static/` assets cache-first.
+- It intercepts **same-origin GET requests only**. Pages, `/api/*`, the scan and order streams and every cross-origin request (the backend, fonts, YouTube, dish images) are never touched and always hit the network.
+- It is versioned (`CACHE_VERSION`), and old caches are evicted on activation.
+
+There is no offline mode, because the product is live AI and live ordering.
+
+## 9. Tech stack
 
 | Layer | Technology |
 |---|---|
-| AI orchestration | Google GenAI SDK, Gemini 2.5 Flash (with fallback chain to lite/older models) |
-| Backend API | FastAPI, Server-Sent Events for streaming pipeline progress |
-| Session / auth | Starlette `SessionMiddleware`, OAuth 2.1 with PKCE against Swiggy's auth server |
-| Frontend | Single vanilla HTML/CSS/JS page, no build step, no framework, `lucide` + Phosphor icons over CDN |
-| Swiggy transport | MCP Python SDK (`streamablehttp_client`), deterministic call sequences (no agent framework) |
-| Commerce integration | Swiggy Food, Instamart, and Dineout MCP servers over streamable HTTP |
-| Testing | pytest, pytest-asyncio, pytest-httpx (network calls mocked) |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, CSS Modules, lucide icons, deployed on Vercel |
+| Backend | Python 3.11, FastAPI, Server-Sent Events, deployed on Render (Docker) |
+| AI | Google GenAI SDK, Gemini 2.5 and 3.x Flash families with a fallback chain |
+| Swiggy | MCP Python SDK over streamable HTTP, OAuth 2.1 with PKCE and Dynamic Client Registration |
+| Auth and crypto | Starlette `SessionMiddleware`, `cryptography` (Fernet), `itsdangerous` |
+| Images and video | Unsplash (dish and ingredient photos), YouTube Data API (how-to videos) |
+| Testing | pytest, pytest-asyncio, pytest-httpx (backend); Node's built-in test runner (frontend) |
 
-## 6. Project structure
+## 10. Project structure
 
 ```text
 fridge-to-fork/
-├── app.py                        # FastAPI app: page, scan/order SSE endpoints, OAuth, Instamart routes
-├── templates/
-│   └── index.html                # The whole frontend: recipe flow, checklist, Smart Cart — single page, vanilla JS
+├── app.py                          # FastAPI app: CORS, sessions, OAuth, SSE scan pipeline, image/video endpoints
+├── frontend/                       # The app: Next.js frontend (see frontend/README.md)
+│   ├── app/                        #   routes: landing, about, faq, contact, design-system, manifest, icons
+│   ├── components/                 #   landing, loading, results (checklist, order sheets), shared (back button, PWA)
+│   ├── hooks/                      #   scan stream, auth, theme, ordering and order-history hooks
+│   ├── lib/                        #   pure, unit-tested logic (scan guard, image sizing, account menu, polling)
+│   └── public/                     #   service worker and icons
 ├── fridge_to_fork/
-│   ├── models.py                 # Ingredient, RecipeIngredient, FridgeContents, MealSuggestion, MealPlan, OrderResult
-│   ├── step1_fridge_vision.py    # Gemini Vision ingredient identification (optional step)
-│   ├── step2_meal_planner.py     # Gemini recipe generation + deterministic staple/fridge matching + top-up upsells
-│   ├── step3_order_router.py     # CLI entry point (route_order): simulates or refuses, the web app doesn't use it
-│   ├── swiggy_agent.py           # CLI --dry-run simulation + refusals (the LLM agent was deleted)
-│   ├── swiggy_common.py          # Transport, addresses, payment classifier, checkout guards, report_error (Instamart + Food)
-│   ├── instamart.py              # Staged Instamart flow (+ instamart_routes/orders/addresses/support)
-│   ├── food.py                   # Staged Food flow (+ food_routes/orders/support)
-│   ├── features.py               # FOOD_ORDERING_ENABLED kill switch
-│   ├── agent.py                  # End-to-end CLI orchestrator (fridge-to-fork console script)
-│   └── swiggy_live_mcp.py        # Legacy stdio MCP stub, not used by the running app
-├── tests/
-│   ├── test_step1_fridge_vision.py
-│   ├── test_step2_meal_planner.py
-│   └── test_step3_order_router.py
-├── .env.example                  # Environment variable template
+│   ├── step1_fridge_vision.py      # Gemini Vision ingredient identification
+│   ├── step2_meal_planner.py       # Gemini recipe planning, deterministic matching, top-up suggestions
+│   ├── gemini_keys.py              # Loads GOOGLE_API_KEY and _2.._9 into a key pool
+│   ├── gemini_resilience.py        # Per-failure-kind fallback policy, cooldowns, timeouts, thinking config
+│   ├── prompt_rules.py             # Shared style rule appended to every prompt
+│   ├── token_vault.py              # Fernet sealing of the Swiggy token
+│   ├── swiggy_common.py            # MCP transport, envelope, addresses, payments, checkout guards
+│   ├── instamart.py                # Staged Instamart flow
+│   ├── instamart_routes.py         #   its HTTP routes
+│   ├── instamart_orders.py         #   order history, status, details
+│   ├── instamart_addresses.py      #   saved addresses
+│   ├── instamart_support.py        #   "Report a problem"
+│   ├── food.py                     # Staged Swiggy Food flow
+│   ├── food_routes.py              #   its HTTP routes
+│   ├── food_orders.py              #   order history, status, details
+│   ├── food_support.py             #   "Report a problem"
+│   ├── features.py                 # FOOD_ORDERING_ENABLED switch
+│   ├── scan_routes.py, db.py       # Fridge-scan persistence layer (SQLite), not yet called by the app
+│   ├── ingredient_matching.py      # One strict "same ingredient?" rule shared by vision dedupe and planner matching
+│   ├── seed_canonical_ingredients.py # Seeds the canonical ingredient table (scan persistence layer)
+│   ├── models.py                   # Pydantic models
+│   ├── agent.py, step3_order_router.py, swiggy_agent.py
+│   │                               # Command-line entry point and dry-run simulation
+│   └── swiggy_live_mcp.py          # Legacy stdio MCP stub, unused by the running app
+├── templates/index.html            # Legacy vanilla-JS page. Retired, not served
+├── tests/                          # Backend tests (35 test files) and eval harnesses
+├── scripts/                        # Developer scripts (SSE scan runner, live checks)
+├── docs/                           # Design proposals and implementation plans
+├── Dockerfile                      # Backend image
+├── render.yaml                     # Render blueprint
+├── DEPLOY.md                       # Deployment guide (Render and Vercel)
+├── .env.example                    # Environment variable template
 └── pyproject.toml
 ```
 
-## 7. Setup
+## 11. Local development
 
-**1. Install dependencies**
+You need Python 3.11 or newer, a current Node.js LTS release and a free Gemini API key.
+
+**1. Backend**
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate           # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
+cp .env.example .env                # set at least GOOGLE_API_KEY
 ```
 
-**2. Get a free Gemini API key**
-
-Go to [Google AI Studio](https://aistudio.google.com/app/apikey), sign in with a personal Gmail account (Workspace accounts have a zero free tier quota), and create a key.
-
-**3. Configure environment**
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set at minimum `GOOGLE_API_KEY`. Everything else has a working default for local development.
-
-**4. Run the server**
+Get a key at [Google AI Studio](https://aistudio.google.com/app/apikey) using a personal Gmail account (Workspace accounts have a zero free tier). In `.env`, set `APP_BASE_URL=http://localhost:3000` so the Swiggy OAuth callback returns to the frontend. Then:
 
 ```bash
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**5. Open the app**
-
-On the same machine: `http://localhost:8000`. On your phone, over the same WiFi network: `http://<your-pc-ip>:8000` (find your IP with `ipconfig` on Windows or `ifconfig` on Mac/Linux — look for the Wi-Fi adapter's IPv4 address, not a virtual/WSL adapter).
-
-**6. (Optional) Connect Swiggy**
-
-Set `APP_BASE_URL` in `.env` (the app registers itself with Swiggy via Dynamic Client Registration, so no client ID is needed), then tap "Connect Swiggy" in the header. Without this, the app still works end to end using dry run order simulation.
-
-**7. Run the test suite**
+**2. Frontend**
 
 ```bash
-pytest --ignore=tests/test_step1_fridge_vision.py
+cd frontend
+npm install
+npm run dev                          # http://localhost:3000
 ```
 
-All network calls and LLM calls in the test suite are mocked, so no API key is required to run tests.
+The dev server proxies `/api/*` and `/auth/*` to `http://localhost:8000` (override with `BACKEND_URL`). The backend allows `http://localhost:3000` by default, so no `FRONTEND_ORIGIN` is needed locally.
 
-## 8. Environment variables
+**3. Open the app** at http://localhost:3000. Dish search and recipes work with just a Gemini key. To place real orders, tap **Connect Swiggy** and complete the OAuth flow. Orders on a connected account are real orders with real charges.
+
+For the frontend's own details see [`frontend/README.md`](frontend/README.md). For deployment see [`DEPLOY.md`](DEPLOY.md).
+
+## 12. Configuration reference
+
+### Backend (`.env` locally, the Render dashboard in production)
 
 | Variable | Required | Description |
 |---|---|---|
-| `GOOGLE_API_KEY` | Yes | Google Gemini API key from AI Studio |
-| `GOOGLE_API_KEY_2`, `GOOGLE_API_KEY_3` | Optional | Extra production keys — vision and text calls try every configured key for a given model before falling to a weaker model (`VISION_API_KEYS`/`TEXT_API_KEYS`, 2026-09). Only adds real headroom if these are on separate Google Cloud projects from `GOOGLE_API_KEY` — Gemini's free-tier quota is scoped per project, not per key |
-| `GOOGLE_API_KEY_EVAL` | Only for `tests/eval_vision_accuracy.py` | Dedicated key for the eval harness, deliberately separate from the production pool above — a real scan hit "0 items detected" once because the harness sharing production's key had exhausted its shared daily quota |
-| `GEMINI_TEXT_MODEL` | Optional | Primary model for meal planning (default `gemini-2.5-flash`; falls back through `gemini-2.5-flash-lite` → `gemini-flash-latest` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `TEXT_MODEL_FALLBACK_CHAIN`) |
-| `GEMINI_VISION_MODEL` | Optional | Primary model for fridge vision (default `gemini-2.5-flash`; falls back through `gemini-flash-latest` → `gemini-2.5-flash-lite` → `gemini-flash-lite-latest` → `gemini-3.1-pro-preview` if quota-exhausted or unavailable — kept in sync with `.env.example` and `VISION_MODEL_FALLBACK_CHAIN`) |
-| `SWIGGY_FOOD_MCP_URL` | Optional | Swiggy Food MCP endpoint (default `https://mcp.swiggy.com/food`) |
-| `SWIGGY_INSTAMART_MCP_URL` | Optional | Swiggy Instamart MCP endpoint (default `https://mcp.swiggy.com/im`) |
-| `SWIGGY_DINEOUT_MCP_URL` | Optional | Swiggy Dineout MCP endpoint (default `https://mcp.swiggy.com/dineout`) |
-| `APP_BASE_URL` | For real orders | Base URL this app is reachable at, used to build the OAuth redirect URI |
-| `SECRET_KEY` | Recommended | Signs session cookies via `itsdangerous`, set a real random value in production |
-| `DELIVERY_ADDRESS` | Optional | Legacy default delivery address for the CLI (default `Mumbai, India`) |
+| `GOOGLE_API_KEY` | Yes | Gemini API key from AI Studio |
+| `GOOGLE_API_KEY_2` to `GOOGLE_API_KEY_9` | No | Extra keys for rotation. Gaps are fine. Only add headroom when they belong to **separate Google Cloud projects**, because the free-tier quota is per project |
+| `GEMINI_SUGGESTIONS_API_KEY` | No | Dedicated key for dish autocomplete. Without it, suggestions are simply empty |
+| `GOOGLE_API_KEY_EVAL` | Eval harness only | Key for `tests/eval_vision_accuracy.py`, deliberately separate from production keys so evaluation runs never consume user quota |
+| `GEMINI_VISION_MODEL` | No | First model in the vision chain (default `gemini-2.5-flash`) |
+| `GEMINI_TEXT_MODEL` | No | First model in the planner chain (default `gemini-2.5-flash`) |
+| `SECRET_KEY` | **Yes in production** | Signs the session cookie and keys the Swiggy token encryption. Long and random. Rotating it logs everyone out. The built-in default is for local development only |
+| `FRONTEND_ORIGIN` | **Yes in production** | The deployed frontend's origin (for example the Vercel URL). The only origin allowed by CORS. Unset means localhost only, never a wildcard |
+| `APP_BASE_URL` | For real orders | Base URL used to build the OAuth redirect URI. Locally the frontend, `http://localhost:3000` |
+| `UNSPLASH_ACCESS_KEY` | No | Dish hero photos (`/api/dish-image`) and ingredient photos (`/api/ingredient-image`). Without it the UI falls back to placeholders |
+| `YOUTUBE_API_KEY` | No | How-to videos (`/api/youtube`) |
+| `SWIGGY_INSTAMART_MCP_URL` | No | Default `https://mcp.swiggy.com/im` |
+| `SWIGGY_FOOD_MCP_URL` | No | Default `https://mcp.swiggy.com/food` |
+| `DELIVERY_ADDRESS` | No | Default address for the command-line entry point only (default `Mumbai, India`) |
+| `FRIDGE_DB_PATH` | No | SQLite path for the scan persistence layer (default `fridge_to_fork.db`) |
 
-## 9. Swiggy MCP integration
+### Frontend (Vercel project settings, or `frontend/.env.local`)
 
-The app talks to Swiggy's MCP servers directly, one deterministic client per product:
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_BACKEND_URL` | In production | The backend's public origin. Used by the browser for the direct, authenticated `/api` calls. Empty falls back to the same-origin dev proxy |
+| `BACKEND_URL` | No | Where the Next.js server proxies `/api` and `/auth` (default `http://localhost:8000`) |
 
-- `SWIGGY_FOOD_MCP_URL`, restaurant delivery (`food.py`)
-- `SWIGGY_INSTAMART_MCP_URL`, grocery delivery (`instamart.py`)
-- `SWIGGY_DINEOUT_MCP_URL`, table reservations (not used by the web app)
+## 13. Testing
 
-**Transport.** `swiggy_common.open_session()` opens a streamable-HTTP MCP session with the user's Bearer token; every tool result goes through one envelope reader (`{success, data | error}`, domain failures arrive as HTTP 200 + `success:false`). Nothing is inferred from free text.
+```bash
+# Backend (all network and LLM calls are mocked; no API key needed)
+pytest --continue-on-collection-errors
 
-**Auth.** `app.py` implements OAuth 2.1 with PKCE itself: `/auth/login` generates a code verifier and S256 challenge and redirects to Swiggy's authorize endpoint, `/auth/callback` exchanges the returned code for a Bearer access token and stores it in the session, `/auth/status` reports whether that token is still valid, and `/auth/logout` clears it. The Bearer token is sent as the `Authorization` header of every MCP session (`swiggy_common.open_session`).
-
-**Token lifetime.** Swiggy MCP issues a 5 day access token with no refresh token, so that token is the entire session. `swiggy_common` maps a 401 (or an `invalid_token`/unauthorized tool error) to `auth_required`, and the frontend surfaces a "Connect Swiggy" prompt rather than retrying silently in the background.
-
-**Dry run.** `run_swiggy_agent(..., dry_run=True)` returns a simulated `OrderResult` without contacting Swiggy at all, used by the CLI's `--dry-run` flag and exercised in the test suite. Without `dry_run` it refuses.
-
-## 10. Architecture
-
+# Frontend
+cd frontend && npm test
 ```
-                              +---------------------+
-                              |   templates/          |
-                              |   index.html           |
-                              | (recipe flow + Smart   |
-                              |  Cart, single page)    |
-                              +----+--------------+----+
-                                   |              |
-                    POST /api/scan |              | POST /api/instamart
-                    POST /api/order|              |
-                                   v              v
-+----------------------------------------------------------------+
-|                            app.py (FastAPI)                     |
-|         SSE streaming, session/OAuth, order routing             |
-+----+------------------------+-----------------------------------+
-     |                        |
-     v                        v
-+-----------+        +------------------------+
-| step1_    |        | step2_meal_planner.py   |
-| fridge_   | -----> | Gemini recipe +         |
-| vision.py |        | deterministic staple /  |
-| Gemini    |        | fridge-photo matching   |
-| Vision    |        | (no AI decision)        |
-+-----------+        +-----------+-------------+
-                                  |
-                                  v
-                        +-----------------------+
-                        | instamart.py / food.py  |
-                        | staged, deterministic   |
-                        +-----------+-------------+
-                                    |
-                                    v
-                        +-----------------------+
-                        | swiggy_common.py        |
-                        | MCP session + envelope  |
-                        | + payment/checkout guards|
-                        +----+------+------+------+
-                             |      |      |
-                  StreamableHTTP    |      |
-                             v      v      v
-                       +-------+ +-------+ +---------+
-                       | Food  | | Insta-| | Dineout |
-                       | MCP   | | mart  | | MCP     |
-                       |       | | MCP   | |         |
-                       +-------+ +-------+ +---------+
-```
+
+**Backend.** `tests/` holds 35 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 17 test files (145 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
+
+**Known failures.** The backend suite is not fully green, and contributors should know before running it:
+
+- `tests/test_step1_fridge_vision.py` fails at import (`_is_url` no longer exists in `step1_fridge_vision.py`).
+- `tests/test_step3_order_router.py` fails at import (`order_dish_from_swiggy` no longer exists in `step3_order_router.py`).
+- 7 tests in `tests/test_step2_meal_planner.py` fail: their mocked Gemini responses no longer reach the planner, which falls through its model chain instead.
+
+The last full run was 645 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
+
+## 14. Deployment
+
+- **Backend:** Render, from `render.yaml` and the `Dockerfile`, on the `main` branch with auto-deploy. `GET /health` is the liveness check.
+- **Frontend:** Vercel, project root `frontend/`.
+- **Required wiring:** `FRONTEND_ORIGIN` on Render must equal the Vercel origin, and `NEXT_PUBLIC_BACKEND_URL` on Vercel must equal the Render origin. Set a real `SECRET_KEY` on Render.
+
+Step-by-step instructions, including the Vercel proxy and cross-origin details, are in [`DEPLOY.md`](DEPLOY.md).
+
+## 15. Known limitations
+
+- **Swiggy has no refresh token.** Sessions last five days, then the user reconnects.
+- **Orders are real.** On a connected production account, checkout places real orders with real charges. Food ordering was enabled before an end-to-end real Food order had been verified, and can be switched off with `FOOD_ORDERING_ENABLED`.
+- **Instamart order history** is read from Swiggy's `get_orders`, which only returns the last 15 days, so an empty list means no recent orders, not none ever. Swiggy files Instamart orders under the order type `DASH`, so the history request sends no order type and the type of each order is logged.
+- **Free-tier infrastructure.** The Render free plan spins down when idle, so the first request after a quiet period can be slow. Gemini's free tier is quota-limited per project, which is why the key pool exists.
+- **No server-side token revocation** (see [Security](#7-security)).
