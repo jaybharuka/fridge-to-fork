@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import type { DetectedIngredient } from '@/lib/types';
-import { scanBarPercent } from '@/lib/scanView';
+import { nextBarCheckpoint, scanBarPercent, type BarCheckpoint } from '@/lib/scanView';
+import { reconcileFinal, type Superseded } from '@/lib/firstLook';
+import { mergeFirstLook } from '@/hooks/scanReducer';
 import { BackButton } from '@/components/shared/BackButton';
 import { useElapsed } from './usePlanningProgress';
 import styles from './loading.module.css';
@@ -44,6 +46,11 @@ interface PhotoScanScreenProps {
   /** null until the backend's step1 event arrives; the scan-line sweep
    *  stops the instant this first becomes non-null. */
   detectedIngredients: DetectedIngredient[] | null;
+  /** "First look": the pass-1 items found so far (cumulative), from step1_partial events, before the real step1. Additive:
+   *  rows already shown are never removed. null when none has arrived (also what an older backend always gives). */
+  firstLook: { ingredients: DetectedIngredient[]; photoIndex: number; photoCount: number } | null;
+  /** From the final step1: shown rows the final merge replaced with a higher-confidence variant; swapped in place. */
+  earlySuperseded: Superseded[];
   /** Fires names.length * 180 + 800ms after ingredients arrive (matches
    *  showDetectionChips(), templates/index.html:2586-2624) — the signal
    *  page.tsx uses to trigger the transition-to-results morph (Task 7). */
@@ -57,11 +64,20 @@ interface PhotoScanScreenProps {
 // fridge photo with a scan-line sweep, then a staggered reveal of detected
 // ingredients below it. Ported from templates/index.html:1912-1936
 // (markup), 1325-1546 (CSS), 2445-2624 (behavior).
-export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRevealComplete, onRetry, onBack }: PhotoScanScreenProps) {
+export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, firstLook, earlySuperseded, onRevealComplete, onRetry, onBack }: PhotoScanScreenProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [subIndex, setSubIndex] = useState(0);
   const [subFading, setSubFading] = useState(false);
   const [revealedCount, setRevealedCount] = useState(0);
+  // The rows on screen (first-look rows, then the final reconcile), and the timers revealing them one by one. Refs mirror
+  // them so a later event can see what is already shown without re-running an effect on every tick.
+  const [rows, setRows] = useState<DetectedIngredient[]>([]);
+  const rowsRef = useRef<DetectedIngredient[]>([]);
+  const revealedRef = useRef(0);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [checkpoint, setCheckpoint] = useState<BarCheckpoint | null>(null);
+  const checkpointRef = useRef<BarCheckpoint | null>(null);
+  const elapsedRef = useRef(0);
   const [statusText, setStatusText] = useState('Scanning your fridge...');
   const [statusComplete, setStatusComplete] = useState(false);
   const [noticeLevel, setNoticeLevel] = useState<'none' | 'soft'>('none');
@@ -92,7 +108,41 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
   const scanStopped = detectedIngredients !== null;
   // Restarts on retry (scanStopped goes back to false). The bar is gone with the screen on an error, so it can't freeze.
   const elapsed = useElapsed(visible && !scanStopped);
-  const barPercent = scanBarPercent(elapsed, scanStopped);
+  const barPercent = scanBarPercent(elapsed, scanStopped, checkpoint);
+
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
+  const showRows = (next: DetectedIngredient[]) => {
+    rowsRef.current = next;
+    setRows(next);
+  };
+  /** Reveals rows[from..total) one every REVEAL_STEP_MS, after any earlier rows still waiting for their turn. Returns the ms until the last one. */
+  const revealRows = (from: number, total: number, onEach?: (index: number) => void): number => {
+    const waiting = Math.max(0, from - revealedRef.current);
+    for (let i = from; i < total; i++) {
+      timersRef.current.push(
+        setTimeout(() => {
+          revealedRef.current = Math.max(revealedRef.current, i + 1);
+          setRevealedCount(revealedRef.current);
+          onEach?.(i);
+        }, (waiting + (i - from)) * REVEAL_STEP_MS)
+      );
+    }
+    return (waiting + Math.max(0, total - from)) * REVEAL_STEP_MS;
+  };
+
+  // Declared before the first-look effect below, so that effect reads this render's elapsed time.
+  useEffect(() => {
+    elapsedRef.current = elapsed;
+  }, [elapsed]);
+
+  // Timers must not outlive the screen: a back press or an error ends the reveal, and onRevealComplete must not fire after it.
+  useEffect(() => {
+    if (!visible) clearTimers();
+  }, [visible]);
+  useEffect(() => clearTimers, []);
 
   // Reset per-scan state whenever a scan (re)starts — initial mount, and
   // retryPhotoScan() resubmitting the same photos (lines 2549-2558), which
@@ -103,11 +153,33 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
     setSubIndex(0);
     setSubFading(false);
     setRevealedCount(0);
+    revealedRef.current = 0;
+    clearTimers();
+    showRows([]);
+    checkpointRef.current = null;
+    setCheckpoint(null);
     setStatusText('Scanning your fridge...');
     setStatusComplete(false);
     setNoticeLevel('none');
     revealStartedRef.current = false;
   }, [visible, scanStopped]);
+
+  // First look: pass 1 of a photo finished while pass 2 still runs. Add the new rows (never remove or reorder one), reveal only
+  // those, and take the bar's real checkpoint. Does nothing once the real step1 has landed.
+  useEffect(() => {
+    if (!visible || scanStopped || !firstLook || firstLook.ingredients.length === 0) return;
+    const before = rowsRef.current.length;
+    const merged = mergeFirstLook(rowsRef.current, firstLook.ingredients);
+    if (merged.length > before) {
+      showRows(merged);
+      revealRows(before, merged.length);
+      setStatusText('Found so far, still looking...');
+    }
+    const next = nextBarCheckpoint(elapsedRef.current, checkpointRef.current, firstLook.photoIndex, firstLook.photoCount);
+    checkpointRef.current = next;
+    setCheckpoint(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstLook, visible, scanStopped]);
 
   // Cycling sub-status message — startPhotoScanSubMessages()
   // (lines 2423-2438). Runs for as long as the screen is visible.
@@ -138,7 +210,8 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
 
   // Staggered detected-items reveal — showDetectionChips()
   // (lines 2586-2624). Runs once per scan, the instant detectedIngredients
-  // first transitions from null to populated.
+  // first transitions from null to populated. Rows a first look already put on screen stay (a few the final merge replaced are
+  // swapped in place); only the items not shown yet are animated. With no first look it is the original reveal of every item.
   useEffect(() => {
     if (!visible || !scanStopped || revealStartedRef.current) return;
     revealStartedRef.current = true;
@@ -150,31 +223,28 @@ export function PhotoScanScreen({ visible, photoUrls, detectedIngredients, onRev
       return () => clearTimeout(t);
     }
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    names.forEach((ingredient, i) => {
-      timers.push(
-        setTimeout(() => {
-          setRevealedCount(i + 1);
-          const isLast = i === names.length - 1;
-          setStatusText(
-            isLast
-              ? `Found ${names.length} ingredient${names.length === 1 ? '' : 's'}`
-              : i === 0
-                ? 'Found something...'
-                : `Found ${ingredient.name}...`
-          );
-          setStatusComplete(isLast);
-        }, i * REVEAL_STEP_MS)
-      );
+    const { rows: finalRows, appendedFrom } = reconcileFinal(rowsRef.current, names, earlySuperseded);
+    showRows(finalRows);
+    const total = finalRows.length;
+    const foundText = `Found ${names.length} ingredient${names.length === 1 ? '' : 's'}`;
+    const msToLast = revealRows(appendedFrom, total, i => {
+      const isLast = i === total - 1;
+      setStatusText(isLast ? foundText : i === 0 ? 'Found something...' : `Found ${finalRows[i].name}...`);
+      setStatusComplete(isLast);
     });
-    timers.push(setTimeout(onRevealComplete, names.length * REVEAL_STEP_MS + REVEAL_SETTLE_MS));
-    return () => timers.forEach(clearTimeout);
+    if (appendedFrom >= total) {
+      // Everything was already on screen from the first look: nothing left to animate, so say so now.
+      setStatusText(foundText);
+      setStatusComplete(true);
+    }
+    timersRef.current.push(setTimeout(onRevealComplete, msToLast + REVEAL_SETTLE_MS));
+    return clearTimers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, scanStopped]);
 
   if (!shouldRender) return null;
 
-  const revealed = names.slice(0, revealedCount);
+  const revealed = rows.slice(0, revealedCount);
 
   return (
     <div className={`${styles.photoScanScreen} ${shown ? styles.show : ''}`}>

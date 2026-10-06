@@ -4,6 +4,7 @@
 // useScanStream.ts uses for the actual network call — those use extensionless
 // value imports that only a bundler (not node --experimental-strip-types)
 // can resolve.
+import type { Superseded } from '../lib/firstLook';
 import type { ChecklistItem, DetectedIngredient, MealSuggestion, RecipeIngredient, ScanEvent, TopUpSuggestion } from '../lib/types';
 
 /** Shared by step2, SELECT_MEAL and REPLAN_SUCCESS — every place that turns
@@ -21,6 +22,20 @@ export function buildChecklist(ingredients: RecipeIngredient[]): ChecklistItem[]
       checked: foundInFridge || isStaple,
     };
   });
+}
+
+/** The early ("first look") list after another step1_partial: everything already shown, in the same order, plus anything new
+ *  appended. Never removes or reorders a row, whatever the incoming list holds. Lives here, not in lib/firstLook.ts, because
+ *  the reducer must stay free of runtime imports (see the note at the top of this file). */
+export function mergeFirstLook(shown: readonly DetectedIngredient[], incoming: readonly DetectedIngredient[]): DetectedIngredient[] {
+  const seen = new Set(shown.map(i => i.name.trim().toLowerCase()));
+  const added = incoming.filter(i => {
+    const k = (i.name ?? '').trim().toLowerCase();
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return [...shown, ...added];
 }
 
 export interface ScanState {
@@ -60,6 +75,11 @@ export interface ScanState {
    *  need to react only once real (possibly empty) results are in must key
    *  on this, not `detectedIngredients.length`. */
   step1Received: boolean;
+  /** "First look" (step1_partial): the pass-1 items found so far, only while the photo scan is running and before step1.
+   *  Additive (see lib/firstLook.ts), cleared by SCAN_START and RESET; the final detectedIngredients is what results use. */
+  firstLook: { ingredients: DetectedIngredient[]; photoIndex: number; photoCount: number } | null;
+  /** From the final step1: early items it replaced with a higher-confidence variant, so the scan screen swaps those rows. */
+  earlySuperseded: Superseded[];
 }
 
 export type Action =
@@ -104,6 +124,8 @@ export const initialState: ScanState = {
   scanError: null,
   timedOutVision: false,
   step1Received: false,
+  firstLook: null,
+  earlySuperseded: [],
   replanPending: false,
   replanError: null,
 };
@@ -146,6 +168,7 @@ export function reducer(state: ScanState, action: Action): ScanState {
       return {
         ...state,
         detectedIngredients: action.ingredients,
+        earlySuperseded: Array.isArray(action.early_superseded) ? action.early_superseded : [],
         timedOutVision: false,
         step1Received: true,
         // A photo scan stays in 'photo-scanning' — the PhotoScanScreen
@@ -317,6 +340,19 @@ export function reducer(state: ScanState, action: Action): ScanState {
         topUpSuggestions: action.topUpSuggestions,
         awaitingChoice: true,
         recipeTabUnlocked: true,
+      };
+
+    // Pass 1 of a photo finished: show what was found so far. Only while the photo scan is still running and the real step1
+    // has not landed (a late or stale event after that, or in any other phase, changes nothing); never removes a row.
+    case 'step1_partial':
+      if (state.phase !== 'photo-scanning' || state.step1Received || !Array.isArray(action.ingredients)) return state;
+      return {
+        ...state,
+        firstLook: {
+          ingredients: mergeFirstLook(state.firstLook?.ingredients ?? [], action.ingredients),
+          photoIndex: action.photo_index,
+          photoCount: action.photo_count,
+        },
       };
 
     // 'progress' and 'step2_partial' don't drive any state the UI reads

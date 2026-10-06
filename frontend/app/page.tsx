@@ -294,6 +294,8 @@ export default function Home() {
         visible={showPhotoScan}
         photoUrls={photos.thumbnailUrls}
         detectedIngredients={state.step1Received ? state.detectedIngredients : null}
+        firstLook={state.firstLook}
+        earlySuperseded={state.earlySuperseded}
         onRevealComplete={() => setPhotoDetectionRevealed(true)}
         onRetry={handleGetRecipe}
         onBack={handleBackToLanding}

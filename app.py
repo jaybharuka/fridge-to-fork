@@ -641,6 +641,8 @@ async def auth_logout(request: Request):
 
 # A hung Gemini vision call must not hang the whole scan (see the step1 timeout in /api/scan).
 STEP1_TIMEOUT_SECONDS = 60.0
+# How often the vision wait wakes up to forward first-look events (step1_partial). Completion itself is not polled.
+FIRST_LOOK_POLL_SECONDS = 0.25
 
 
 @app.post("/api/scan")
@@ -670,6 +672,7 @@ async def scan(
         tmp_paths: list[str] = []
         fridge = None
         top_up_task = None
+        vision_task = None
         try:
             if scan_mode == "recipe":
                 # ── Step 1: No fridge data at all — recipe checklist starts
@@ -696,12 +699,33 @@ async def scan(
                 yield _sse({"type": "progress", "step": 1, "message": "Scanning your fridge with AI vision…"})
                 t_vision = time.time()
                 vision_timed_out = False
+                # "First look": identify_ingredients() reports each photo's pass-1 items through this queue while it keeps
+                # running in its thread, and they go out as step1_partial events. Purely additive: the final step1 below
+                # is unchanged (an old client ignores the new event type).
+                first_look_q: queue.Queue = queue.Queue()
+                vision_task = asyncio.ensure_future(asyncio.to_thread(
+                    identify_ingredients, tmp_paths, target_dish or "",
+                    on_pass1=lambda items, photo_index, photo_count: first_look_q.put(
+                        {"type": "step1_partial", "ingredients": items, "photo_index": photo_index, "photo_count": photo_count}
+                    ),
+                ))
                 try:
-                    fridge = await asyncio.wait_for(
-                        asyncio.to_thread(identify_ingredients, tmp_paths, target_dish or ""),
-                        timeout=STEP1_TIMEOUT_SECONDS,  # hard limit — a hung Gemini call must not hang the whole scan
-                    )
+                    # Same hard limit as before (a hung Gemini call must not hang the whole scan), checked against the
+                    # same start time; the loop only adds a short wake-up to forward queued first-look events.
+                    while True:
+                        while not first_look_q.empty():
+                            yield _sse(first_look_q.get_nowait())
+                        remaining = STEP1_TIMEOUT_SECONDS - (time.time() - t_vision)
+                        if remaining <= 0:
+                            raise asyncio.TimeoutError
+                        done, _ = await asyncio.wait({vision_task}, timeout=min(FIRST_LOOK_POLL_SECONDS, remaining))
+                        if done:
+                            break
+                    while not first_look_q.empty():
+                        yield _sse(first_look_q.get_nowait())
+                    fridge = vision_task.result()
                 except asyncio.TimeoutError:
+                    vision_task.cancel()  # the thread itself keeps running (it cannot be stopped); this just detaches it
                     print(f"[STEP1 TIMEOUT] identify_ingredients exceeded {STEP1_TIMEOUT_SECONDS:g}s ({time.time() - t_vision:.2f}s), stopping the scan")
                     vision_timed_out = True
                     fridge = FridgeContents(ingredients=[])
@@ -723,6 +747,7 @@ async def scan(
                         for i in sorted(fridge.ingredients, key=lambda x: -x.confidence)
                     ],
                     **({"timed_out": True} if vision_timed_out else {}),
+                    **({"early_superseded": fridge.early_superseded} if getattr(fridge, "early_superseded", None) else {}),
                 })
                 if vision_timed_out:
                     # Stop here. Planning on an empty fridge produced a plan that looked real ("9 of 17 ingredients" is
@@ -907,6 +932,8 @@ async def scan(
             # this, don't leave the background thread's task dangling.
             if top_up_task is not None and not top_up_task.done():
                 top_up_task.cancel()
+            if vision_task is not None and not vision_task.done():
+                vision_task.cancel()  # the client left mid-vision; detach (the thread cannot be stopped)
 
     return StreamingResponse(
         stream(),

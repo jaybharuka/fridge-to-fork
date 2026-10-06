@@ -20,7 +20,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Union
+from typing import Callable, Union
 
 import httpx
 from dotenv import load_dotenv
@@ -33,7 +33,7 @@ from rich.table import Table
 from . import gemini_resilience as resilience
 from . import prompt_rules
 from .gemini_keys import load_api_keys
-from .ingredient_matching import dedupe_detections, is_blocked_detection, passes_confidence
+from .ingredient_matching import dedupe_detections, is_blocked_detection, passes_confidence, same_ingredient
 from .models import FridgeContents, Ingredient
 
 load_dotenv()
@@ -551,12 +551,52 @@ def _gemini_deep_scan(image_bytes: bytes, found_items: list[str], clients: list[
     return _call_gemini_vision_with_fallback(clients, image_bytes, prompt, model)
 
 
+def _merge_and_filter(all_items: dict[str, dict]) -> list[dict]:
+    """The final list's filters, in one place so the "first look" (on_pass1) judges an item exactly as the end result will.
+    Re-keys each dict's own "name" onto the (already lowercased/stripped) merge key — dedupe_detections() and
+    is_blocked_detection() both read item["name"], and the extended fields ride along unchanged."""
+    items = [{**item, "name": name} for name, item in all_items.items()]
+    items = [item for item in items if not is_blocked_detection(item["name"])]
+    # floor=50 explicitly, not the module's default 60 — preserves this
+    # path's existing confidence threshold; this is a matching-logic fix,
+    # not a confidence-tuning change.
+    items = [
+        item for item in items
+        if passes_confidence(item["name"], item.get("confidence", 0), floor=50)
+    ]
+    items = dedupe_detections(items)
+    return sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
+
+
+def _first_look_payload(items: list[dict]) -> list[dict]:
+    """Shaped like the step1 event's ingredients (same confidence arithmetic as Ingredient + the event)."""
+    return [{"name": i["name"], "quantity": "", "confidence": round(i.get("confidence", 0) / 100.0 * 100)} for i in items]
+
+
+def _superseded_early(emitted: list[str], final_items: list[dict]) -> list[dict]:
+    """Early names the final list no longer has. Final dedupe keeps the higher-confidence report of true variants, so a
+    first-look "tomato" can be replaced by a pass-2 "cherry tomato"; each such name is paired with the final item that
+    replaced it, so the client can swap that row in place instead of dropping it."""
+    final_names = {i["name"] for i in final_items}
+    out = []
+    for name in emitted:
+        if name in final_names:
+            continue
+        replacement = next((i["name"] for i in final_items if same_ingredient(name, i["name"])), None)
+        if replacement:
+            out.append({"from": name, "to": replacement})
+        else:
+            print(f"[STEP1] first_look item {name!r} is not in the final list and has no variant there")
+    return out
+
+
 def identify_ingredients(
     image_source: Union[str, Path, bytes, list[Union[str, Path, bytes]]],
     dish_name: str = "",
     *,
     model: str | None = None,
     client: genai.Client | None = None,
+    on_pass1: Callable[[list[dict], int, int], None] | None = None,
 ) -> FridgeContents:
     """
     Analyse one or more fridge photos and return structured FridgeContents.
@@ -598,6 +638,13 @@ def identify_ingredients(
         Optional pre-built Gemini client (useful for testing / DI) — bypasses
         the multi-key rotation pool entirely and is used as the sole client,
         same as before this existed.
+    on_pass1:
+        Optional "first look" hook: called as on_pass1(items, photo_index, photo_count) once per photo, right after that
+        photo's pass 1 and only when there is something to show. `items` is everything found so far across the photos
+        done (cumulative), put through exactly the same filters as the final list (_merge_and_filter) and shaped like the
+        step1 event's ingredients; photo_index is 1-based. Pure notification: it cannot change the result, and an
+        exception in it is logged and swallowed. The final return value is identical with or without it, except for
+        FridgeContents.early_superseded (see there).
 
     Returns
     -------
@@ -621,8 +668,9 @@ def identify_ingredients(
     # estimated_quantity, needs_confirmation, possible_matches) alongside
     # confidence, not just the bare number the old dict[str, int] held.
     all_items: dict[str, dict] = {}
+    emitted_names: list[str] = []  # every name ever sent through on_pass1, in order
 
-    for source in sources:
+    for photo_number, source in enumerate(sources, 1):
         try:
             raw_bytes, _media_type = _load_image(source)
             image_bytes = _preprocess_for_gemini(raw_bytes)
@@ -640,6 +688,15 @@ def identify_ingredients(
             if name not in all_items or confidence > all_items[name].get("confidence", 0):
                 all_items[name] = item
 
+        if on_pass1 is not None and pass1_items:
+            early = _merge_and_filter(all_items)
+            if early:
+                emitted_names.extend(i["name"] for i in early if i["name"] not in emitted_names)
+                try:
+                    on_pass1(_first_look_payload(early), photo_number, len(sources))
+                except Exception as e:  # noqa: BLE001 - a notification hook must never break a scan
+                    console.print(f"[yellow][WARNING] on_pass1 hook failed: {type(e).__name__}: {e}[/yellow]")
+
         # Pass 2 sees what THIS photo's Pass 1 found so far, not items
         # found in a previous photo in a multi-photo scan — it's hunting
         # for what this specific image's first pass missed.
@@ -656,20 +713,13 @@ def identify_ingredients(
         console.print("[yellow][WARNING] Gemini found nothing across both passes[/yellow]")
         return FridgeContents(ingredients=[])
 
-    # Re-key each dict's own "name" onto the (already lowercased/stripped)
-    # merge key — dedupe_detections() and is_blocked_detection() below both
-    # read item["name"], and the extended fields ride along unchanged.
-    items = [{**item, "name": name} for name, item in all_items.items()]
-    items = [item for item in items if not is_blocked_detection(item["name"])]
-    # floor=50 explicitly, not the module's default 60 — preserves this
-    # path's existing confidence threshold; this is a matching-logic fix,
-    # not a confidence-tuning change.
-    items = [
-        item for item in items
-        if passes_confidence(item["name"], item.get("confidence", 0), floor=50)
-    ]
-    items = dedupe_detections(items)
-    items = sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
+    items = _merge_and_filter(all_items)
+
+    superseded = _superseded_early(emitted_names, items) if emitted_names else []
+    if emitted_names:
+        for s in superseded:
+            print(f"[STEP1] first_look superseded: {s['from']!r} -> {s['to']!r}")
+        print(f"[STEP1] first_look summary: shown={len(emitted_names)} final={len(items)} superseded={len(superseded)}")
 
     console.print(f"[green][OK] Vision succeeded: {len(items)} item(s) after filtering[/green]")
 
@@ -693,6 +743,7 @@ def identify_ingredients(
             f"{len(ingredients)} ingredient(s) detected in your fridge."
             if ingredients else "No ingredients detected."
         ),
+        early_superseded=superseded,
     )
 
 
