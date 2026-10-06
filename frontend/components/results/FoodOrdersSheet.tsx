@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useFoodLiveStatus, useFoodOrderDetails, useFoodOrderList } from '@/hooks/useFoodOrders';
 import { formatInr, type FoodOrderRow } from '@/lib/food';
 import { closeOrders, useOrdersUi } from '@/lib/ordersUi';
+import { orderProblemMessage } from '@/lib/reportText';
 import { useSelectedAddressId } from '@/lib/addressStore';
 import { Sheet } from '@/components/ui/Sheet';
 import sheetStyles from '@/components/ui/Sheet.module.css';
@@ -184,7 +185,7 @@ function Panel({ initialOrderId, initialAddressId, onClose }: { initialOrderId: 
             label="Report a problem with this order"
             input={{
               tool: order?.active ? 'get_food_delivery_status' : 'get_food_order_details',
-              errorMessage: `Problem with order ${viewId}${order?.status ? ` (status: ${order.status})` : ''}`,
+              errorMessage: orderProblemMessage(viewId),
               flow: 'Viewing the order in the app',
               context: { orderId: viewId, ...(list.address?.id ?? addressId ? { addressId: (list.address?.id ?? addressId) as string } : {}) },
             }}

@@ -3,6 +3,7 @@
 import { ChevronLeft, CircleAlert, CircleCheck, RefreshCw, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { closeOrders, useOrdersUi } from '@/lib/ordersUi';
+import { orderProblemMessage } from '@/lib/reportText';
 import { formatInr, isPastOrder, type OrderDetails, type OrderSummary } from '@/lib/instamart';
 import { useLiveStatus, useOrderDetails, useOrderList } from '@/hooks/useInstamartOrders';
 import { Sheet } from '@/components/ui/Sheet';
@@ -188,7 +189,7 @@ function Panel({ initialOrderId, onClose }: { initialOrderId: string | null; onC
             label="Report a problem with this order"
             input={{
               tool: order && isPastOrder(order.status) ? 'get_order_details' : 'get_delivery_status',
-              errorMessage: `Problem with order ${viewId}${order?.status ? ` (status: ${order.status})` : ''}`,
+              errorMessage: orderProblemMessage(viewId),
               flow: 'Viewing the order in the app',
               context: { orderId: viewId, ...(order?.addressId ? { addressId: order.addressId } : {}) },
             }}
