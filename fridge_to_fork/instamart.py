@@ -387,7 +387,7 @@ async def apply_coupon(token: str, address_id: str, coupon_code: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _order_type_diag(data) -> str:
-    """TEMPORARY diagnostic: the `orderType` (and status/isActive/createdAt) Swiggy puts on each order of a get_orders answer.
+    """Diagnostic kept on purpose: the `orderType` (and status/isActive/createdAt) Swiggy puts on each order of a get_orders answer.
     Structure only: no addresses, names, phone numbers or item names."""
     raw = data.get("orders") if isinstance(data, dict) else None
     orders = [o for o in raw if isinstance(o, dict)] if isinstance(raw, list) else []
@@ -397,25 +397,15 @@ def _order_type_diag(data) -> str:
     )
 
 
-async def _log_unfiltered_active_orders(session: ClientSession) -> None:
-    """TEMPORARY diagnostic, log only: the filtered call below has been seen returning [] for real Instamart orders, so also
-    ask without orderType and log what comes back. Never affects the result; bounded and fully swallowed."""
-    try:
-        data = await asyncio.wait_for(_call(session, "get_orders", activeOnly=True, count=10), timeout=5)
-        log.warning("[INSTAMART][diag][orderType] checkout check, no orderType, activeOnly=True: %s", _order_type_diag(data))
-    except Exception as exc:  # noqa: BLE001 - diagnostics must never break an order
-        log.warning("[INSTAMART][diag][orderType] checkout check probe failed: %r", exc)
-
-
 async def _active_order_ids(session: ClientSession) -> set[str] | None:
     """None = couldn't check (callers must then treat an ambiguous checkout as unknown)."""
     try:
-        data = await _call(session, "get_orders", orderType="INSTAMART", activeOnly=True, count=10)
+        # No orderType: Swiggy files Instamart orders as "DASH", so filtering by "INSTAMART" hid them from this check
+        # (see list_orders in instamart_orders.py).
+        data = await _call(session, "get_orders", activeOnly=True, count=10)
     except Exception:
         return None
-    log.warning("[INSTAMART][diag][orderType] checkout check, orderType=INSTAMART activeOnly=True: %s", _order_type_diag(data))
-    if not (data.get("orders") or []):
-        await _log_unfiltered_active_orders(session)
+    log.warning("[INSTAMART][diag][orderType] checkout check, activeOnly=True: %s", _order_type_diag(data))
     return {str(o["orderId"]) for o in data.get("orders") or [] if o.get("orderId")}
 
 
