@@ -33,6 +33,10 @@ class Ingredient:
 class FridgeContents:
     ingredients: list[Ingredient] = field(default_factory=list)
     raw_description: str = ""        # free-text from vision model
+    # "First look" bookkeeping (step1_fridge_vision.identify_ingredients' on_pass1): early items that the final merge replaced
+    # with a higher-confidence variant, as [{"from": early name, "to": final name}]. Empty when no early item was sent or none
+    # was replaced. Never affects the ingredients themselves.
+    early_superseded: list = field(default_factory=list)
 
 
 @dataclass

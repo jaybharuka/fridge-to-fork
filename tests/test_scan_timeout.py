@@ -23,12 +23,12 @@ def events(response) -> list[dict]:
     return [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
 
 
-def slow_vision(_paths, _dish=""):
+def slow_vision(_paths, _dish="", **_kw):
     time.sleep(0.4)  # outlives the patched timeout, like a hung Gemini call
     return FridgeContents(ingredients=[Ingredient(name="late tomato", confidence=0.9)])
 
 
-def fast_vision(_paths, _dish=""):
+def fast_vision(_paths, _dish="", **_kw):
     return FridgeContents(ingredients=[Ingredient(name="tomato", confidence=0.9)])
 
 
@@ -88,9 +88,9 @@ class VisionTimeoutTests(unittest.TestCase):
     def test_temp_photo_files_are_cleaned_up_after_a_timeout(self):
         seen: list[list[str]] = []
 
-        def spying_vision(paths, dish=""):
+        def spying_vision(paths, dish="", **kw):
             seen.append(list(paths))
-            return slow_vision(paths, dish)
+            return slow_vision(paths, dish, **kw)
 
         self.scan(spying_vision)
         import os

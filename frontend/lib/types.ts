@@ -19,7 +19,11 @@ export interface TopUpSuggestion { name: string; estimated_price?: number; categ
 
 export type ScanEvent =
   | { type: 'progress'; step: number; message: string }
-  | { type: 'step1'; raw_description: string; ingredients: DetectedIngredient[]; source?: string; timed_out?: boolean }
+  | { type: 'step1'; raw_description: string; ingredients: DetectedIngredient[]; source?: string; timed_out?: boolean;
+      /** Early items the final merge replaced with a higher-confidence variant (absent when none). */
+      early_superseded?: { from: string; to: string }[] }
+  /** Cumulative pass-1 items ("first look"), once per photo while pass 2 still runs; photo_index is 1-based. Additive only. */
+  | { type: 'step1_partial'; ingredients: DetectedIngredient[]; photo_index: number; photo_count: number }
   | { type: 'step2_partial'; text: string }
   | { type: 'step2'; decision: string; recommended_meal: string | null; reasoning: string;
       suggestions: MealSuggestion[]; recipe_ingredients: RecipeIngredient[];
