@@ -102,6 +102,46 @@ class FirstLookCallbackTests(unittest.TestCase):
         self.assertEqual(run([[], []], on_pass1=lambda *args: None).ingredients, [])
 
 
+class FirstLookLogTests(unittest.TestCase):
+    """Why a first look shows fewer rows than pass 1 returned (2026-10-06: 15 raw items, 4 shown): the dropped names, with the filter."""
+
+    @staticmethod
+    def lines(passes, hook=True):
+        with patch("builtins.print") as printed:
+            result = run(passes, on_pass1=(lambda *args: None) if hook else None)
+        return result, [str(c.args[0]) for c in printed.call_args_list if c.args]
+
+    def test_dropped_names_are_logged_with_the_filter_that_dropped_each(self):
+        pass1 = [item("tomato", 90), item("cherry tomato", 80), item("salt", 95), item("onion", 40), item("milk", 70)]
+        _, lines = self.lines([pass1, []])
+        dropped = next(l for l in lines if "first_look dropped" in l)
+        self.assertIn("after pass 1 (photo 1/1, 3 of 5 unique)", dropped)
+        self.assertIn("'salt' (blocked name)", dropped)
+        self.assertIn("'onion' (confidence floor, 40)", dropped)
+        self.assertIn("'cherry tomato' (dedupe, same as 'tomato')", dropped)
+        self.assertNotIn("'milk'", dropped)  # kept names are not listed
+
+    def test_logging_does_not_change_the_result(self):
+        pass1 = [item("tomato", 90), item("salt", 95), item("onion", 40)]
+        with_logs, _ = self.lines([pass1, [item("lemon", 75)]])
+        self.assertEqual(with_logs.ingredients, run([pass1, [item("lemon", 75)]]).ingredients)
+
+    def test_nothing_is_logged_when_nothing_was_dropped(self):
+        _, lines = self.lines([[item("tomato", 90), item("milk", 70)], []])
+        self.assertFalse(any("first_look dropped" in l for l in lines))
+
+    def test_nothing_is_logged_without_the_first_look_hook(self):
+        _, lines = self.lines([[item("salt", 95)], []], hook=False)
+        self.assertFalse(any("first_look" in l for l in lines))
+
+    def test_the_drop_reasons_come_from_the_same_filters_as_the_final_list(self):
+        all_items = {"tomato": item("tomato", 90), "salt": item("salt", 95), "onion": item("onion", 40), "cherry tomato": item("cherry tomato", 80)}
+        drops: list = []
+        kept = vision._merge_and_filter(all_items, drops)
+        self.assertEqual([i["name"] for i in kept], [i["name"] for i in vision._merge_and_filter(all_items)])
+        self.assertEqual({n for n, _ in drops} | {i["name"] for i in kept}, set(all_items))
+
+
 # ---- the /api/scan stream -------------------------------------------------------------------------------------------------
 
 client = TestClient(a.app)
@@ -149,6 +189,26 @@ class ScanStreamTests(unittest.TestCase):
         self.assertEqual([i["name"] for i in step1["ingredients"]], ["tomato", "lemon"])
         self.assertNotIn("early_superseded", step1)  # nothing was replaced: the field is absent, exactly as before
         self.assertIn("step2", types)
+
+    def test_each_first_look_emitted_is_logged_with_photo_items_and_seconds(self):
+        def vision_fn(_paths, _dish="", on_pass1=None):
+            on_pass1(EARLY, 1, 2)
+            time.sleep(0.05)
+            return FridgeContents(ingredients=[Ingredient(name="tomato", confidence=0.9)])
+
+        with patch("builtins.print") as printed:
+            self.scan(vision_fn)
+        lines = [str(c.args[0]) for c in printed.call_args_list if c.args and "first_look sent" in str(c.args[0])]
+        self.assertEqual(len(lines), 1)
+        self.assertRegex(lines[0], r"^\[STEP1\] first_look sent: photo 1/2 items=1 t=\d+\.\d\ds$")
+
+    def test_no_first_look_means_no_emit_line(self):
+        def vision_fn(_paths, _dish="", on_pass1=None):
+            return FridgeContents(ingredients=[Ingredient(name="tomato", confidence=0.9)])
+
+        with patch("builtins.print") as printed:
+            self.scan(vision_fn)
+        self.assertFalse(any("first_look sent" in str(c.args[0]) for c in printed.call_args_list if c.args))
 
     def test_superseded_pairs_ride_on_the_final_step1(self):
         def vision_fn(_paths, _dish="", on_pass1=None):
