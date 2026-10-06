@@ -54,16 +54,13 @@ console = Console()
 # outer retry loop) - an SDK-level retry on an identical slow/loaded model
 # rarely helps and only compounds the wait, same reasoning already applied
 # to vision.
-_TEXT_CALL_HTTP_OPTIONS = types.HttpOptions(
-    timeout=25_000,
-    retry_options=types.HttpRetryOptions(attempts=1, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
-)
+# Timeouts: resilience.PLAN_TIMEOUT_SECONDS (18s) and resilience.TOP_UP_TIMEOUT_SECONDS (15s), one attempt each.
 
 
-def _text_config(model: str) -> types.GenerateContentConfig:
+def _text_config(model: str, timeout_seconds: float) -> types.GenerateContentConfig:
     """Thinking is turned down for the models that accept it (see gemini_resilience.thinking_config_for): the planner's
     prompts are templated JSON, and thinking was a large part of why one plan took 250s on 2026-10-03."""
-    return types.GenerateContentConfig(http_options=_TEXT_CALL_HTTP_OPTIONS, thinking_config=resilience.thinking_config_for(model))
+    return types.GenerateContentConfig(http_options=resilience.http_options(timeout_seconds), thinking_config=resilience.thinking_config_for(model))
 
 
 # ---------------------------------------------------------------------------
@@ -793,7 +790,7 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
             full_text = ""
             for chunk in client.models.generate_content_stream(
                 model=model, contents=prompt,
-                config=_text_config(model),
+                config=_text_config(model, resilience.PLAN_TIMEOUT_SECONDS),
             ):
                 if chunk.text:
                     full_text += chunk.text
@@ -869,11 +866,13 @@ def plan_meals_stream(
     for chain_model, model_clients in resilience.attempt_plan(chain, clients):
         attempt = resilience.ModelAttempt()
         for key_label, key_client in model_clients:
+            started = time.monotonic()
             try:
                 for kind, payload in _call_text_model_with_retry_stream(key_client, chain_model, prompt):
                     if kind == "partial":
                         yield ("partial", payload)
                     else:
+                        resilience.log_success("plan", chain_model, key_label, started)
                         resilience.note_success(chain_model)
                         console.print(f"[green][OK] Meal planning succeeded with model: {chain_model} on {key_label}[/green]")
                         yield ("result", _enrich_recipe_ingredients(payload, fridge))
@@ -1060,10 +1059,11 @@ def generate_top_up_suggestions(
         attempt = resilience.ModelAttempt()
         for key_label, client in model_clients:
             print(f"[TOP_UP] Attempting with model: {chain_model} on {key_label}")
+            started = time.monotonic()
             try:
                 response = client.models.generate_content(
                     model=chain_model, contents=prompt,
-                    config=_text_config(chain_model),
+                    config=_text_config(chain_model, resilience.TOP_UP_TIMEOUT_SECONDS),
                 )
                 suggestions = _parse_top_up_response(response.text)
                 suggestions = [
@@ -1072,6 +1072,7 @@ def generate_top_up_suggestions(
                 ]
                 print(f"[TOP_UP] Result: {_ascii_safe(suggestions)}")
                 if suggestions:
+                    resilience.log_success("top_up", chain_model, key_label, started)
                     resilience.note_success(chain_model)
                     console.print(f"[green][OK] Top-up suggestions succeeded with model: {chain_model} on {key_label}[/green]")
                     return suggestions[:5]
