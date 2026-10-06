@@ -32,14 +32,12 @@ function OrderList({ orders, onPick }: { orders: FoodOrderRow[]; onPick: (id: st
           {rows.map(o => (
             <li key={o.orderId}>
               <button type="button" className={styles.orderRow} onClick={() => onPick(o.orderId)}>
-                <span className={styles.couponBody}>
+                <span className={styles.orderHead}>
                   <span className={styles.orderTitle}>{o.restaurant || `Order ${o.orderId}`}</span>
-                  <span className={styles.meta}>{[o.orderedTime, o.items].filter(Boolean).join(' · ')}</span>
-                </span>
-                <span className={styles.orderSide}>
-                  <StatusChip order={o} />
                   {o.total && <span className={styles.lineTotal}>{o.total}</span>}
                 </span>
+                <span className={styles.meta}>{[o.orderedTime, o.items].filter(Boolean).join(' · ')}</span>
+                <StatusChip order={o} />
               </button>
             </li>
           ))}
