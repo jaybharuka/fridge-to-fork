@@ -18,6 +18,7 @@ What each failure now means (see failure_kind):
 
 from __future__ import annotations
 
+import os
 import re
 import threading
 import time
@@ -32,6 +33,37 @@ UNAVAILABLE_COOLDOWN_SECONDS = 6 * 3600.0  # a (model, key) that 404'd "no longe
 MAX_OVERLOADED_PER_MODEL = 2
 
 NEXT_KEY, NEXT_MODEL = "next_key", "next_model"
+
+
+def _env_seconds(name: str, default: float) -> float:
+    try:
+        value = float(os.environ.get(name, ""))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Per-attempt timeouts (2026-10-06). Chosen from the successful-call durations in the Render logs of 2026-10-03
+# (vision 2.8-17.1s, plan 1.7-13.0s, top-up 1.5-12.0s): 15s would have cut off ~5% of successes, 18s none, against 25s
+# before, which made every timeout cost 25s. Google enforces the deadline itself (the SDK sends it as X-Server-Timeout),
+# so a call cut off here is cancelled on their side too. Overridable per step to tune without a deploy of code.
+VISION_TIMEOUT_SECONDS = _env_seconds("GEMINI_VISION_TIMEOUT_SECONDS", 15.0)
+PLAN_TIMEOUT_SECONDS = _env_seconds("GEMINI_PLAN_TIMEOUT_SECONDS", 18.0)
+TOP_UP_TIMEOUT_SECONDS = _env_seconds("GEMINI_TOP_UP_TIMEOUT_SECONDS", 15.0)
+
+
+def http_options(timeout_seconds: float) -> types.HttpOptions:
+    """One attempt, no SDK-level retry (the fallback loops are the retry layer), capped at `timeout_seconds`."""
+    return types.HttpOptions(
+        timeout=int(timeout_seconds * 1000),
+        retry_options=types.HttpRetryOptions(attempts=1, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
+    )
+
+
+def log_success(step: str, model: str, key_label: str, started: float) -> None:
+    """One greppable line per successful call: `[TIMING] gemini_call <step> <model> on <keyN>: 4.12s`. `started` is a
+    time.monotonic() reading taken just before the call. Key label only, never the key."""
+    print(f"[TIMING] gemini_call {step} {model} on {key_label}: {time.monotonic() - started:.2f}s")
 
 _now = time.monotonic  # patchable in tests
 _lock = threading.Lock()

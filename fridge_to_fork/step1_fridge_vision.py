@@ -459,6 +459,9 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
             # Thinking is on by default for these models and was the main reason this call timed out (504 at 25s); off,
             # the same call takes ~9s. Extraction from a photo doesn't need it. See gemini_resilience.thinking_config_for.
             thinking_config=resilience.thinking_config_for(model),
+            # 2026-10-06: 25s -> resilience.VISION_TIMEOUT_SECONDS (15s), see gemini_resilience for the data behind it.
+            # The history below is why it was 25s before.
+            #
             # timeout is PER ATTEMPT, not a shared budget across retries (confirmed against the
             # google-genai SDK's own source, _api_client.py: _request_once() receives this same
             # value on every call _retry() makes) — so worst case for ONE model in the fallback
@@ -482,10 +485,7 @@ def _call_gemini_vision(image_bytes: bytes, prompt: str, client: genai.Client, m
             # real headroom. Worst case per model: ~25s (no retry multiplier) — leaves ~35s of
             # the 60s ceiling for at least one, ideally two, fallback models to also get tried,
             # versus ~33s a single model could already consume before this change.
-            http_options=types.HttpOptions(
-                timeout=25_000,
-                retry_options=types.HttpRetryOptions(attempts=1, initial_delay=0.5, max_delay=3.0, exp_base=2.0),
-            ),
+            http_options=resilience.http_options(resilience.VISION_TIMEOUT_SECONDS),
         ),
     )
 
@@ -526,7 +526,9 @@ def _call_gemini_vision_with_fallback(
         attempt = resilience.ModelAttempt()
         for key_label, client in model_clients:
             try:
+                started = time.monotonic()
                 result = _call_gemini_vision(image_bytes, prompt, client, chain_model)
+                resilience.log_success("vision", chain_model, key_label, started)
                 resilience.note_success(chain_model)
                 if len(clients) > 1 or key_label != "key1":
                     console.print(f"[green][Gemini] {chain_model} succeeded on {key_label}[/green]")
