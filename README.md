@@ -90,7 +90,7 @@ The app is two deployables that talk to each other across origins.
 
 **Landing.** A hero, a dish search box with live suggestions, a servings picker (1 to 8), a popular-dishes shelf, and a fridge photo area (up to three photos, camera or gallery). Photos are downscaled in the browser to at most 1200 px on the long edge and re-encoded as JPEG before upload, using native decoder downscaling where the browser supports it, which keeps memory use low for large phone photos. **Get Recipe** works with no photo at all.
 
-**Scan and planning screens.** A full-screen photo scan screen shows the scan line, a progress bar and detected ingredients as they arrive. Recipe planning has its own progress view. Both are fed by Server-Sent Events from the backend (`progress`, `step1`, `step2`, `awaiting_user_choice`, `top_up`, `complete`, plus `auth_required` and `error`), and both can be backed out of. A stalled or failed scan lands on a clear, retryable error state.
+**Scan and planning screens.** A full-screen photo scan screen shows the scan line, a progress bar and detected ingredients as they arrive. Recipe planning has its own progress view. Both are fed by Server-Sent Events from the backend (`progress`, `step1_partial` (a first look at the pass-1 ingredients while pass 2 still runs), `step1`, `step2`, `awaiting_user_choice`, `top_up`, `complete`, plus `auth_required` and `error`), and both can be backed out of. A stalled or failed scan lands on a clear, retryable error state.
 
 **Results.** A dish hero photo, a sticky summary bar ("6 of 9 ingredients, 3 to order"), and two tabs:
 
@@ -238,7 +238,7 @@ fridge-to-fork/
 │   │                               # Command-line entry point and dry-run simulation
 │   └── swiggy_live_mcp.py          # Legacy stdio MCP stub, unused by the running app
 ├── templates/index.html            # Legacy vanilla-JS page. Retired, not served
-├── tests/                          # Backend tests (35 test files) and eval harnesses
+├── tests/                          # Backend tests (36 test files) and eval harnesses
 ├── scripts/                        # Developer scripts (SSE scan runner, live checks)
 ├── docs/                           # Design proposals and implementation plans
 ├── Dockerfile                      # Backend image
@@ -320,7 +320,7 @@ pytest --continue-on-collection-errors
 cd frontend && npm test
 ```
 
-**Backend.** `tests/` holds 35 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 17 test files (145 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
+**Backend.** `tests/` holds 36 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 18 test files (167 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
 
 **Known failures.** The backend suite is not fully green, and contributors should know before running it:
 
@@ -328,7 +328,7 @@ cd frontend && npm test
 - `tests/test_step3_order_router.py` fails at import (`order_dish_from_swiggy` no longer exists in `step3_order_router.py`).
 - 7 tests in `tests/test_step2_meal_planner.py` fail: their mocked Gemini responses no longer reach the planner, which falls through its model chain instead.
 
-The last full run was 645 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
+The last full run was 660 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
 
 ## 14. Deployment
 
