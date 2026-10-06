@@ -127,7 +127,7 @@ A separate `generate_top_up_suggestions()` call proposes a few Instamart add-ons
 
 **Prompt style.** `prompt_rules.py` appends one shared style rule to every prompt (vision, planning, top-up) so generated copy never uses em dashes. The prompts themselves are free of them as well.
 
-**Streaming and limits.** `/api/scan` streams its progress over SSE. The vision step has a hard 60 second ceiling, and each individual Gemini call is capped at 25 seconds, so one hung call can never hold a scan hostage.
+**Streaming and limits.** `/api/scan` streams its progress over SSE. The vision step has a hard 60 second ceiling, and each individual Gemini call is capped at 15 seconds for vision and top-up and 18 seconds for the meal plan (overridable with `GEMINI_VISION_TIMEOUT_SECONDS`, `GEMINI_PLAN_TIMEOUT_SECONDS` and `GEMINI_TOP_UP_TIMEOUT_SECONDS`), so one hung call can never hold a scan hostage. Every successful call logs its duration as `[TIMING] gemini_call <step> <model> on <key>: <seconds>s`.
 
 ## 5. Gemini resilience
 
@@ -143,7 +143,7 @@ A separate `generate_top_up_suggestions()` call proposes a few Instamart add-ons
 
 If every model is on cooldown, all are tried anyway, so a total outage still gets a real attempt.
 
-**Thinking mode is tuned for speed.** These calls are structured extraction and templated JSON, which do not benefit from long reasoning. `thinking_config_for()` turns thinking off for `gemini-2.5-flash` variants (a vision call that used to time out at 25 seconds now answers in about 9) and sets the lowest thinking level for non-Pro `gemini-3.x` models. Aliases such as `gemini-flash-latest` and Pro models keep their defaults, because what an alias points at can change and an unsupported setting would be rejected.
+**Thinking mode is tuned for speed.** These calls are structured extraction and templated JSON, which do not benefit from long reasoning. `thinking_config_for()` turns thinking off for `gemini-2.5-flash` variants (a vision call that used to time out now answers in about 9 seconds) and sets the lowest thinking level for non-Pro `gemini-3.x` models. Aliases such as `gemini-flash-latest` and Pro models keep their defaults, because what an alias points at can change and an unsupported setting would be rejected.
 
 ## 6. Swiggy integration
 
@@ -216,7 +216,7 @@ fridge-to-fork/
 │   ├── step1_fridge_vision.py      # Gemini Vision ingredient identification
 │   ├── step2_meal_planner.py       # Gemini recipe planning, deterministic matching, top-up suggestions
 │   ├── gemini_keys.py              # Loads GOOGLE_API_KEY and _2.._9 into a key pool
-│   ├── gemini_resilience.py        # Per-failure-kind fallback policy, cooldowns, thinking config
+│   ├── gemini_resilience.py        # Per-failure-kind fallback policy, cooldowns, timeouts, thinking config
 │   ├── prompt_rules.py             # Shared style rule appended to every prompt
 │   ├── token_vault.py              # Fernet sealing of the Swiggy token
 │   ├── swiggy_common.py            # MCP transport, envelope, addresses, payments, checkout guards
