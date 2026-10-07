@@ -1,0 +1,140 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Landing page options</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700;800&family=Rubik:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* the app's real tokens (globals.css) */
+.light{--bg:#FFFFFF;--bg-secondary:#F8F8F8;--bg-card:#FFFFFF;--border:#E4E4E4;--text:#1A1A1A;--text-2:#6B6B6B;--muted:#757575;--orange:#FC8019;--orange-dark:#E8700A;--orange-light:#FFF3E8;--orange-border:rgba(252,128,25,.3);--green:#1BA672;--hero:rgba(0,0,0,.9);--heroSub:rgba(0,0,0,.5);--sh1:0 2px 8px rgba(0,0,0,.06)}
+.dark{--bg:#0F0F0F;--bg-secondary:#1A1A1A;--bg-card:#1E1E1E;--border:#2A2A2A;--text:#F5F5F5;--text-2:#A0A0A0;--muted:#808080;--orange:#FC8019;--orange-dark:#E8700A;--orange-light:rgba(252,128,25,.12);--orange-border:rgba(252,128,25,.3);--green:#34D399;--hero:rgba(255,255,255,.95);--heroSub:rgba(255,255,255,.5);--sh1:0 2px 8px rgba(0,0,0,.3)}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Nunito Sans',sans-serif;background:#888;padding:20px;width:max-content}
+h2{font:700 15px 'Rubik';color:#fff;background:#222;padding:8px 12px;border-radius:8px;margin-bottom:6px;max-width:1380px}
+h2 small{display:block;font:500 12px 'Nunito Sans';color:#bbb;margin-top:3px}
+.row{display:flex;gap:24px;align-items:flex-start}
+.cell figcaption{font:700 12px 'Nunito Sans';color:#fff;background:#222a;padding:4px 8px;border-radius:6px;margin-bottom:6px;display:inline-block}
+.frame{width:var(--w);background:var(--bg);color:var(--text);border-radius:14px;overflow:hidden;border:1px solid #0003}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.top{height:44px;display:flex;align-items:center;justify-content:center;gap:8px;border-bottom:1px solid var(--border);font:700 15px 'Rubik'}
+.logo{width:22px;height:22px;border-radius:6px;background:#FC8019;display:grid;place-items:center;color:#fff;font:800 11px Rubik}
+.hero{padding:20px 20px 8px}
+.hero h1{font:800 36px/1.15 'Rubik';letter-spacing:-.02em;color:var(--hero);margin-top:4px}
+.hero p{font-size:15px;line-height:1.6;color:var(--heroSub);margin-top:10px}
+.wrap{padding:0 20px 20px}
+.lab{display:flex;justify-content:space-between;align-items:center;font:600 11px 'Nunito Sans';letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px}
+.lab.first{margin-top:12px}
+.opt{font:600 11px 'Nunito Sans';letter-spacing:0;text-transform:none;color:var(--text-2);background:var(--bg-secondary);border:1px solid var(--border);border-radius:99px;padding:2px 8px}
+.field{display:flex;align-items:center;gap:8px;border-radius:14px;border:1.5px solid var(--border);background:var(--bg-secondary);padding:0 12px}
+.field svg{color:var(--muted)}
+.field span{flex:1;padding:15px 0;font:500 16px 'Nunito Sans';color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.field span.v{color:var(--text)}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--sh1)}
+.pills{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.pill{aspect-ratio:1;max-width:40px;border-radius:50%;border:1px solid var(--border);display:grid;place-items:center;font:600 12px 'Nunito Sans';color:var(--text-2)}
+.pill.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px 20px;border-radius:14px;font:600 16px 'Rubik';border:0}
+.btn.p{background:var(--orange);color:#fff}
+.btn.p.dis{opacity:.5}
+.btn.s{background:transparent;color:var(--orange);border:1.5px solid var(--orange-border)}
+.btn.sm{padding:12px 16px;font-size:15px}
+.or{display:flex;align-items:center;gap:12px;color:var(--muted);font:700 12px 'Nunito Sans';letter-spacing:.08em;text-transform:uppercase;margin:16px 0}
+.or:before,.or:after{content:"";flex:1;height:1px;background:var(--border)}
+.thumbs{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.th{width:64px;height:64px;border-radius:12px;position:relative;background:repeating-linear-gradient(0deg,#dfe8ef 0 14px,#fff 14px 16px);border:1px solid var(--border)}
+.th:before{content:"";position:absolute;inset:8px 10px;background:repeating-linear-gradient(90deg,#d9534f 0 8px,transparent 8px 18px);opacity:.8;border-radius:3px}
+.th b{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#222;color:#fff;display:grid;place-items:center}
+.th b svg{width:11px;height:11px}
+.plus{width:64px;height:64px;border-radius:12px;border:1.5px dashed var(--orange-border);background:var(--orange-light);color:var(--orange);display:grid;place-items:center}
+.hint{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font:600 13px/1.45 'Nunito Sans';color:var(--text-2)}
+.hint svg{width:16px;height:16px;color:var(--green);margin-top:1px}
+.fc-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.ico{width:40px;height:40px;border-radius:12px;background:var(--orange-light);color:var(--orange);display:grid;place-items:center;flex-shrink:0}
+.fc-top b{display:block;font:600 16px 'Rubik'}
+.fc-top p{font-size:14px;line-height:1.45;color:var(--text-2);margin-top:3px}
+.big{border-color:var(--orange-border);background:linear-gradient(160deg,var(--orange-light),var(--bg-card) 70%)}
+.big .ico{width:48px;height:48px;border-radius:14px;background:var(--orange);color:#fff}
+.big .ico svg{width:24px;height:24px}
+.big b{font:800 20px/1.2 'Rubik'}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.tile{border:1.5px solid var(--border);border-radius:14px;padding:12px;background:var(--bg-card);position:relative;min-height:92px}
+.tile.on{border-color:var(--orange);background:var(--orange-light)}
+.tile .ico{width:32px;height:32px;border-radius:10px;margin-bottom:8px}
+.tile b{display:block;font:600 14px/1.25 'Rubik'}
+.tile small{display:block;font:500 12px/1.35 'Nunito Sans';color:var(--text-2);margin-top:2px}
+.tile .chk{position:absolute;top:10px;right:10px;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);display:grid;place-items:center}
+.tile.on .chk{background:var(--orange);border-color:var(--orange);color:#fff}
+.tile .chk svg{width:11px;height:11px;stroke-width:3}
+.panel{margin-top:12px}
+.pop{margin-top:24px}
+.pop .g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pop .c{height:70px;border-radius:14px;border:1px solid var(--border);background:var(--bg-secondary)}
+.note{font:500 11px/1.4 'Nunito Sans';color:var(--muted);margin-top:8px}
+#meas{margin-top:18px;color:#fff;font:600 12px/1.6 monospace;background:#222;padding:10px 12px;border-radius:8px;max-width:1380px;white-space:pre}
+</style></head><body>
+<script>
+const q=new URLSearchParams(location.search), theme=q.get('theme')||'dark', opt=q.get('opt')||'cur';
+document.body.className=theme; if(q.get('z'))document.body.style.zoom=q.get('z');
+const I={
+ search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+ camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+ wand:'<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/>',
+ x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', plus:'<path d="M5 12h14"/><path d="M12 5v14"/>', check:'<path d="M20 6 9 17l-5-5"/>',
+ fridge:'<path d="M5 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/><path d="M5 10h14"/><path d="M15 7v6"/>'
+};
+const ic=(n,s)=>`<svg viewBox="0 0 24 24"${s?` style="${s}"`:''}>${I[n]}</svg>`;
+const SUB={cur:'Type a dish. Scan your fridge. Get exactly what you need delivered.',new:'Type a dish, or just snap your fridge and we’ll suggest one.'};
+const ST=[{k:'empty',t:'1. Nothing added yet',dish:'',photos:0},{k:'photo',t:'2. Fridge photo only',dish:'',photos:1},{k:'both',t:'3. Dish and fridge photo',dish:'Paneer Tikka',photos:1}];
+const CTA=s=>s.photos&&s.dish?'Get recipe using my fridge':s.photos?'Find dishes from my fridge':'Get recipe';
+const hero=sub=>`<div class="top"><span class="logo">F</span>Fridge to Fork</div><div class="hero"><h1>Cook anything.<br>Order what’s missing.</h1><p>${sub}</p></div>`;
+const dish=(s,label)=>`${label?`<div class="lab first">A dish in mind <span class="opt">Optional</span></div>`:''}<div class="field">${ic('search')}<span class="${s.dish?'v':''}">${s.dish||'Try “Paneer Tikka” or “Matar Pulao”'}</span></div>`;
+const servings=(lab)=>`<div class="lab">${lab||'For how many people?'}</div><div class="pills">${[1,2,3,4,5,6,7,8].map(n=>`<div class="pill ${n===2?'on':''}">${n}</div>`).join('')}</div>`;
+const thumbs=n=>`<div class="thumbs">${Array.from({length:n},()=>`<div class="th"><b>${ic('x')}</b></div>`).join('')}<div class="plus">${ic('plus','width:22px;height:22px')}</div></div>`;
+const pop=`<div class="pop"><div class="lab" style="margin-top:0">Popular right now</div><div class="g"><div class="c"></div><div class="c"></div></div></div>`;
+const cta=(s,dis)=>`<div style="margin-top:20px"><div class="btn p ${dis?'dis':''}">${ic('wand','width:16px;height:16px')}${s}</div></div>`;
+const hintFor=s=>s.dish?'Fridge added. We’ll build the recipe around what you have.':'Fridge added. Type a dish to cook with it, or just tap Find dishes.';
+
+/* CURRENT: exactly today's order and copy */
+function cur(s){return hero(SUB.cur)+`<div class="wrap">${dish(s,false)}<div class="card" style="margin:20px 0">${servings()}</div><div class="btn p">${ic('wand','width:16px;height:16px')}Get Recipe</div><div style="margin-top:12px">${s.photos?thumbs(s.photos):`<div class="btn s">${ic('camera')}Scan Fridge</div>`}</div>${pop}</div>`}
+
+/* A: Or divider, grouped routes, dynamic button */
+function A(s){const dis=!s.dish&&!s.photos;
+ const fr=`<div class="lab" style="margin-top:0">Your fridge <span class="opt">Optional</span></div><div class="card">`+(s.photos?`${thumbs(s.photos)}<div class="hint">${ic('check')}<span>${hintFor(s)}</span></div>`:`<div class="fc-top"><div class="ico">${ic('camera')}</div><div><b>No dish in mind?</b><p>Snap your fridge and we’ll suggest what to cook.</p></div></div><div class="btn s sm">${ic('camera')}Add a fridge photo</div>`)+`</div>`;
+ return hero(SUB.new)+`<div class="wrap">${dish(s,true)}<div class="or">or</div>${fr}${servings()}${cta(CTA(s),dis)}${pop}</div>`}
+
+/* B: Fridge leads: the distinctive feature goes first, shared button at the bottom */
+function B(s){const dis=!s.dish&&!s.photos;
+ const fr=s.photos?`<div class="card big">${thumbs(s.photos)}<div class="hint">${ic('check')}<span>${hintFor(s)}</span></div></div>`:`<div class="card big"><div class="fc-top"><div class="ico">${ic('fridge')}</div><div><b>Snap your fridge. We’ll suggest what to cook.</b></div></div><div class="btn s sm" style="background:var(--bg-card)">${ic('camera')}Add a fridge photo</div></div>`;
+ return hero(SUB.new)+`<div class="wrap"><div class="lab first">Start from your fridge <span class="opt">Optional</span></div>${fr}<div class="or">or type a dish</div>${dish(s,false)}${servings()}${cta(CTA(s),dis)}${pop}</div>`}
+
+/* C: Two choice tiles (multi select), the chosen routes open below */
+function C(s){const dOn=s.k==='empty'||s.k==='both', fOn=s.photos>0, dis=!s.dish&&!s.photos;
+ const tile=(on,i,t,sub)=>`<div class="tile ${on?'on':''}"><span class="chk">${on?ic('check'):''}</span><div class="ico">${ic(i)}</div><b>${t}</b><small>${sub}</small></div>`;
+ return hero(SUB.new)+`<div class="wrap"><div class="lab first">What do you have in mind? <span class="opt">Pick one or both</span></div><div class="tiles">${tile(dOn,'search','A dish','Type or pick one')}${tile(fOn,'fridge','My fridge','We suggest dishes')}</div>`+
+  (dOn?`<div class="panel">${dish(s,false)}</div>`:'')+(fOn?`<div class="panel card">${thumbs(s.photos)}<div class="hint">${ic('check')}<span>${hintFor(s)}</span></div></div>`:'')+`${servings()}${cta(CTA(s),dis)}${pop}</div>`}
+
+const FN={cur,A,B,C}, NAME={cur:['Current layout','Today: dish box, servings, big orange Get Recipe, then a smaller Scan Fridge button. Reads as one form.'],
+ A:['A. "Or" divider, grouped routes','Same order as today. Dish and fridge become two labelled, optional routes joined by "or"; servings sits with the button; the button label follows the input.'],
+ B:['B. Fridge leads','The fridge card goes first, with the outcome in its headline; the dish box follows an "or type a dish" divider. Shared button, label follows the input.'],
+ C:['C. Choice tiles','Two tiles ("A dish", "My fridge") that can both be on. The chosen routes open below; the button label follows the selection.']};
+const meas=[];
+function frame(fn,s,w){const f=document.createElement('div');f.className='frame';f.style.setProperty('--w',w+'px');f.innerHTML=FN[fn](s);return f}
+const root=document.createElement('div');document.body.appendChild(root);
+if(opt==='w320'){
+ const h=document.createElement('h2');h.innerHTML='At 320px, nothing added yet (the narrowest phone we support)<small>Height is from the top of the page to the bottom of the button.</small>';root.appendChild(h);
+ const row=document.createElement('div');row.className='row';root.appendChild(row);
+ ['cur','A','B','C'].forEach(k=>{const c=document.createElement('figure');c.className='cell';c.innerHTML=`<figcaption>${NAME[k][0]}</figcaption>`;c.appendChild(frame(k,ST[0],320));row.appendChild(c)});
+}else{
+ const h=document.createElement('h2');h.innerHTML=`${NAME[opt][0]}<small>${NAME[opt][1]}</small>`;root.appendChild(h);
+ const row=document.createElement('div');row.className='row';root.appendChild(row);
+ ST.forEach(s=>{const c=document.createElement('figure');c.className='cell';c.innerHTML=`<figcaption>${s.t}</figcaption>`;c.appendChild(frame(opt,s,390));row.appendChild(c)});
+ if(opt!=='cur'){const n=document.createElement('div');n.className='note';n.style.color='#eee';n.textContent='The button is shown dimmed when nothing is added: that is the small logic change proposed in the report (it is enabled today and gives generic suggestions).';root.appendChild(n)}
+}
+/* measurements: top of page to the bottom of the action button, per option and width, empty state */
+document.fonts.ready.then(()=>{
+ const out=[];
+ [390,320].forEach(w=>['cur','A','B','C'].forEach(k=>{const f=frame(k,ST[0],w);f.style.visibility='hidden';f.style.position='absolute';document.body.appendChild(f);
+  const btn=[...f.querySelectorAll('.btn.p')][0];const top=f.getBoundingClientRect().top;const bottom=btn.getBoundingClientRect().bottom;
+  const scanBtn=[...f.querySelectorAll('.btn.s')][0];const lastBottom=Math.max(bottom,scanBtn?scanBtn.getBoundingClientRect().bottom:0);
+  out.push(`${w}px ${k.padEnd(3)} first action area ends at ${Math.round(lastBottom-top)}px`);f.remove()}));
+ window.MEAS=out;const m=document.createElement('div');m.id='meas';m.textContent=out.join('\n');if(opt==='meas')document.body.appendChild(m);
+});
+</script>
+</body></html>
