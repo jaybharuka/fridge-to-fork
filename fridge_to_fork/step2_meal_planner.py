@@ -788,10 +788,19 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
     for attempt in range(1, max_retries + 1):
         try:
             full_text = ""
-            for chunk in client.models.generate_content_stream(
-                model=model, contents=prompt,
-                config=_text_config(model, resilience.PLAN_TIMEOUT_SECONDS),
-            ):
+            stats: dict = {}
+            # The stream is read through resilience.iter_with_idle_timeout: a stream that starts and then goes quiet fails over
+            # to the next model after PLAN_STREAM_IDLE_SECONDS instead of waiting out the whole PLAN_TIMEOUT_SECONDS.
+            stream = resilience.iter_with_idle_timeout(
+                lambda: client.models.generate_content_stream(
+                    model=model, contents=prompt,
+                    config=_text_config(model, resilience.PLAN_TIMEOUT_SECONDS),
+                ),
+                resilience.PLAN_STREAM_IDLE_SECONDS,
+                resilience.PLAN_TIMEOUT_SECONDS + 5,
+                stats,
+            )
+            for chunk in stream:
                 if chunk.text:
                     full_text += chunk.text
                     yield ("partial", chunk.text)
@@ -802,6 +811,8 @@ def _call_text_model_with_retry_stream(client: genai.Client, model: str, prompt:
                 console.print(f"[yellow][WARNING] {model} API error detected in response[/yellow]")
                 raise RuntimeError("API returned error-like payload")
 
+            # Measured so the idle limit can be checked against real streams: how many chunks, and the longest silence between two.
+            print(f"[TIMING] plan_stream {model}: chunks={stats.get('chunks', 0)} max_gap={stats.get('max_gap', 0.0):.2f}s")
             yield ("result", _parse_meal_plan_payload(raw_text))
             return
 

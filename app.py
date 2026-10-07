@@ -645,6 +645,14 @@ STEP1_TIMEOUT_SECONDS = 60.0
 FIRST_LOOK_POLL_SECONDS = 0.25
 
 
+def _log_first_look_sent(event: dict, started: float) -> None:
+    """One line per step1_partial actually emitted: which photo, how many items, and seconds since the scan started."""
+    print(
+        f"[STEP1] first_look sent: photo {event.get('photo_index')}/{event.get('photo_count')} "
+        f"items={len(event.get('ingredients') or [])} t={time.time() - started:.2f}s"
+    )
+
+
 @app.post("/api/scan")
 async def scan(
     request: Request,
@@ -714,7 +722,9 @@ async def scan(
                     # same start time; the loop only adds a short wake-up to forward queued first-look events.
                     while True:
                         while not first_look_q.empty():
-                            yield _sse(first_look_q.get_nowait())
+                            early_event = first_look_q.get_nowait()
+                            _log_first_look_sent(early_event, t_total)
+                            yield _sse(early_event)
                         remaining = STEP1_TIMEOUT_SECONDS - (time.time() - t_vision)
                         if remaining <= 0:
                             raise asyncio.TimeoutError
@@ -722,7 +732,9 @@ async def scan(
                         if done:
                             break
                     while not first_look_q.empty():
-                        yield _sse(first_look_q.get_nowait())
+                        early_event = first_look_q.get_nowait()
+                        _log_first_look_sent(early_event, t_total)
+                        yield _sse(early_event)
                     fridge = vision_task.result()
                 except asyncio.TimeoutError:
                     vision_task.cancel()  # the thread itself keeps running (it cannot be stopped); this just detaches it

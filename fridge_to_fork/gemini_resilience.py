@@ -19,10 +19,11 @@ What each failure now means (see failure_kind):
 from __future__ import annotations
 
 import os
+import queue
 import re
 import threading
 import time
-from typing import Sequence
+from typing import Callable, Iterable, Iterator, Sequence
 
 from google.genai import types
 
@@ -50,6 +51,11 @@ def _env_seconds(name: str, default: float) -> float:
 VISION_TIMEOUT_SECONDS = _env_seconds("GEMINI_VISION_TIMEOUT_SECONDS", 15.0)
 PLAN_TIMEOUT_SECONDS = _env_seconds("GEMINI_PLAN_TIMEOUT_SECONDS", 18.0)
 TOP_UP_TIMEOUT_SECONDS = _env_seconds("GEMINI_TOP_UP_TIMEOUT_SECONDS", 15.0)
+# Longest a plan stream may go quiet AFTER its first chunk before it counts as stalled (2026-10-06). gemini-2.5-flash has
+# twice answered the first chunk in ~2-4s and then said nothing until the total cutoff (2026-10-03 10:41, 2026-10-06
+# 12:39); waiting out the cutoff cost 18-25s. A healthy plan finishes 6-13s after its first chunk, so 8s of silence in the
+# middle of a stream is a stall. The total PLAN_TIMEOUT_SECONDS stays the ceiling.
+PLAN_STREAM_IDLE_SECONDS = _env_seconds("GEMINI_PLAN_STREAM_IDLE_SECONDS", 8.0)
 
 
 def http_options(timeout_seconds: float) -> types.HttpOptions:
@@ -69,6 +75,65 @@ _now = time.monotonic  # patchable in tests
 _lock = threading.Lock()
 _cold_until: dict[str, float] = {}
 _unavailable_until: dict[tuple[str, str], float] = {}
+
+
+class StreamStalledTimeout(TimeoutError):
+    """A stream that had started went quiet for longer than the idle limit. Its name contains "timeout", so failure_kind() files
+    it as a TIMEOUT: next model, and the slow model is skipped for MODEL_COOLDOWN_SECONDS, exactly like a total timeout."""
+
+
+def iter_with_idle_timeout(
+    open_stream: Callable[[], Iterable],
+    idle_seconds: float,
+    first_chunk_seconds: float,
+    stats: dict | None = None,
+) -> Iterator:
+    """Yields what `open_stream()` yields, but raises StreamStalledTimeout if, once the first chunk has arrived, no further
+    chunk comes within `idle_seconds`. (Before the first chunk only `first_chunk_seconds` applies, a safety net behind the SDK's
+    own deadline: waiting for the first token is not a stall.)
+
+    The blocking stream is read on a helper daemon thread that hands chunks over through a queue, because a blocked read cannot be
+    interrupted from outside. After a stall the helper is abandoned: it ends by itself when the SDK's own request deadline (the
+    http timeout set on the call, enforced server side) aborts the request, so it can outlive the call by at most that long and
+    never accumulates. Errors raised by the stream are re-raised here unchanged. `stats`, if given, gets `chunks` and `max_gap`
+    (the longest silence between consecutive chunks, in seconds) so healthy streams can be measured."""
+    handoff: queue.Queue = queue.Queue()
+    abandoned = threading.Event()
+
+    def pump() -> None:
+        try:
+            for chunk in open_stream():
+                if abandoned.is_set():
+                    return
+                handoff.put(("chunk", chunk))
+            handoff.put(("end", None))
+        except BaseException as exc:  # noqa: BLE001 - handed to the consumer, which re-raises it
+            handoff.put(("error", exc))
+
+    threading.Thread(target=pump, daemon=True, name="gemini-stream-pump").start()
+    chunks, max_gap, last = 0, 0.0, None
+    try:
+        while True:
+            wait = idle_seconds if chunks else first_chunk_seconds
+            try:
+                kind, payload = handoff.get(timeout=wait)
+            except queue.Empty:
+                what = f"no chunk for {idle_seconds:g}s after {chunks} chunk(s)" if chunks else f"no first chunk within {first_chunk_seconds:g}s"
+                raise StreamStalledTimeout(what) from None
+            if kind == "end":
+                return
+            if kind == "error":
+                raise payload
+            now = _now()
+            if last is not None:
+                max_gap = max(max_gap, now - last)
+            last = now
+            chunks += 1
+            if stats is not None:
+                stats.update(chunks=chunks, max_gap=max_gap)
+            yield payload
+    finally:
+        abandoned.set()
 
 
 def failure_kind(exc: BaseException) -> str:

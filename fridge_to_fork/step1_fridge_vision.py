@@ -551,21 +551,37 @@ def _gemini_deep_scan(image_bytes: bytes, found_items: list[str], clients: list[
     return _call_gemini_vision_with_fallback(clients, image_bytes, prompt, model)
 
 
-def _merge_and_filter(all_items: dict[str, dict]) -> list[dict]:
+def _merge_and_filter(all_items: dict[str, dict], drops: list[tuple[str, str]] | None = None) -> list[dict]:
     """The final list's filters, in one place so the "first look" (on_pass1) judges an item exactly as the end result will.
     Re-keys each dict's own "name" onto the (already lowercased/stripped) merge key — dedupe_detections() and
-    is_blocked_detection() both read item["name"], and the extended fields ride along unchanged."""
+    is_blocked_detection() both read item["name"], and the extended fields ride along unchanged.
+
+    `drops`, if given, is only appended to: (name, why) for every item the filters removed, in order of the filter that removed
+    it. It does not change what is returned."""
     items = [{**item, "name": name} for name, item in all_items.items()]
-    items = [item for item in items if not is_blocked_detection(item["name"])]
+    unblocked = [item for item in items if not is_blocked_detection(item["name"])]
     # floor=50 explicitly, not the module's default 60 — preserves this
     # path's existing confidence threshold; this is a matching-logic fix,
     # not a confidence-tuning change.
-    items = [
-        item for item in items
+    confident = [
+        item for item in unblocked
         if passes_confidence(item["name"], item.get("confidence", 0), floor=50)
     ]
-    items = dedupe_detections(items)
-    return sorted(items, key=lambda x: x.get("confidence", 0), reverse=True)
+    kept = dedupe_detections(confident)
+    if drops is not None:
+        unblocked_names = {i["name"] for i in unblocked}
+        confident_names = {i["name"] for i in confident}
+        kept_names = {i["name"] for i in kept}
+        for item in items:
+            name = item["name"]
+            if name not in unblocked_names:
+                drops.append((name, "blocked name"))
+            elif name not in confident_names:
+                drops.append((name, f"confidence floor, {item.get('confidence', 0)}"))
+            elif name not in kept_names:
+                keeper = next((k["name"] for k in kept if same_ingredient(name, k["name"])), "?")
+                drops.append((name, f"dedupe, same as {keeper!r}"))
+    return sorted(kept, key=lambda x: x.get("confidence", 0), reverse=True)
 
 
 def _first_look_payload(items: list[dict]) -> list[dict]:
@@ -689,7 +705,14 @@ def identify_ingredients(
                 all_items[name] = item
 
         if on_pass1 is not None and pass1_items:
-            early = _merge_and_filter(all_items)
+            drops: list[tuple[str, str]] = []
+            early = _merge_and_filter(all_items, drops)
+            if drops:
+                # Why a first look can show far fewer rows than pass 1 returned (2026-10-06: 15 raw items, 4 shown).
+                print(
+                    f"[STEP1] first_look dropped after pass 1 (photo {photo_number}/{len(sources)}, {len(drops)} of {len(all_items)} unique): "
+                    + "; ".join(f"{name!r} ({why})" for name, why in drops)
+                )
             if early:
                 emitted_names.extend(i["name"] for i in early if i["name"] not in emitted_names)
                 try:
