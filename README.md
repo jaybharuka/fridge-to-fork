@@ -88,7 +88,7 @@ The app is two deployables that talk to each other across origins.
 
 ## 3. The app, screen by screen
 
-**Landing.** A hero, a dish search box with live suggestions, a servings picker (1 to 8), a popular-dishes shelf, and a fridge photo area (up to three photos, camera or gallery). Photos are downscaled in the browser to at most 1200 px on the long edge and re-encoded as JPEG before upload, using native decoder downscaling where the browser supports it, which keeps memory use low for large phone photos. **Get Recipe** works with no photo at all.
+**Landing.** A hero and two independent, optional routes joined by an "or": a dish search box with live suggestions, and a fridge card (up to three photos, camera or gallery) whose button, "Add a fridge photo", only adds the photo. Below them are a servings picker (1 to 8), one main button and a popular-dishes shelf. The button's label follows what was given: "Get recipe" for a dish, "Find dishes from my fridge" for photos alone, "Get recipe using my fridge" for both. It stays disabled, with a line saying why, until there is a dish or at least one photo, and a blank dish counts as empty. Photos are downscaled in the browser to at most 1200 px on the long edge and re-encoded as JPEG before upload, using native decoder downscaling where the browser supports it, which keeps memory use low for large phone photos. A dish with no photo works without a scan, and photos with no dish scan the fridge and suggest dishes.
 
 **Scan and planning screens.** A full-screen photo scan screen shows the scan line, a progress bar and detected ingredients as they arrive. Recipe planning has its own progress view. Both are fed by Server-Sent Events from the backend (`progress`, `step1_partial` (a first look at the pass-1 ingredients while pass 2 still runs), `step1`, `step2`, `awaiting_user_choice`, `top_up`, `complete`, plus `auth_required` and `error`), and both can be backed out of. A stalled or failed scan lands on a clear, retryable error state.
 
@@ -322,7 +322,7 @@ pytest --continue-on-collection-errors
 cd frontend && npm test
 ```
 
-**Backend.** `tests/` holds 37 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 18 test files (167 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
+**Backend.** `tests/` holds 37 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 19 test files (180 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
 
 **Known failures.** The backend suite is not fully green, and contributors should know before running it:
 
