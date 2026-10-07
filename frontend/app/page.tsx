@@ -21,6 +21,7 @@ import { AppHeader } from '@/components/results/AppHeader';
 import { Results } from '@/components/results/Results';
 import { Toast } from '@/components/results/Toast';
 import { showsPhotoScan } from '@/lib/scanView';
+import { landingAction } from '@/lib/landingAction';
 
 const DEFAULT_SERVINGS = 2;
 
@@ -73,13 +74,17 @@ export default function Home() {
   );
 
   const handleGetRecipe = useCallback(() => {
+    // The main button is disabled with neither a dish nor a photo; this keeps any other caller from starting an empty scan.
+    // The dish is trimmed so a whitespace-only box counts as empty (as the button's label already assumes).
+    const dish = targetDish.trim();
+    if (!landingAction(dish, photos.photos.length).enabled) return;
     setTab('order');
     setPhotoDetectionRevealed(false);
     setRecipeDotDismissed(false);
     if (photos.photos.length > 0) {
-      startScan('photo', { files: photos.photos, targetDish, servings });
+      startScan('photo', { files: photos.photos, targetDish: dish, servings });
     } else {
-      startScan('recipe', { targetDish, servings });
+      startScan('recipe', { targetDish: dish, servings });
     }
   }, [photos.photos, targetDish, servings, startScan]);
 

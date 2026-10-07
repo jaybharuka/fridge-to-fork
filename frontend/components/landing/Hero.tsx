@@ -9,7 +9,7 @@ export function Hero() {
         <br />
         Order what&apos;s missing.
       </h1>
-      <p className={styles.heroSub}>Type a dish. Scan your fridge. Get exactly what you need delivered.</p>
+      <p className={styles.heroSub}>Type a dish, or just snap your fridge and we&apos;ll suggest one.</p>
     </div>
   );
 }
