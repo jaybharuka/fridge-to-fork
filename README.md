@@ -135,11 +135,13 @@ A separate `generate_top_up_suggestions()` call proposes a few Instamart add-ons
 
 | Failure | What it means | Reaction |
 |---|---|---|
-| Timeout (504, deadline exceeded) | The model is slow on Google's side, not a key problem | Move to the **next model** and skip the slow model for 10 minutes |
+| Timeout (504, deadline exceeded), or a plan stream that goes quiet | The model is slow on Google's side, not a key problem | Move to the **next model** and skip the slow model for 10 minutes |
 | Quota (429, resource exhausted) | This project's quota is spent | Try the **next key** (each project has its own quota) |
 | Overloaded (503, high demand) | Transient | Next key once, then the **next model** after two overloaded answers |
 | Unavailable (404 "no longer available to new users") | Google has withheld the model from that key's project | Never retry that model and key pair; skip it for 6 hours |
 | Anything else (for example malformed JSON) | One-off | Retry in place, then the next key |
+
+**Stalled plan streams.** The meal plan is streamed. Once its first chunk has arrived, 8 seconds without another chunk counts as a stall and fails over straight away, instead of waiting out the 18 second cutoff (`GEMINI_PLAN_STREAM_IDLE_SECONDS` overrides the 8). It is handled exactly like a timeout. Waiting for the first chunk is not a stall, the 18 second cutoff stays the ceiling, and each healthy stream logs its chunk count and longest silence (`[TIMING] plan_stream`) so the limit can be tuned.
 
 If every model is on cooldown, all are tried anyway, so a total outage still gets a real attempt.
 
@@ -238,7 +240,7 @@ fridge-to-fork/
 │   │                               # Command-line entry point and dry-run simulation
 │   └── swiggy_live_mcp.py          # Legacy stdio MCP stub, unused by the running app
 ├── templates/index.html            # Legacy vanilla-JS page. Retired, not served
-├── tests/                          # Backend tests (36 test files) and eval harnesses
+├── tests/                          # Backend tests (37 test files) and eval harnesses
 ├── scripts/                        # Developer scripts (SSE scan runner, live checks)
 ├── docs/                           # Design proposals and implementation plans
 ├── Dockerfile                      # Backend image
@@ -320,7 +322,7 @@ pytest --continue-on-collection-errors
 cd frontend && npm test
 ```
 
-**Backend.** `tests/` holds 36 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 18 test files (167 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
+**Backend.** `tests/` holds 37 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 18 test files (167 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
 
 **Known failures.** The backend suite is not fully green, and contributors should know before running it:
 
@@ -328,7 +330,7 @@ cd frontend && npm test
 - `tests/test_step3_order_router.py` fails at import (`order_dish_from_swiggy` no longer exists in `step3_order_router.py`).
 - 7 tests in `tests/test_step2_meal_planner.py` fail: their mocked Gemini responses no longer reach the planner, which falls through its model chain instead.
 
-The last full run was 660 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
+The last full run was 675 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
 
 ## 14. Deployment
 
