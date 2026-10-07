@@ -115,6 +115,7 @@ export function DishInput({ value, onChange }: DishInputProps) {
           ref={inputRef}
           type="text"
           className={styles.dishInput}
+          aria-label="A dish in mind (optional)"
           placeholder='Try "Paneer Tikka" or "Matar Pulao"'
           value={value}
           onChange={(e) => onChange(e.target.value)}

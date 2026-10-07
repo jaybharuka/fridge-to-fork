@@ -1,4 +1,3 @@
-import { Card } from '@/components/ui/Card';
 import styles from './landing.module.css';
 
 interface ServingsSelectorProps {
@@ -8,12 +7,11 @@ interface ServingsSelectorProps {
 
 const SERVINGS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-// Phase 2 (2026-09): wrapped in a Card so this reads as one designed input group rather than loose circles floating
-// in the page — the audit's finding was that it visually competed with the primary CTA right below it; grouping and
-// slightly smaller pills quiet it down relative to that button, which should be the loudest thing on the screen.
+// Sits right above the main button, as a setting for it (landing redesign, 2026-10): between the dish box and the fridge card
+// it read as a step of one form. Phase 2's slightly smaller pills stay, so the button is still the loudest thing on screen.
 export function ServingsSelector({ value, onChange }: ServingsSelectorProps) {
   return (
-    <Card padding="sm" className={styles.servingsCard}>
+    <div className={styles.servingsCard}>
       <label className={styles.inputLabel}>For how many people?</label>
       <div className={styles.servingsPills}>
         {SERVINGS.map((n) => (
@@ -28,6 +26,6 @@ export function ServingsSelector({ value, onChange }: ServingsSelectorProps) {
           </button>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }

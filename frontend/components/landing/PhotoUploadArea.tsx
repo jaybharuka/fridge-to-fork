@@ -1,9 +1,10 @@
 'use client';
 import { useRef, useState } from 'react';
-import { Camera, Images, Plus, X } from 'lucide-react';
+import { Camera, Check, Images, Plus, X } from 'lucide-react';
 import type { UsePhotoUpload } from '@/hooks/usePhotoUpload';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
+import { fridgeHint } from '@/lib/landingAction';
 import styles from './landing.module.css';
 
 const MAX_PHOTOS = 3;
@@ -11,7 +12,10 @@ const MAX_PHOTOS = 3;
 // Parent (page.tsx, Task 14) owns the single usePhotoUpload() instance —
 // this component is a controlled view over it, mirroring DishInput's
 // controlled-props pattern (see the note in DishInput.tsx).
-type PhotoUploadAreaProps = Pick<UsePhotoUpload, 'photos' | 'thumbnailUrls' | 'addPhoto' | 'removePhoto'>;
+type PhotoUploadAreaProps = Pick<UsePhotoUpload, 'photos' | 'thumbnailUrls' | 'addPhoto' | 'removePhoto'> & {
+  /** A dish is already typed: the hint after a photo is added says the recipe will be built around the fridge. */
+  hasDish: boolean;
+};
 
 // Ported from templates/index.html:1818-1824 (markup), 4223-4243
 // (updatePhotoUI / input onChange). Toggles between a single "Scan Fridge"
@@ -29,7 +33,7 @@ type PhotoUploadAreaProps = Pick<UsePhotoUpload, 'photos' | 'thumbnailUrls' | 'a
 // Android Chrome); the gallery button's input never has `capture`, so
 // gallery access is always available through it regardless of which exact
 // picker UI a given browser/OS version happens to show for it.
-export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }: PhotoUploadAreaProps) {
+export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto, hasDish }: PhotoUploadAreaProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -57,7 +61,7 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
   }
 
   return (
-    <div className={styles.photoUploadArea}>
+    <section className={styles.photoUploadArea} aria-label="Your fridge (optional)">
       <input
         ref={cameraInputRef}
         type="file"
@@ -75,11 +79,26 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
         style={{ display: 'none' }}
         onChange={e => handleFiles(e.target.files)}
       />
+      <div className={styles.fieldLabel}>
+        <span>Your fridge</span>
+        <span className={styles.optionalChip}>Optional</span>
+      </div>
+      <div className={styles.fridgeCard}>
       {photos.length === 0 ? (
-        <Button variant="secondary" icon={<Camera size={18} />} onClick={() => setPickerOpen(true)}>
-          Scan Fridge
-        </Button>
+        <>
+          <div className={styles.fridgeCardTop}>
+            <div className={styles.fridgeIcon} aria-hidden="true"><Camera size={20} /></div>
+            <div>
+              <p className={styles.fridgeTitle}>No dish in mind?</p>
+              <p className={styles.fridgeText}>Snap your fridge and we&apos;ll suggest what to cook.</p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" icon={<Camera size={16} />} onClick={() => setPickerOpen(true)}>
+            Add a fridge photo
+          </Button>
+        </>
       ) : (
+        <>
         <div className={styles.photoThumbnailRow}>
           {thumbnailUrls.map((url, i) => (
             <div key={url} className={styles.photoThumb}>
@@ -105,7 +124,10 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
             </button>
           )}
         </div>
+        <p className={styles.fridgeHint} role="status"><Check aria-hidden="true" /><span>{fridgeHint(hasDish ? 'dish' : '')}</span></p>
+        </>
       )}
+      </div>
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} ariaLabel="Add a fridge photo" title="Add a fridge photo">
         <div className={styles.photoPickerOptions}>
@@ -117,6 +139,6 @@ export function PhotoUploadArea({ photos, thumbnailUrls, addPhoto, removePhoto }
           </Button>
         </div>
       </Sheet>
-    </div>
+    </section>
   );
 }
