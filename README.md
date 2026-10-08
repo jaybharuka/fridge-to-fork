@@ -165,7 +165,7 @@ The app talks to Swiggy's MCP servers directly, with one deterministic client pe
 
 **Swiggy Food** (`food.py`, mounted at `/api/food/*`): restaurant and menu search (open restaurants only), a cart that is flushed and rebuilt with the chosen dish, variants and add-ons and then **verified against Swiggy's cart before it is offered**, coupons, checkout (documented as not idempotent, so it uses the same guards), payment status, order history, tracking and "Report a problem". It is enabled by the `FOOD_ORDERING_ENABLED` switch in `features.py` and `frontend/lib/features.ts`, which is also its kill switch.
 
-**Checkout guards** (shared in `swiggy_common.py`): a replay cache keyed by idempotency key, one in-flight order per account, a re-check of the total the user reviewed, and an `unknown` outcome that never offers a retry when an order may already exist.
+**Checkout guards** (shared in `swiggy_common.py`): a replay cache keyed by idempotency key, one in-flight order per account, a re-check of the total the user reviewed, and an `unknown` outcome that never offers a retry when an order may already exist. "Request sent" begins just before the checkout call: a network failure after that point is `unknown` (with a re-check of Swiggy's order list, which turns it into "placed" if the order exists), never "not placed", while a failure before it is a plain `checkout_not_sent` failure. Every outcome after a send is remembered under the idempotency key, so resending the same key cannot place a second order, and each checkout logs one `[CHECKOUT]` line (order type, payment, Swiggy's raw status, error code, order ids, verified, outcome, elapsed time) with no personal data.
 
 Dry-run order simulation and a console entry point (`fridge-to-fork`) remain for command-line use only. They do not touch Swiggy.
 
@@ -240,7 +240,7 @@ fridge-to-fork/
 │   │                               # Command-line entry point and dry-run simulation
 │   └── swiggy_live_mcp.py          # Legacy stdio MCP stub, unused by the running app
 ├── templates/index.html            # Legacy vanilla-JS page. Retired, not served
-├── tests/                          # Backend tests (37 test files) and eval harnesses
+├── tests/                          # Backend tests (39 test files) and eval harnesses
 ├── scripts/                        # Developer scripts (SSE scan runner, live checks)
 ├── docs/                           # Design proposals and implementation plans
 ├── Dockerfile                      # Backend image
@@ -322,7 +322,7 @@ pytest --continue-on-collection-errors
 cd frontend && npm test
 ```
 
-**Backend.** `tests/` holds 37 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 19 test files (180 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
+**Backend.** `tests/` holds 39 test files covering key rotation, Gemini failure handling and timeouts, the vision tiers, ingredient matching, token sealing and CORS, bearer auth, the scan routes, and the Instamart and Food flows (cart, checkout guards, payments, addresses, orders, support). **Frontend.** 20 test files (187 tests, all passing) cover the pure logic: scan state, image sizing, account menu, order polling, search, theme and a guard that keeps em dashes out of UI copy.
 
 **Known failures.** The backend suite is not fully green, and contributors should know before running it:
 
@@ -330,7 +330,7 @@ cd frontend && npm test
 - `tests/test_step3_order_router.py` fails at import (`order_dish_from_swiggy` no longer exists in `step3_order_router.py`).
 - 7 tests in `tests/test_step2_meal_planner.py` fail: their mocked Gemini responses no longer reach the planner, which falls through its model chain instead.
 
-The last full run was 675 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
+The last full run was 703 passing, 7 failing and 2 collection errors. All three predate recent work and are stale tests, not known product bugs, but they are real and worth cleaning up. `--continue-on-collection-errors` lets the rest of the suite run past the two import failures.
 
 ## 14. Deployment
 
