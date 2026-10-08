@@ -23,7 +23,7 @@ from .step2_meal_planner import _normalize_ingredient_words
 from .swiggy_common import (  # noqa: F401  (re-exported: sibling modules and tests import these from here)
     _account, _attempts, _call, _explain_methods, _inflight, _method_kind, _num, _outcome, _payment_options, _pick_address,
     _public_address, _remember, _resolve_address, _same_address_id, _same_id, _saved_addresses, _view_methods,
-    ATTEMPT_TTL_SECONDS, COD_FALLBACK_ID, SwiggyError,
+    ATTEMPT_TTL_SECONDS, COD_FALLBACK_ID, CheckoutRun, SwiggyError, UNKNOWN_MESSAGE, guarded_checkout, raw_status,
 )
 
 log = logging.getLogger("uvicorn.error")
@@ -446,7 +446,7 @@ async def _verify(token: str, outcome: dict, before: set[str] | None) -> dict:
     try:
         async with _session(token) as session:
             after = await _active_order_ids(session)
-    except InstamartError:
+    except Exception:  # noqa: BLE001 - a failed re-check can only leave the outcome as it was, never change it
         return outcome
     if after is None:
         return outcome
@@ -459,16 +459,13 @@ async def _verify(token: str, outcome: dict, before: set[str] | None) -> dict:
 
 
 async def checkout(token: str, address_id: str, expected_total: str, key: str, payment_key: str) -> dict:
-    if key in _attempts:
-        return _attempts[key][1]  # a replayed click / network retry never runs checkout twice
-    account = _account(token)
-    if account in _inflight:
-        raise InstamartError("checkout_in_progress", "An order is already being placed. Give it a moment.")
-    _inflight.add(account)
-    try:
-        return _remember(key, await _checkout_locked(token, address_id, expected_total, payment_key))
-    finally:
-        _inflight.discard(account)
+    """The replay cache, the one-checkout-at-a-time rule, what a failure after the request was sent means (always "unknown",
+    never "not placed"), and the one log line per outcome all live in swiggy_common.guarded_checkout."""
+    return await guarded_checkout(
+        "instamart", token, key,
+        lambda run: _checkout_locked(token, address_id, expected_total, payment_key, run),
+        lambda outcome, run: _verify(token, outcome, run.before),
+    )
 
 
 def _checkout_args(address_id: str, choice: dict) -> dict:
@@ -481,7 +478,7 @@ def _checkout_args(address_id: str, choice: dict) -> dict:
     return {**base, "paymentMethod": "UPI", "intentApp": choice["methodId"]}
 
 
-async def _checkout_locked(token: str, address_id: str, expected_total: str, payment_key: str) -> dict:
+async def _checkout_locked(token: str, address_id: str, expected_total: str, payment_key: str, run: CheckoutRun) -> dict:
     async with _session(token) as session:
         cart = await _call(session, "get_cart")
         review = await _verify_cart_address(session, _review(cart, await _fetch_payment(session, cart, stage="checkout")), address_id, stage="checkout")
@@ -495,24 +492,35 @@ async def _checkout_locked(token: str, address_id: str, expected_total: str, pay
         if choice is None:
             raise InstamartError("payment_unavailable", "That payment method isn't available anymore. Please choose again.")
 
+        run.payment = choice["type"]
         before = await _active_order_ids(session)
+        run.before = before
         log.info("[INSTAMART] placing %s order, total=%s", choice["type"], review["total"])
+        # From here the request may reach Swiggy: a failure past this line is never a plain "not placed" (see CheckoutRun).
+        run.sent = True
         try:
             data = await _call(session, "checkout", **_checkout_args(address_id, choice))
         except InstamartError as exc:
             if exc.code == "auth_required":
                 raise
+            run.error_code = exc.code
             ambiguous = exc.code == "upstream_unavailable"
-            fallback = (
-                _outcome("unknown", "We couldn't confirm whether the order went through. Check the Swiggy app before trying again.")
-                if ambiguous else _outcome("failed", exc.message)
-            )
-            return await _verify(token, fallback, before)
+            fallback = _outcome("unknown", UNKNOWN_MESSAGE) if ambiguous else _outcome("failed", exc.message)
+            run.outcome = await _verify(token, fallback, before)
+            return run.outcome
         except Exception as exc:  # transport drop mid-call: outcome unknown, never assume failure
             log.error("[INSTAMART] checkout transport error: %s", exc)
-            fallback = _outcome("unknown", "We couldn't confirm whether the order went through. Check the Swiggy app before trying again.")
-            return await _verify(token, fallback, before)
+            run.error_code = type(exc).__name__
+            run.outcome = await _verify(token, _outcome("unknown", UNKNOWN_MESSAGE), before)
+            return run.outcome
 
+        orders = data.get("orders")
+        run.status_raw = (
+            raw_status("orders:", *(o.get("status") for o in orders if isinstance(o, dict)), f"allSucceeded={data.get('allSucceeded')}")
+            if isinstance(orders, list) else raw_status(data.get("status"))
+        )
         if str(data.get("status") or "").upper() == "PENDING_PAYMENT":
-            return _pending_outcome(data)  # not an order yet: the payment page + payment_status() finish it
-        return await _verify(token, _read_checkout(data), before)
+            run.outcome = _pending_outcome(data)  # not an order yet: the payment page + payment_status() finish it
+            return run.outcome
+        run.outcome = await _verify(token, _read_checkout(data), before)
+        return run.outcome

@@ -30,6 +30,7 @@ from . import swiggy_common
 from .swiggy_common import (
     SwiggyError, _call, _fetch_payment as _fetch_payment_common, _num, _outcome, _pick_address, _public_address, _saved_addresses,
     _same_address_id, _same_id, _account, _attempts, _inflight, _remember, _pending_outcome, _settle_payment,
+    CheckoutRun, UNKNOWN_MESSAGE, guarded_checkout, raw_status,
 )
 
 log = logging.getLogger("uvicorn.error")
@@ -718,7 +719,7 @@ async def _verify(token: str, address_id: str, outcome: dict, before: set[str] |
     try:
         async with _session(token) as session:
             after = await _active_order_ids(session, address_id)
-    except SwiggyError:
+    except Exception:  # noqa: BLE001 - a failed re-check can only leave the outcome as it was, never change it
         return outcome
     if after is None:
         return outcome
@@ -741,19 +742,16 @@ def _checkout_args(address_id: str, choice: dict) -> dict:
 
 
 async def checkout(token: str, address_id: str, expected_total: float, key: str, payment_key: str) -> dict:
-    if key in _attempts:
-        return _attempts[key][1]  # a replayed click / network retry never places an order twice
-    account = _account(token)
-    if account in _inflight:
-        raise SwiggyError("checkout_in_progress", "An order is already being placed. Give it a moment.")
-    _inflight.add(account)
-    try:
-        return _remember(key, await _checkout_locked(token, address_id, expected_total, payment_key))
-    finally:
-        _inflight.discard(account)
+    """The replay cache, the one-checkout-at-a-time rule, what a failure after the request was sent means (always "unknown",
+    never "not placed"), and the one log line per outcome all live in swiggy_common.guarded_checkout."""
+    return await guarded_checkout(
+        "food", token, key,
+        lambda run: _checkout_locked(token, address_id, expected_total, payment_key, run),
+        lambda outcome, run: _verify(token, run.ctx.get("address_id", address_id), outcome, run.before),
+    )
 
 
-async def _checkout_locked(token: str, address_id: str, expected_total: float, payment_key: str) -> dict:
+async def _checkout_locked(token: str, address_id: str, expected_total: float, payment_key: str, run: CheckoutRun) -> dict:
     async with _session(token) as session:
         address = await _resolve_address(session, address_id)
         cart = await _call(session, "get_food_cart", addressId=address["id"])
@@ -768,32 +766,40 @@ async def _checkout_locked(token: str, address_id: str, expected_total: float, p
         if choice is None:
             raise SwiggyError("payment_unavailable", "That payment method isn't available anymore. Please choose again.")
 
+        run.payment = choice["type"]
+        run.ctx["address_id"] = address["id"]
         before = await _active_order_ids(session, address["id"])
+        run.before = before
         log.info("[FOOD] placing %s order, total=%s", choice["type"], review["total"])
         place_args = _checkout_args(address["id"], choice)
         # The exact payment method value sent (cod.id echoed, or the documented "Cash" fallback) is an open question.
         log.warning("[FOOD][diag] place_food_order sent: %s", json.dumps(place_args))
+        # From here the request may reach Swiggy: a failure past this line is never a plain "not placed" (see CheckoutRun).
+        run.sent = True
         try:
             data = await _call(session, "place_food_order", **place_args)
         except SwiggyError as exc:
             if exc.code == "auth_required":
                 raise
+            run.error_code = exc.code
             log.warning("[FOOD][diag] place_food_order refused: code=%s message=%.300r", exc.code, exc.message)
             ambiguous = exc.code == "upstream_unavailable"
-            fallback = (
-                _outcome("unknown", "We couldn't confirm whether the order went through. Check the Swiggy app before trying again.")
-                if ambiguous else _outcome("failed", exc.message)
-            )
-            return await _verify(token, address["id"], fallback, before)
+            fallback = _outcome("unknown", UNKNOWN_MESSAGE) if ambiguous else _outcome("failed", exc.message)
+            run.outcome = await _verify(token, address["id"], fallback, before)
+            return run.outcome
         except Exception as exc:  # transport drop mid-call: outcome unknown, never assume failure
             log.error("[FOOD] place_food_order transport error: %s", exc)
-            fallback = _outcome("unknown", "We couldn't confirm whether the order went through. Check the Swiggy app before trying again.")
-            return await _verify(token, address["id"], fallback, before)
+            run.error_code = type(exc).__name__
+            run.outcome = await _verify(token, address["id"], _outcome("unknown", UNKNOWN_MESSAGE), before)
+            return run.outcome
 
+        run.status_raw = raw_status(data.get("status"), data.get("normalizedStatus"))
         log.warning("[FOOD][diag] place_food_order: keys=%s status=%r normalizedStatus=%r has_orderId=%s", sorted(data), data.get("status"), data.get("normalizedStatus"), bool(data.get("orderId")))
         if str(data.get("status") or "").upper() == "PENDING_PAYMENT":
-            return _food_pending(data, address["id"])  # not an order yet: the payment page + payment_status() finish it
-        return await _verify(token, address["id"], _read_placed(data, expected_total), before)
+            run.outcome = _food_pending(data, address["id"])  # not an order yet: the payment page + payment_status() finish it
+            return run.outcome
+        run.outcome = await _verify(token, address["id"], _read_placed(data, expected_total), before)
+        return run.outcome
 
 
 async def payment_status(

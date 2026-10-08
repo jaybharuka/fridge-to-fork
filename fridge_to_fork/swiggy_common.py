@@ -9,6 +9,7 @@ What Swiggy's Instamart (/im) and Food (/food) MCP servers have in common, so th
 Every rule here was confirmed against a real account or Swiggy's reference docs; see the comments.
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -421,6 +422,118 @@ def _outcome(
     status: str, message: str, order_ids: list[str] | None = None, verified: bool = False, total=None, payment: dict | None = None
 ) -> dict:
     return {"status": status, "orderIds": order_ids or [], "message": message, "verified": verified, "total": total, "payment": payment}
+
+
+# ---------------------------------------------------------------------------
+# The checkout guard: what any failure means once the request may have been sent (shared by Instamart and Food)
+# ---------------------------------------------------------------------------
+
+UNKNOWN_MESSAGE = "We couldn't confirm whether the order went through. Check the Swiggy app before trying again."
+NOT_SENT_MESSAGE = "Couldn't reach Swiggy, so nothing was ordered. Please try again."
+
+
+class CheckoutRun:
+    """What one checkout attempt has learned so far, shared between its body and the guard around it.
+
+    `sent` flips to True immediately BEFORE the checkout tool call is awaited, and that is where "the request may have been sent"
+    begins: everything earlier (reading the cart, checking the address, the total, the payment option, the order snapshot) cannot
+    place an order, so a failure there is a plain failure. From that point on a failure cannot tell us whether Swiggy acted, so
+    it must never be reported as "not placed"."""
+
+    def __init__(self, kind: str):
+        self.kind = kind
+        self.sent = False
+        self.before: set[str] | None = None   # active order ids taken just before the request, for the re-check
+        self.payment = "-"                    # cod / upi_qr / upi_intent
+        self.status_raw: str | None = None    # the status string Swiggy's checkout answered with, exactly as sent
+        self.error_code: str | None = None
+        self.outcome: dict | None = None      # the definite answer, as soon as there is one
+        self.ctx: dict = {}                   # whatever the product's own re-check needs (Food: the resolved address id)
+
+
+def raw_status(*values) -> str | None:
+    """Swiggy's own status strings from a checkout answer, joined, with line breaks stripped and the length capped.
+    Logged as-is on purpose: we have never seen the real values, and this is how we learn them."""
+    parts = [str(v) for v in values if v not in (None, "")]
+    return " / ".join(parts).replace("\n", " ").replace("\r", " ")[:80] if parts else None
+
+
+def _outcome_label(outcome: dict) -> str:
+    status = outcome.get("status")
+    if status == "placed":
+        return "placed" if outcome.get("verified") else "unverified"
+    return str(status)
+
+
+def log_checkout(run: CheckoutRun, outcome: dict | None, started: float, *, error_code: str | None = None, replayed: bool = False) -> None:
+    """One structured line per checkout outcome: order type, payment, Swiggy's raw status, error code, order ids, whether it was
+    verified, what the client was told, how long it took. Ids and codes only: no names, phones or addresses."""
+    label = _outcome_label(outcome) if outcome else "failed"
+    ids = ",".join(outcome.get("orderIds") or []) if outcome else ""
+    log.warning(
+        "[CHECKOUT] kind=%s payment=%s sent=%s status_raw=%s error_code=%s order_ids=%s verified=%s outcome=%s%s elapsed=%.2fs",
+        run.kind, run.payment, "yes" if run.sent else "no", repr(run.status_raw) if run.status_raw else "-",
+        error_code or run.error_code or "-", ids or "-", "yes" if (outcome or {}).get("verified") else "no", label,
+        " replayed=yes" if replayed else "", time.monotonic() - started,
+    )
+
+
+async def guarded_checkout(kind: str, token: str, key: str, locked, recheck) -> dict:
+    """Run one checkout under the guards both products share, and decide what every kind of failure means.
+
+    - A key seen before returns its stored result: a replayed click or retry never places an order twice.
+    - One checkout at a time per account.
+    - `locked(run)` does the work and returns an outcome. A failure BEFORE the request is sent (cart, address, total, payment,
+      auth, or the network) is raised as a plain failure and is not stored, so the user can fix it and order again.
+    - A failure AFTER the request may have been sent, other than an expired session, is never a plain failure: the order may
+      exist. If the call had already produced an answer, that answer stands (the session closing badly afterwards cannot undo it);
+      otherwise the outcome is "unknown", re-checked against Swiggy's order list through `recheck(outcome, run)`.
+    - Whatever the outcome after a send (including a cancelled request), it is stored under the key, so resending the same key
+      cannot run checkout a second time."""
+    started = time.monotonic()
+    run = CheckoutRun(kind)
+    if key in _attempts:
+        cached = _attempts[key][1]
+        log_checkout(run, cached, started, replayed=True)
+        return cached
+    account = _account(token)
+    if account in _inflight:
+        error = SwiggyError("checkout_in_progress", "An order is already being placed. Give it a moment.")
+        log_checkout(run, None, started, error_code=error.code)
+        raise error
+    _inflight.add(account)
+    try:
+        try:
+            outcome = await locked(run)
+        except asyncio.CancelledError:
+            unknown = run.outcome or _outcome("unknown", UNKNOWN_MESSAGE)
+            if run.sent and key not in _attempts:
+                _remember(key, unknown)
+            log_checkout(run, unknown if run.sent else None, started, error_code="cancelled")
+            raise
+        except Exception as exc:
+            code = exc.code if isinstance(exc, SwiggyError) else type(exc).__name__
+            if not run.sent or (isinstance(exc, SwiggyError) and exc.code == "auth_required"):
+                if not run.sent and isinstance(exc, SwiggyError) and exc.code == "upstream_unavailable":
+                    exc = SwiggyError("checkout_not_sent", NOT_SENT_MESSAGE, 502)  # the request never left: nothing was ordered
+                log_checkout(run, None, started, error_code=getattr(exc, "code", code))
+                raise exc
+            if run.outcome is not None:
+                outcome = run.outcome
+                log.warning("[CHECKOUT] kind=%s the session closed badly after the answer was in (%s); keeping the answer", kind, code)
+            else:
+                log.error("[CHECKOUT] kind=%s failure after the request was sent (%s: %s); outcome is unknown", kind, type(exc).__name__, str(exc)[:200])
+                run.error_code = run.error_code or code
+                outcome = _outcome("unknown", UNKNOWN_MESSAGE)
+                try:
+                    outcome = await recheck(outcome, run)
+                except Exception:  # noqa: BLE001 - the re-check can only improve on "unknown", never make it worse
+                    pass
+        _remember(key, outcome)
+        log_checkout(run, outcome, started)
+        return outcome
+    finally:
+        _inflight.discard(account)
 
 
 # ---------------------------------------------------------------------------
