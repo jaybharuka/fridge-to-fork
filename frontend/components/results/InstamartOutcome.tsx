@@ -14,11 +14,13 @@ interface OutcomeProps {
   onBackToCart: () => void;
   /** Open live tracking for a placed order. */
   onTrack: (orderId: string) => void;
+  /** Open the order history, so a user told "please check" can see whether the order exists. */
+  onCheckOrders: () => void;
   /** Identifiers for a problem report: address, payment method, coupon. */
   reportContext: ReportContext;
 }
 
-export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack, reportContext }: OutcomeProps) {
+export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack, onCheckOrders, reportContext }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
   const report = (
     <ReportProblem
@@ -74,7 +76,8 @@ export function InstamartOutcome({ outcome, payOnDelivery, onClose, onBackToCart
       <p className={styles.outcomeBody}>{outcome.message}</p>
       {ids && <p className={styles.outcomeBody}>Order {ids}.</p>}
       <p className={styles.hint}>Don&apos;t order again until you&apos;ve checked, so you aren&apos;t charged twice.</p>
-      <button type="button" className={styles.primary} onClick={onClose}>Close</button>
+      <button type="button" className={styles.primary} onClick={onCheckOrders}>Check my orders</button>
+      <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
       {report}
     </div>
   );

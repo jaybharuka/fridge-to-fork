@@ -138,7 +138,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
             <ReportProblem input={{ tool: 'search_products', errorMessage: state.error ?? 'Search failed', flow: 'Searched Instamart for the missing ingredients', context: state.address?.id ? { addressId: state.address.id } : {} }} />
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id); }} reportContext={reportContext} />
+          <InstamartOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id); }} onCheckOrders={() => { onClose(); openOrders(null); }} reportContext={reportContext} />
         ) : state.stage === 'picking' && addressOpen ? (
           <AddressPicker
             currentId={state.address?.id ?? null}

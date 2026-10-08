@@ -128,7 +128,7 @@ export function FoodOrderSheet({ open, dish, onClose, onDishImageFound }: FoodOr
             />
           </div>
         ) : state.stage === 'done' && state.outcome ? (
-          <FoodOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id, 'food', state.review?.address.id ?? null); }} reportTool={selectedPayment && selectedPayment.type !== 'cod' ? 'check_payment_status' : 'place_food_order'} reportContext={reportContext} />
+          <FoodOutcome outcome={state.outcome} payOnDelivery={selectedPayment?.type === 'cod'} onClose={onClose} onBackToCart={order.backToPicking} onTrack={id => { onClose(); openOrders(id, 'food', state.review?.address.id ?? null); }} onCheckOrders={() => { onClose(); openOrders(null, 'food', state.review?.address.id ?? null); }} reportTool={selectedPayment && selectedPayment.type !== 'cod' ? 'check_payment_status' : 'place_food_order'} reportContext={reportContext} />
         ) : state.stage === 'picking' && addressOpen ? (
           <AddressPicker
             currentId={state.address?.id ?? null}
