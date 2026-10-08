@@ -15,6 +15,8 @@ interface OutcomeProps {
   onBackToCart: () => void;
   /** Open live tracking for a placed order. */
   onTrack: (orderId: string) => void;
+  /** Open the order history, so a user told "please check" can see whether the order exists. */
+  onCheckOrders: () => void;
   /** The Swiggy tool a problem report should name: place_food_order, or check_payment_status after a UPI payment. */
   reportTool: string;
   /** Identifiers for a problem report: address, restaurant, dish, payment method, coupon. */
@@ -23,7 +25,7 @@ interface OutcomeProps {
 
 const total = (value: Outcome['total']): string | null => (typeof value === 'number' ? formatInr(value) : value ? String(value) : null);
 
-export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack, reportTool, reportContext }: OutcomeProps) {
+export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onTrack, onCheckOrders, reportTool, reportContext }: OutcomeProps) {
   const ids = outcome.orderIds.join(', ');
   const report = (
     <ReportProblem
@@ -82,7 +84,8 @@ export function FoodOutcome({ outcome, payOnDelivery, onClose, onBackToCart, onT
       <p className={styles.outcomeBody}>{outcome.message}</p>
       {ids && <p className={styles.outcomeBody}>Order {ids}.</p>}
       <p className={styles.hint}>Don&apos;t order again until you&apos;ve checked, so you aren&apos;t charged twice.</p>
-      <button type="button" className={styles.primary} onClick={onClose}>Close</button>
+      <button type="button" className={styles.primary} onClick={onCheckOrders}>Check my orders</button>
+      <button type="button" className={styles.secondary} onClick={onClose}>Close</button>
       {report}
     </div>
   );
