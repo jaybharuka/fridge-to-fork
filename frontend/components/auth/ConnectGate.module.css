@@ -18,9 +18,13 @@
   background: var(--orange); color: #fff; font-size: 16px; font-weight: 700;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.cta:hover { background: var(--orange-dark); }
+@media (hover: hover) {
+  .cta:hover { background: var(--orange-dark); }
+}
 .cta:active { transform: scale(0.98); }
 .cta svg { width: 18px; height: 18px; }
 .hint { font-size: 13px; line-height: 1.45; color: var(--text-muted); margin: 16px 0 0 0; max-width: 320px; }
 .spin { width: 18px; height: 18px; animation: gateSpin 0.9s linear infinite; }
 @keyframes gateSpin { to { transform: rotate(360deg); } }
+@keyframes gateSpinReduced { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: gateSpinReduced 2s ease-in-out infinite !important; } }

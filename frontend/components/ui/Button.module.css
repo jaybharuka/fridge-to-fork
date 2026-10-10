@@ -12,17 +12,25 @@
 .button:disabled { cursor: not-allowed; opacity: 0.5; }
 .fullWidth { width: 100%; }
 
-.sm { padding: var(--space-2) var(--space-4); font-size: var(--text-md); border-radius: var(--radius-sm); gap: var(--space-1); }
+.sm { position: relative; padding: var(--space-2) var(--space-4); font-size: var(--text-md); border-radius: var(--radius-sm); gap: var(--space-1); }
+
+.sm::after { content: ''; position: absolute; inset: -5px 0; } /* 35.5px button, 45px hit area */
 
 .primary { background: var(--orange); color: #fff; }
-.primary:hover:not(:disabled) { background: var(--orange-dark); }
+@media (hover: hover) {
+  .primary:hover:not(:disabled) { background: var(--orange-dark); }
+}
 .primary:disabled { opacity: 0.5; }
 
 .secondary { background: transparent; color: var(--orange); border: 1.5px solid var(--orange-border, rgba(252,128,25,0.4)); }
-.secondary:hover:not(:disabled) { background: var(--orange-light); }
+@media (hover: hover) {
+  .secondary:hover:not(:disabled) { background: var(--orange-light); }
+}
 
 .ghost { background: transparent; color: var(--text-secondary); padding: var(--space-1) 0; font-weight: var(--weight-semibold); font-size: var(--text-base); }
-.ghost:hover:not(:disabled) { color: var(--text-primary); }
+@media (hover: hover) {
+  .ghost:hover:not(:disabled) { color: var(--text-primary); }
+}
 
 .loading { cursor: default; }
 .spinner { width: 16px; height: 16px; animation: btnSpin 0.9s linear infinite; flex-shrink: 0; }

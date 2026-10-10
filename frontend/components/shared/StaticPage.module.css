@@ -44,6 +44,8 @@
   color: var(--orange);
   text-decoration: none;
 }
-.backLink:hover {
+@media (hover: hover) {
+  .backLink:hover {
   color: var(--orange-dark);
+}
 }

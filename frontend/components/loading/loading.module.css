@@ -89,7 +89,7 @@
 }
 .loadingStageLabel {
   font-family: var(--font-body); font-size: 14px; font-weight: 500;
-  color: rgba(255, 255, 255, 0.35); transition: color .3s ease, font-weight .3s ease;
+  color: rgba(255, 255, 255, 0.5); transition: color .3s ease, font-weight .3s ease;
 }
 .loadingStage.active .loadingStageIcon { border-color: #FC8019; }
 .loadingStage.active .loadingStageIcon::before {
@@ -100,6 +100,8 @@
 .loadingStage.active .loadingStageLabel { color: rgba(255, 255, 255, 0.95); font-weight: 600; animation: stageLabelPulse 1.8s ease-in-out infinite; }
 @keyframes stageLabelPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.68; } }
 @keyframes stageSpin { to { transform: rotate(360deg); } }
+@keyframes stageSpinReduced { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .loadingStage.active .loadingStageIcon::before { animation: stageSpinReduced 2s ease-in-out infinite !important; } }
 .loadingStage.done .loadingStageIcon { border-color: #FC8019; background: #FC8019; }
 .loadingStage.done .loadingStageIcon::after {
   content: ''; position: absolute; left: 7px; top: 4px; width: 5px; height: 9px;
@@ -150,7 +152,9 @@
   transition: opacity 0.15s ease, border-color 0.15s ease;
 }
 .scanThumb.active { opacity: 1; border-color: #FC8019; }
-.scanThumb:hover:not(.active) { opacity: 0.9; }
+@media (hover: hover) {
+  .scanThumb:hover:not(.active) { opacity: 0.9; }
+}
 .photoScanStatus {
   margin-top: 20px; font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, 0.9);
   text-align: center; letter-spacing: 0.01em; min-height: 20px;
@@ -159,7 +163,7 @@
 .photoScanStatus.complete { color: #FC8019; }
 .photoScanSubStatus {
   margin-top: 6px; font-size: 12px; font-weight: 400; font-style: italic;
-  color: rgba(255, 255, 255, 0.38); text-align: center; min-height: 16px;
+  color: rgba(255, 255, 255, 0.5); text-align: center; min-height: 16px;
   transition: opacity 0.3s ease;
 }
 .detectedItemsList {
@@ -183,7 +187,7 @@
   background: rgba(255, 255, 255, 0.06); border: 1.5px solid rgba(255, 255, 255, 0.12);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.detectedItemCheck svg { width: 14px; height: 14px; stroke: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.3); stroke-width: 2.5; }
+.detectedItemCheck svg { width: 14px; height: 14px; stroke: rgba(255, 255, 255, 0.4); color: rgba(255, 255, 255, 0.4); stroke-width: 2.5; }
 .detectedItemName {
   flex: 1; font-family: var(--font-body); font-size: 15px; font-weight: 600;
   color: rgba(255, 255, 255, 0.92); text-transform: capitalize;
@@ -210,12 +214,15 @@
    a text-style link rather than a filled button, so it doesn't compete
    with the reassuring tone. */
 .photoScanRetryBtnSubtle {
-  margin-top: 6px; background: none; border: none; padding: 4px 8px;
+  position: relative; margin-top: 6px; background: none; border: none; padding: 4px 8px;
   color: rgba(255, 255, 255, 0.55); font-weight: 600; font-size: 12px;
   text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: inherit;
   transition: color 0.15s ease;
 }
-.photoScanRetryBtnSubtle:hover { color: rgba(255, 255, 255, 0.85); }
+.photoScanRetryBtnSubtle::after { content: ''; position: absolute; inset: -9px -4px; } /* ~26px -> 44px hit area */
+@media (hover: hover) {
+  .photoScanRetryBtnSubtle:hover { color: rgba(255, 255, 255, 0.85); }
+}
 
 /* Overlay progress bar (under the stage list). */
 .loadingBar { margin-top: 26px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
@@ -229,3 +236,7 @@
 .photoScanBar { width: min(280px, 80%); height: 4px; margin: 14px auto 2px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.12); }
 .photoScanBarFill { height: 100%; border-radius: 4px; background: #FC8019; transition: width 0.5s linear; }
 @media (prefers-reduced-motion: reduce) { .photoScanBarFill { transition: none; } }
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.scanThumb:active { opacity: 0.8; }
+.photoScanRetryBtnSubtle:active { color: rgba(255, 255, 255, 0.85); }

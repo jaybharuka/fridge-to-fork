@@ -13,7 +13,7 @@
   margin-top: 10px; overflow-wrap: break-word; word-break: normal;
 }
 :global([data-theme='light']) .heroTitle { color: rgba(0, 0, 0, 0.9); }
-:global([data-theme='light']) .heroSub { color: rgba(0, 0, 0, 0.5); }
+:global([data-theme='light']) .heroSub { color: var(--text-secondary); }
 
 /* Dish input — templates/index.html:219-242. Phase 2 (2026-09): rebuilt on tokens (var(--bg-secondary)/var(--border)/
    var(--text-primary), all theme-aware already) instead of a separate hardcoded-dark + :global([data-theme='light'])
@@ -28,11 +28,12 @@
 .dishInputField {
   display: flex; align-items: center; gap: var(--space-2);
   border-radius: var(--radius);
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--border-control);
   background: var(--bg-secondary);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
-.dishInputField:focus-within { border-color: var(--orange-border, rgba(252,128,25,0.5)); }
+/* Focus: the same 2px ring as every other control, and the border turns to the ring colour so the field reads as one object. */
+.dishInputField:focus-within { border-color: var(--focus-ring); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .dishInputIcon { width: 18px; height: 18px; margin-left: var(--space-4); color: var(--text-muted); flex-shrink: 0; }
 .dishInput {
   flex: 1; min-width: 0; width: 100%; padding: var(--space-4) var(--space-4) var(--space-4) 0;
@@ -48,10 +49,13 @@
 .dishInput::placeholder { color: var(--text-muted); }
 .dishInputClear {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 32px; height: 32px; margin-right: var(--space-2); border-radius: 50%;
+  position: relative; width: 32px; height: 32px; margin-right: var(--space-2); border-radius: 50%;
   border: none; background: transparent; color: var(--text-muted); cursor: pointer;
 }
-.dishInputClear:hover { background: var(--bg-card); color: var(--text-primary); }
+.dishInputClear::after { content: ''; position: absolute; inset: -6px; }
+@media (hover: hover) {
+  .dishInputClear:hover { background: var(--bg-card); color: var(--text-primary); }
+}
 .dishInputClear svg { width: 16px; height: 16px; }
 
 /* Suggestion dropdown — templates/index.html:4345-4384 (was inline style.cssText) */
@@ -99,13 +103,18 @@
    signalled that to a real user, so the 8th pill just looked cut off). */
 .servingsPills { display: grid; grid-template-columns: repeat(8, 1fr); gap: var(--space-2); }
 .servingsPill {
-  width: 100%; aspect-ratio: 1; max-width: 40px; padding: 0; border-radius: 50%;
+  position: relative; width: 100%; aspect-ratio: 1; max-width: 40px; padding: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
   font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; font-family: inherit;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.servingsPill:hover { background: var(--bg-card); border-color: var(--text-secondary); color: var(--text-primary); }
+/* 8 pills share one row, so they cannot grow without wrapping: instead each one's hit area fills the gap to its neighbours (4px each side)
+   and gains 8px above and below, 44px tall at 320px (28px pill) and 44.75px wide at 390px. */
+.servingsPill::after { content: ''; position: absolute; inset: -8px -4px; }
+@media (hover: hover) {
+  .servingsPill:hover { background: var(--bg-card); border-color: var(--text-secondary); color: var(--text-primary); }
+}
 .servingsPill:active { transform: scale(0.94); }
 .servingsPill.active { background: var(--orange); border-color: var(--orange); color: #fff; box-shadow: var(--shadow-1); }
 
@@ -143,8 +152,12 @@
   text-align: left; font-family: inherit; -webkit-tap-highlight-color: transparent;
   transition: transform 0.15s ease;
 }
-.popularDishBtn:hover { transform: translateY(-1px); }
-.popularDishBtn:hover .popularDishCard { border-color: var(--orange-border, rgba(252,128,25,0.3)); }
+@media (hover: hover) {
+  .popularDishBtn:hover { transform: translateY(-1px); }
+}
+@media (hover: hover) {
+  .popularDishBtn:hover .popularDishCard { border-color: var(--orange-border, rgba(252,128,25,0.3)); }
+}
 .popularDishBtn:active { transform: scale(0.98); }
 .popularDishCard { display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.2s ease; }
 .popularDishThumb {
@@ -197,7 +210,7 @@
   display: flex; gap: var(--space-2); align-items: flex-start; margin: var(--space-3) 0 0;
   font-size: var(--text-base); font-weight: var(--weight-semibold); line-height: 1.45; color: var(--text-secondary);
 }
-.fridgeHint svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; color: var(--success); }
+.fridgeHint svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; color: var(--success-text); }
 .fridgeCard .photoThumb, .fridgeCard .addPhotoPlus { width: 64px; height: 64px; }
 /* The longest label ("Get recipe using my fridge") must fit the narrowest phone (320px) without the button's own ellipsis cutting it. */
 @media (max-width: 359px) {
@@ -212,7 +225,9 @@
   background: rgba(252, 128, 25, 0.05); display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0; transition: background 0.2s ease, border-color 0.2s ease; color: #FC8019;
 }
-.addPhotoPlus:hover { background: rgba(252, 128, 25, 0.1); border-color: rgba(252, 128, 25, 0.6); }
+@media (hover: hover) {
+  .addPhotoPlus:hover { background: rgba(252, 128, 25, 0.1); border-color: rgba(252, 128, 25, 0.6); }
+}
 .addPhotoPlus svg { width: 24px; height: 24px; stroke-width: 1.5; }
 .photoThumb {
   position: relative; width: 80px; height: 80px; border-radius: 12px; overflow: hidden;
@@ -227,6 +242,15 @@
   background: rgba(0, 0, 0, 0.7); border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; line-height: 1; padding: 0;
 }
-.photoThumbRemove:hover { background: rgba(220, 50, 50, 0.8); }
+/* The thumbnail clips overflow, so the hit area grows inward only (36px). Larger would cover over half of a 64px thumbnail and make a stray tap delete a photo. */
+.photoThumbRemove::after { content: ''; position: absolute; inset: -4px -4px -8px -8px; }
+@media (hover: hover) {
+  .photoThumbRemove:hover { background: rgba(220, 50, 50, 0.8); }
+}
 .photoThumbRemove svg { width: 12px; height: 12px; }
-:global([data-theme='light']) .popularDishTag { color: rgba(0, 0, 0, 0.4); }
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.dishInputClear:active:not(:disabled),
+.suggestionRow:active:not(:disabled) { background-image: linear-gradient(var(--press-overlay), var(--press-overlay)); }
+.addPhotoPlus:active { background: rgba(252, 128, 25, 0.14); border-color: rgba(252, 128, 25, 0.6); }
+.photoThumbRemove:active { background: rgba(220, 50, 50, 0.8); }

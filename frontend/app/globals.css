@@ -5,13 +5,19 @@
   --border: #E4E4E4;
   --text-primary: #1A1A1A;
   --text-secondary: #6B6B6B;
-  --text-muted: #757575;
+  --text-muted: #707070;
   --shadow: 0 2px 8px rgba(0,0,0,0.06);
   --orange: #FC8019;
   --orange-light: #FFF3E8;
   --orange-dark: #E8700A;
   --bg-rgb: 255,255,255;
   --success: #2ECC71;
+  /* Accessible variants for text, icons and focus (docs/ui-defaults.md): the brand green/red/orange fills stay as they are. */
+  --success-text: #1B7A43;   /* 4.9:1 on every light surface and the green tint */
+  --red-text: #C41E1E;       /* 5.2:1 on every light surface and the red tints */
+  --focus-ring: #D46C15;     /* 3.2:1 on white, the grey surfaces and the orange tint (brand orange is 2.3 to 2.6:1 there) */
+  --border-control: #8E8E8E; /* 3:1 against both sides of a field boundary (the hairline --border is 1.2:1) */
+  --press-overlay: rgba(0,0,0,0.07);
 
   /* ---- Design-system tokens (Phase 1, 2026-09). Additive: nothing existing is removed or repointed here — these
      are the canonical scale for new/rebuilt components (components/ui/*) to use going forward. The audit found the
@@ -121,12 +127,17 @@
 
 [data-theme="dark"] {
   --bg: #0F0F0F;
+  --success-text: #2ECC71;
+  --red-text: #FF8F8F;
+  --focus-ring: #FC8019;
+  --border-control: #6E6E6E;
+  --press-overlay: rgba(255,255,255,0.10);
   --bg-secondary: #1A1A1A;
   --bg-card: #1E1E1E;
   --border: #2A2A2A;
   --text-primary: #F5F5F5;
   --text-secondary: #A0A0A0;
-  --text-muted: #808080;
+  --text-muted: #888888;
   --shadow: 0 2px 8px rgba(0,0,0,0.3);
   --orange: #FC8019;
   --orange-light: rgba(252,128,25,0.12);
@@ -182,7 +193,7 @@
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; min-width:0; }
 html { scroll-behavior:smooth; }
 button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid #FC8019; outline-offset: 2px;
+  outline: 2px solid var(--focus-ring); outline-offset: 2px;
 }
 body {
   font-family:var(--font-body); font-size:14px; line-height:1.5; font-weight:400;
@@ -211,7 +222,7 @@ svg.lucide { width:1em; height:1em; display:inline-block; vertical-align:middle;
 
 /* Typography scale */
 .label-text { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
-.section-label-text { font-size:0.65rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--grey-400); }
+.section-label-text { font-size:0.6875rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--grey-400); }
 .caption-text { font-size:12px; color:var(--text-3); }
 .mono-text { font-family:'SF Mono','Courier New',monospace; color:var(--text); }
 
@@ -219,6 +230,9 @@ svg.lucide { width:1em; height:1em; display:inline-block; vertical-align:middle;
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+  html { scroll-behavior:auto; }
+  /* The rule above would leave a looping spinner as one still frame. Spinner classes in the component stylesheets replace their
+     rotation with a slow fade (a replacement MDN recommends), so "loading" still reads as alive without anything turning. */
 }
 
 /* Page content gutter — templates/index.html:179 */

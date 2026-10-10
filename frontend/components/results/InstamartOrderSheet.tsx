@@ -70,7 +70,7 @@ export function InstamartOrderSheet({ open, itemsToOrder, topUpSuggestions, init
   useEffect(() => {
     if (state.stage !== 'picking' || !focusIngredient) return;
     const rows = panelRef.current?.querySelectorAll<HTMLElement>('[data-ingredient]') ?? [];
-    Array.from(rows).find(el => el.dataset.ingredient === focusIngredient)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    Array.from(rows).find(el => el.dataset.ingredient === focusIngredient)?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, [state.stage, focusIngredient]);
 
   // Your usual items at this address; the recipe-based suggestions are only the fallback when there are none.

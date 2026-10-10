@@ -44,7 +44,9 @@
 .rows::-webkit-scrollbar { width: 6px; }
 .rows::-webkit-scrollbar-track { background: transparent; }
 .rows::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
-.rows::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+@media (hover: hover) {
+  .rows::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+}
 
 /* "More below" affordance — toggled via the hasMoreBelow class below.
    Fades to --bg-card, matching .row's own background exactly (not --bg,
@@ -61,13 +63,15 @@
   display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); cursor: pointer;
   border-bottom: 1px solid var(--border); background: var(--bg-card); transition: opacity .12s ease, background .1s ease;
 }
-.rows .row:hover { background: var(--bg-secondary); }
+@media (hover: hover) {
+  .rows .row:hover { background: var(--bg-secondary); }
+}
 .rows .row:last-child { border-bottom: none; }
 .rowCheckbox {
   width: 20px; height: 20px; border-radius: var(--radius-xs); flex-shrink: 0; border: 1.5px solid var(--grey-200);
   display: flex; align-items: center; justify-content: center; font-size: var(--text-2xl); transition: border-color .12s ease;
 }
-.rowCheckbox svg { color: var(--success); width: 16px; height: 16px; }
+.rowCheckbox svg { color: var(--success-text); width: 16px; height: 16px; }
 /* Staple rows still get a pre-checked circle, but muted grey rather than
    green — it's an assumption, not something the vision scan actually saw. */
 .row.isStaple .rowCheckbox svg { color: var(--text-muted); }
@@ -82,7 +86,7 @@
 
 .rowRight { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
 .rowTag {
-  flex-shrink: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: .06em; text-transform: uppercase; color: var(--grey-400); background: var(--grey-100);
+  flex-shrink: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); background: var(--grey-100);
   padding: 3px var(--space-3); border-radius: var(--radius-pill); white-space: nowrap;
   display: inline-flex; align-items: center; gap: 3px;
 }
@@ -101,7 +105,9 @@
   background: var(--bg-secondary); border: none; border-radius: var(--radius-sm);
   transition: background .12s ease;
 }
-.match:hover { background: var(--border); }
+@media (hover: hover) {
+  .match:hover { background: var(--border); }
+}
 .matchThumb, .matchThumbFallback { width: 40px; height: 40px; border-radius: var(--radius-xs); flex-shrink: 0; }
 .matchThumb { object-fit: contain; background: #fff; }
 .matchThumbFallback { display: flex; align-items: center; justify-content: center; background: var(--border); font-size: var(--text-lg); }
@@ -132,3 +138,7 @@
 .rows > .row:nth-child(7) { animation-delay: 0.3s; }
 .rows > .row:nth-child(n+8) { animation-delay: 0.35s; }
 @media (prefers-reduced-motion: reduce) { .rows > .row { animation: none; } }
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.row:active:not(:disabled),
+.match:active:not(:disabled) { background-image: linear-gradient(var(--press-overlay), var(--press-overlay)); }

@@ -26,7 +26,10 @@
   border: none; background: none; padding: 0; text-align: left;
 }
 button.brand { cursor: pointer; }
-button.brand:hover { opacity: 0.8; }
+button.brand::after { content: ''; position: absolute; inset: -9px -4px; } /* 26px tall logo + name: 44px hit area */
+@media (hover: hover) {
+  button.brand:hover { opacity: 0.8; }
+}
 .brandLogo { width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; }
 
 /* Sticky at-a-glance summary bar — templates/index.html:1003-1035 */
@@ -47,12 +50,11 @@ button.brand:hover { opacity: 0.8; }
 .stickySummaryText { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
 .stickySummaryText strong { color: #FC8019; }
 .stickySummaryDish {
-  font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.4);
+  font-size: 12px; font-weight: 500; color: var(--text-muted);
   text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 40%;
 }
 :global([data-theme="light"]) .stickySummaryBar { background: rgba(255, 255, 255, 0.88); border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
 :global([data-theme="light"]) .stickySummaryText { color: rgba(0, 0, 0, 0.9); }
-:global([data-theme="light"]) .stickySummaryDish { color: rgba(0, 0, 0, 0.4); }
 
 /* Order/Recipe tab bar — templates/index.html:1040-1085 */
 .resultTabBar {
@@ -62,7 +64,7 @@ button.brand:hover { opacity: 0.8; }
 }
 .resultTab {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 14px 0; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.35);
+  padding: 14px 0; font-size: 14px; font-weight: 600; color: var(--text-muted);
   background: transparent; border: none; border-bottom: 2px solid transparent;
   cursor: pointer; transition: color 0.2s ease, border-color 0.2s ease; position: relative;
   font-family: inherit;
@@ -70,7 +72,9 @@ button.brand:hover { opacity: 0.8; }
 .resultTab svg { width: 16px; height: 16px; stroke-width: 1.5; }
 .resultTab.active { color: #FC8019; border-bottom: 2px solid #FC8019; }
 .resultTab.locked { opacity: 0.4; cursor: not-allowed; }
-.resultTab.locked:hover { color: rgba(255, 255, 255, 0.35); }
+@media (hover: hover) {
+  .resultTab.locked:hover { color: var(--text-muted); }
+}
 .tabLoadingDot {
   width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.3);
   animation: tabDotPulse 1.2s ease-in-out infinite; display: inline-block;
@@ -81,9 +85,7 @@ button.brand:hover { opacity: 0.8; }
 }
 .tabReadyDot { width: 6px; height: 6px; border-radius: 50%; background: #FC8019; display: inline-block; }
 :global([data-theme="light"]) .resultTabBar { border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
-:global([data-theme="light"]) .resultTab { color: rgba(0, 0, 0, 0.35); }
 :global([data-theme="light"]) .resultTab.active { color: #FC8019; }
-:global([data-theme="light"]) .resultTab.locked:hover { color: rgba(0, 0, 0, 0.35); }
 
 /* Fridge summary header + thumbnail — templates/index.html:1165-1260.
    Opacity-driven visible/hidden (no display:none) so the thumbnail can sit
@@ -95,26 +97,28 @@ button.brand:hover { opacity: 0.8; }
   display: flex; align-items: center; gap: 14px; padding: 16px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07); cursor: pointer; user-select: none;
 }
-.fridgeSummaryRow:hover { opacity: 0.85; }
+@media (hover: hover) {
+  .fridgeSummaryRow:hover { opacity: 0.85; }
+}
 .fridgeThumbTarget {
   width: 56px; height: 56px; border-radius: 12px; overflow: hidden; flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); cursor: pointer;
 }
-.fridgeThumbTarget:hover { filter: brightness(0.85); transition: filter 0.15s ease; }
+@media (hover: hover) {
+  .fridgeThumbTarget:hover { filter: brightness(0.85); transition: filter 0.15s ease; }
+}
 .fridgeThumbImg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fridgeSummaryText { flex: 1; min-width: 0; }
 .fridgeSummaryLabel {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.35);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--text-muted);
   text-transform: uppercase; margin: 0 0 3px;
 }
 .fridgeSummaryCount { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85); margin: 0; }
-.fridgeDropdownChevron { margin-left: auto; flex-shrink: 0; color: rgba(255, 255, 255, 0.4); transition: transform 0.2s ease; }
+.fridgeDropdownChevron { margin-left: auto; flex-shrink: 0; color: var(--text-muted); transition: transform 0.2s ease; }
 .fridgeDropdownChevron svg { width: 16px; height: 16px; stroke-width: 1.5; }
 .fridgeDropdownChevron.open { transform: rotate(180deg); }
 :global([data-theme="light"]) .fridgeSummaryRow { border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
-:global([data-theme="light"]) .fridgeSummaryLabel { color: rgba(0, 0, 0, 0.35); }
 :global([data-theme="light"]) .fridgeSummaryCount { color: rgba(0, 0, 0, 0.85); }
-:global([data-theme="light"]) .fridgeDropdownChevron { color: rgba(0, 0, 0, 0.4); }
 
 /* Chips dropdown — templates/index.html:1262-1305. Opacity/pointer-events
    driven instead of the original's display:none + double-rAF trick — that
@@ -133,19 +137,23 @@ button.brand:hover { opacity: 0.8; }
 .fridgeChipsDropdown.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
 .fridgeChipsDropdownHeader {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
-  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.35);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
 }
 .fridgeChipsClose {
-  width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.08);
+  position: relative; width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.08);
   border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
   color: rgba(255, 255, 255, 0.6); transition: background 0.15s ease; flex-shrink: 0;
 }
-.fridgeChipsClose:hover { background: rgba(255, 255, 255, 0.14); }
+.fridgeChipsClose::after { content: ''; position: absolute; inset: -8px; } /* 28px -> 44px hit area */
+@media (hover: hover) {
+  .fridgeChipsClose:hover { background: rgba(255, 255, 255, 0.14); }
+}
 .fridgeChipsClose svg { width: 14px; height: 14px; stroke-width: 2; }
 :global([data-theme="light"]) .fridgeChipsDropdown { background: #ffffff; border-color: rgba(0, 0, 0, 0.08); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12); }
-:global([data-theme="light"]) .fridgeChipsDropdownHeader { color: rgba(0, 0, 0, 0.35); }
 :global([data-theme="light"]) .fridgeChipsClose { background: rgba(0, 0, 0, 0.06); color: rgba(0, 0, 0, 0.55); }
-:global([data-theme="light"]) .fridgeChipsClose:hover { background: rgba(0, 0, 0, 0.1); }
+@media (hover: hover) {
+  :global([data-theme="light"]) .fridgeChipsClose:hover { background: rgba(0, 0, 0, 0.1); }
+}
 
 /* Ingredient chips — templates/index.html:416-466 */
 .chipsInner { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
@@ -161,30 +169,37 @@ button.brand:hover { opacity: 0.8; }
 .chip.other { opacity: 0.6; }
 .otherFridgeItems { width: 100%; }
 .otherFridgeToggle {
-  display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 14px; border-radius: 999px;
+  position: relative; display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 14px; border-radius: 999px;
   background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.55);
   font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s ease; width: auto;
 }
-.otherFridgeToggle:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.8); }
+@media (hover: hover) {
+  .otherFridgeToggle:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.8); }
+}
+.otherFridgeToggle::after { content: ''; position: absolute; inset: -5px 0; } /* ~34px -> 44px hit area */
 .otherFridgeToggle svg { width: 14px; height: 14px; stroke-width: 1.5; }
 .otherFridgeChevron { margin-left: auto; transition: transform 0.2s ease; }
 .otherFridgeChevron.open { transform: rotate(180deg); }
 .otherFridgeChipsWrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-:global([data-theme="light"]) .otherFridgeToggle { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.08); color: rgba(0, 0, 0, 0.5); }
-:global([data-theme="light"]) .otherFridgeToggle:hover { color: rgba(0, 0, 0, 0.75); }
+:global([data-theme="light"]) .otherFridgeToggle { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.08); color: var(--text-secondary); }
+@media (hover: hover) {
+  :global([data-theme="light"]) .otherFridgeToggle:hover { color: rgba(0, 0, 0, 0.75); }
+}
 
 /* No-detection empty state — templates/index.html:4490-4497 */
 .scanStateCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 8px; text-align: center; }
-.scanStateIcon { width: 26px; height: 26px; color: rgba(255, 255, 255, 0.3); margin-bottom: 4px; }
-.scanStateHeading { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
-.scanStateSub { font-size: 12px; color: rgba(255, 255, 255, 0.45); line-height: 1.5; }
+.scanStateIcon { width: 26px; height: 26px; color: var(--text-muted); margin-bottom: 4px; }
+.scanStateHeading { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.scanStateSub { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .ctaSecondaryBtn {
   margin-top: 16px; height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: center; gap: 8px;
   background: rgba(252, 128, 25, 0.12); color: #FC8019; border: 1.5px solid rgba(252, 128, 25, 0.3);
   border-radius: 14px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
-.ctaSecondaryBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+@media (hover: hover) {
+  .ctaSecondaryBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+}
 .ctaSecondaryBtn:active { transform: translateY(0) scale(.98); }
 :global([data-theme="light"]) .ctaSecondaryBtn { background: rgba(252, 128, 25, 0.15); border: none; }
 
@@ -202,7 +217,10 @@ button.brand:hover { opacity: 0.8; }
   background: rgba(255, 255, 255, 0.12); border: none; cursor: pointer; display: flex;
   align-items: center; justify-content: center; color: white; transition: background 0.15s ease; z-index: 1;
 }
-.fridgeLightboxClose:hover { background: rgba(255, 255, 255, 0.2); }
+.fridgeLightboxClose::after { content: ''; position: absolute; inset: -2px; } /* 40px -> 44px hit area */
+@media (hover: hover) {
+  .fridgeLightboxClose:hover { background: rgba(255, 255, 255, 0.2); }
+}
 
 /* Dish hero image — templates/index.html:1078-1157 (CSS), 1980-1987
    (markup), 3599-3652 (waterfall). Dark-only by design, matches the page
@@ -267,7 +285,9 @@ button.brand:hover { opacity: 0.8; }
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
   --spot-x: 50%; --spot-y: 50%;
 }
-.choiceBtn:hover:not(:disabled):not(.loading) { transform: translateY(-1px); box-shadow: var(--shadow-2); }
+@media (hover: hover) {
+  .choiceBtn:hover:not(:disabled):not(.loading) { transform: translateY(-1px); box-shadow: var(--shadow-2); }
+}
 .choiceBtn:active:not(:disabled):not(.loading) { transform: translateY(0) scale(.98); }
 .choiceBtn::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
 .choiceBtn.spotlightActive::before { opacity: 1; }
@@ -276,10 +296,14 @@ button.brand:hover { opacity: 0.8; }
 .choiceBtn:disabled:not(.loading) { opacity: .45; cursor: not-allowed; }
 .choiceBtn.loading { opacity: .7; cursor: not-allowed; }
 .choiceBtnPrimary { background: var(--orange); border: none; color: #fff; }
-.choiceBtnPrimary:hover:not(:disabled) { background: var(--orange-dark); }
+@media (hover: hover) {
+  .choiceBtnPrimary:hover:not(:disabled) { background: var(--orange-dark); }
+}
 .choiceBtnPrimary:active:not(:disabled) { background: #D4640A; } /* one shade past --orange-dark for the press state; no token for it */
 .choiceBtnOutline { background: transparent; border: 1.5px solid var(--orange-border, rgba(252,128,25,0.4)); color: var(--orange); }
-.choiceBtnOutline:hover:not(:disabled) { background: var(--orange-light); }
+@media (hover: hover) {
+  .choiceBtnOutline:hover:not(:disabled) { background: var(--orange-light); }
+}
 .choiceIconCircle { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: var(--text-2xl); }
 .choiceIconCircle svg { width: 20px; height: 20px; }
 .choiceBtnPrimary .choiceIconCircle { background: var(--orange-dark); color: #fff; }
@@ -324,9 +348,11 @@ button.brand:hover { opacity: 0.8; }
   background: var(--orange); color: #fff; font-weight: 600; font-size: 14px;
   border-radius: 10px; text-decoration: none; transition: background 0.15s ease;
 }
-.orderSheetAuthCta:hover { background: var(--orange-dark); }
+@media (hover: hover) {
+  .orderSheetAuthCta:hover { background: var(--orange-dark); }
+}
 .orderSheetAuthCta svg { width: 16px; height: 16px; }
-.orderSheetErrorNotice { margin-top: 16px; font-size: 13px; color: #ff6b6b; text-align: center; }
+.orderSheetErrorNotice { margin-top: 16px; font-size: 13px; color: var(--red-text); text-align: center; }
 
 /* Top Up cards inside the order sheet — templates/index.html:3910-3918
    (markup), 913-936 (CSS). Emoji fallback sits underneath at all times; the
@@ -407,7 +433,9 @@ button.brand:hover { opacity: 0.8; }
 .ytThumbnails { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; margin-top: 12px; }
 .ytThumbnails::-webkit-scrollbar { display: none; }
 .ytThumbCard { width: 130px; flex-shrink: 0; cursor: pointer; transition: transform 0.15s ease; background: none; border: none; text-align: left; font-family: inherit; padding: 0; }
-.ytThumbCard:hover { transform: scale(1.02); }
+@media (hover: hover) {
+  .ytThumbCard:hover { transform: scale(1.02); }
+}
 .ytThumbImgWrap { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; margin-bottom: 6px; background: var(--bg-secondary); }
 .ytThumbImgWrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ytThumbCard.ytThumbActive .ytThumbImgWrap { outline: 2px solid #FC8019; outline-offset: -2px; }
@@ -415,10 +443,10 @@ button.brand:hover { opacity: 0.8; }
   font-size: 11px; font-weight: 600; color: var(--text-primary); line-height: 1.3;
   display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.ytThumbChannel { font-size: 10px; font-weight: 400; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ytThumbChannel { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ytPlayingBadge {
   position: absolute; top: 6px; left: 6px;
-  font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
   color: #fff; background: #FC8019; padding: 2px 6px; border-radius: 999px;
 }
 
@@ -426,7 +454,9 @@ button.brand:hover { opacity: 0.8; }
    (markup), 762-786 (CSS). */
 .mealCards { display: flex; flex-direction: column; gap: 14px; }
 .mealCard { background: var(--swiggy-surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; opacity: 0; animation: fadeSlideUp .35s ease forwards; transition: box-shadow .2s ease; }
-.mealCard:hover { box-shadow: var(--shadow-lift); }
+@media (hover: hover) {
+  .mealCard:hover { box-shadow: var(--shadow-lift); }
+}
 .mealHeaderBar { background: var(--swiggy-orange); color: #fff; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
 .mealHeaderBar svg { width: 14px; height: 14px; }
 .mealBody { padding: 14px; }
@@ -442,7 +472,9 @@ button.brand:hover { opacity: 0.8; }
 
 /* Switching the active dish — 2026-10-01 feature. */
 .mealCardClickable { cursor: pointer; }
-.mealCardClickable:hover { box-shadow: var(--shadow-lift); border-color: var(--swiggy-orange); }
+@media (hover: hover) {
+  .mealCardClickable:hover { box-shadow: var(--shadow-lift); border-color: var(--swiggy-orange); }
+}
 .mealCardClickable:focus-visible { outline: 2px solid var(--swiggy-orange); outline-offset: 2px; }
 .mealCardActive { border-color: var(--swiggy-orange); }
 .mealCardActive .mealHeaderBar { background: var(--swiggy-orange); }
@@ -490,14 +522,16 @@ button.brand:hover { opacity: 0.8; }
   display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font-size: 14px; border: none; cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
 }
-.authCta:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+@media (hover: hover) {
+  .authCta:hover { background: #E8700A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+}
 .authCta:active { background: #D4640A; transform: translateY(0) scale(.98); }
 .authCta svg { width: 20px; height: 20px; }
 
 /* Error card (inline, resultsAlreadyShown) — templates/index.html:987-1004 */
 .errorCard {
   background: var(--red-dim); border: 1px solid var(--red-border); border-radius: 16px; padding: 16px; font-size: 13px;
-  color: var(--swiggy-red); overflow-wrap: break-word; word-break: normal; display: flex; align-items: flex-start; gap: 8px;
+  color: var(--red-text); overflow-wrap: break-word; word-break: normal; display: flex; align-items: flex-start; gap: 8px;
 }
 .errorCard svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
 
@@ -565,8 +599,22 @@ button.brand:hover { opacity: 0.8; }
 /* Real content arriving where a placeholder was: a short fade-up instead of a hard swap. */
 @keyframes revealIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .revealIn { animation: revealIn 0.45s ease-out both; }
+@keyframes spinReduced { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
 @media (prefers-reduced-motion: reduce) {
+  .spin { animation: spinReduced 2s ease-in-out infinite !important; }
   .skelRichRow { animation: none; opacity: 1; }
   .revealIn { animation: none; }
   .topupSheetCheckBadge { animation: none; }
 }
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.resultTab:not(.locked):active:not(:disabled),
+.fridgeSummaryRow:active:not(:disabled),
+.fridgeChipsClose:active:not(:disabled),
+.otherFridgeToggle:active:not(:disabled),
+.recipeStepsToggle:active:not(:disabled),
+.mealCardClickable:active:not(:disabled) { background-image: linear-gradient(var(--press-overlay), var(--press-overlay)); }
+.fridgeThumbTarget:active { filter: brightness(0.8); }
+.ytThumbCard:active { transform: scale(0.98); }
+.fridgeLightboxClose:active { background: rgba(255, 255, 255, 0.28); }
+button.brand:active { opacity: 0.7; }
