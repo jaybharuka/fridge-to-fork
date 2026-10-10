@@ -6,12 +6,16 @@
   transition: background .2s ease, transform .15s ease;
 }
 .trigger svg { width: 18px; height: 18px; }
-.trigger:hover, .triggerOpen { background: var(--orange-border); }
+.triggerOpen { background: var(--orange-border); }
+@media (hover: hover) {
+  .trigger:hover { background: var(--orange-border); }
+}
 .trigger:active { transform: scale(.96); }
-.trigger:focus-visible, .item:focus-visible, .seg:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.trigger::after { content: ''; position: absolute; inset: -2px; } /* 40px -> 44px hit area */
+.trigger:focus-visible, .item:focus-visible, .seg:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .dot {
   position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%;
-  background: var(--green); border: 2px solid var(--bg);
+  background: var(--success-text); border: 2px solid var(--bg);
 }
 
 .panel {
@@ -23,23 +27,26 @@
 
 .status { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
 .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
-.statusOn { color: var(--green); }
-.statusOn::before { background: var(--green); }
+.statusOn { color: var(--success-text); }
+.statusOn::before { background: var(--success-text); }
 
 .item {
-  width: 100%; display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; cursor: pointer;
+  width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; cursor: pointer;
   font: inherit; font-size: 14px; font-weight: 600; color: var(--text-primary); background: none; border: none; text-align: left;
 }
 .item svg { width: 18px; height: 18px; color: var(--text-secondary); flex-shrink: 0; }
-.item:hover { background: var(--bg-secondary); }
+@media (hover: hover) {
+  .item:hover { background: var(--bg-secondary); }
+}
 .rule { border: 0; border-top: 1px solid var(--border); margin: 4px 6px; }
 
 .segment { display: flex; margin: 6px 8px 8px; padding: 3px; background: var(--bg-secondary); border-radius: 999px; }
 .seg {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 0; border-radius: 999px; cursor: pointer;
+  position: relative; flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 0; border-radius: 999px; cursor: pointer;
   font: inherit; font-size: 12px; font-weight: 700; color: var(--text-secondary); background: none; border: none;
   transition: background .2s ease, color .2s ease;
 }
+.seg::after { content: ''; position: absolute; inset: -6px 0; } /* ~32px segments -> 44px hit area */
 .seg svg { width: 14px; height: 14px; }
 .segOn { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-1); }
 
@@ -47,3 +54,7 @@
   .panel { animation: none; }
   .trigger { transition: none; }
 }
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.item:active:not(:disabled),
+.seg:active:not(:disabled) { background-image: linear-gradient(var(--press-overlay), var(--press-overlay)); }

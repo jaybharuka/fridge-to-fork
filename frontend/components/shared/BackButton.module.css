@@ -4,9 +4,17 @@
   transition: background .2s ease, color .2s ease;
 }
 .back svg { width: 22px; height: 22px; }
-.back:hover { color: var(--text-primary); background: var(--bg-secondary); }
-.back:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+@media (hover: hover) {
+  .back:hover { color: var(--text-primary); background: var(--bg-secondary); }
+}
+.back:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* On the always-dark scan overlays: pinned top-left, light colours that don't depend on the theme. */
 .onDark { position: absolute; top: 12px; left: 12px; z-index: 2; color: rgba(255, 255, 255, 0.8); }
-.onDark:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+@media (hover: hover) {
+  .onDark:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+}
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.back:active:not(:disabled) { background-image: linear-gradient(var(--press-overlay), var(--press-overlay)); }
+.onDark:active { background: rgba(255, 255, 255, 0.2); }

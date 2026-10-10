@@ -11,7 +11,7 @@
   animation: bannerIn .25s ease-out;
 }
 .notice, .warn, .adjust { background: var(--orange-light); border: 1px solid var(--orange-border); color: var(--swiggy-text-2); }
-.blocker { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.35); color: #ff8f8f; }
+.blocker { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.35); color: var(--red-text); }
 
 .list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
 .row { background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 16px; padding: 12px; transition: border-color .2s ease, box-shadow .2s ease; }
@@ -28,17 +28,19 @@
 .skipped, .none { font-size: 13px; color: var(--swiggy-text-3); margin: 0; animation: rowSwap .18s ease-out; }
 @keyframes rowSwap { from { opacity: 0; } to { opacity: 1; } }
 .actions { display: flex; gap: 16px; margin-top: 10px; }
-.linkBtn { background: none; border: none; padding: 4px 0; font-size: 13px; font-weight: 600; color: #FC8019; cursor: pointer; transition: opacity .15s ease, color .15s ease; }
+.linkBtn { position: relative; background: none; border: none; padding: 4px 0; font-size: 13px; font-weight: 600; color: #FC8019; cursor: pointer; transition: opacity .15s ease, color .15s ease; }
 .linkBtn:disabled { opacity: .5; cursor: not-allowed; }
+.linkBtn::after { content: ''; position: absolute; inset: -11px -8px; } /* 23px tall -> 45px hit area; 8px sideways fills half of the 16px gap between links */
 .linkBtn.muted { color: var(--swiggy-text-3); }
 .linkBtn:active:not(:disabled) { opacity: .6; }
 
 .stepper { display: flex; align-items: center; gap: 2px; background: var(--swiggy-surface-2); border-radius: 10px; flex-shrink: 0; }
 .stepper button {
-  width: 32px; height: 32px; background: none; border: none; color: #FC8019; cursor: pointer;
+  position: relative; width: 32px; height: 32px; background: none; border: none; color: #FC8019; cursor: pointer;
   display: flex; align-items: center; justify-content: center; /* centers the Minus/Plus icon (was a lone text glyph, which didn't need this) */
   transition: color .15s ease, transform .1s ease;
 }
+.stepper button::after { content: ''; position: absolute; inset: -6px; } /* 32px -> 44px hit area */
 .stepper button:disabled { color: var(--swiggy-text-3); cursor: not-allowed; }
 .stepper button:active:not(:disabled) { transform: scale(.82); }
 .stepper span { min-width: 20px; text-align: center; font-size: 14px; font-weight: 600; color: var(--swiggy-text); display: inline-block; animation: qtyPop .18s ease-out; }
@@ -53,7 +55,7 @@
 .option:disabled { opacity: .45; cursor: not-allowed; }
 .option:active:not(:disabled) { transform: scale(.98); }
 .option .thumb, .option .thumbFallback { width: 40px; height: 40px; border-radius: 8px; font-size: 16px; }
-.oos { font-size: 11px; color: #ff8f8f; font-weight: 600; }
+.oos { font-size: 11px; color: var(--red-text); font-weight: 600; }
 
 @keyframes optionsExpand { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes optionPick { 0% { transform: scale(.97); } 55% { transform: scale(1.015); } 100% { transform: scale(1); } }
@@ -65,11 +67,13 @@
   width: 100%; padding: 16px; margin-top: 20px; background: #FC8019; color: #fff; font-size: 16px; font-weight: 700;
   border: none; border-radius: 14px; cursor: pointer; transition: background .15s ease, transform .15s ease, opacity .15s ease;
 }
-.primary:hover { background: #E8700A; }
+@media (hover: hover) {
+  .primary:hover { background: #E8700A; }
+}
 .primary:active { transform: scale(0.98); }
 .primary:disabled { opacity: .5; cursor: not-allowed; }
 .secondary {
-  width: 100%; padding: 13px; margin-top: 10px; background: transparent; color: var(--swiggy-text-2); font-size: 14px; font-weight: 600;
+  width: 100%; min-height: 44px; padding: 13px; margin-top: 10px; background: transparent; color: var(--swiggy-text-2); font-size: 14px; font-weight: 600;
   border: 1px solid var(--swiggy-border); border-radius: 14px; cursor: pointer; transition: opacity .15s ease;
 }
 .secondary:disabled { opacity: .5; cursor: not-allowed; }
@@ -94,13 +98,15 @@
 
 .centered { text-align: center; padding: 8px 0; animation: paneIn .25s ease-out; }
 .bigIcon { width: 44px; height: 44px; margin: 8px auto 12px auto; display: block; animation: bigIconPop .35s ease-out; }
-.bigIcon.ok { color: #2ECC71; }
+.bigIcon.ok { color: var(--success-text); }
 .bigIcon.warnIcon { color: #FC8019; }
-.bigIcon.bad { color: #ff6b6b; }
+.bigIcon.bad { color: var(--red-text); }
 .outcomeTitle { font-size: 18px; font-weight: 700; color: var(--swiggy-text); margin: 0 0 6px 0; }
 .outcomeBody { font-size: 14px; line-height: 1.5; color: var(--swiggy-text-2); margin: 0 0 8px 0; }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spinReduced { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: spinReduced 2s ease-in-out infinite !important; } }
 @keyframes paneIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes bigIconPop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 
@@ -124,12 +130,13 @@
 .couponBody { flex: 1; min-width: 0; }
 .couponTitle { font-size: 14px; font-weight: 600; color: var(--swiggy-text); margin: 0; }
 .couponCode { margin-left: 6px; padding: 1px 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #FC8019; border: 1px dashed rgba(252,128,25,0.6); border-radius: 6px; }
-.couponWhy { font-size: 12px; color: #ff8f8f; margin: 4px 0 0 0; animation: bannerIn .2s ease-out; }
+.couponWhy { font-size: 12px; color: var(--red-text); margin: 4px 0 0 0; animation: bannerIn .2s ease-out; }
 .couponBtn {
-  flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #FC8019; background: transparent;
+  position: relative; flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #FC8019; background: transparent;
   border: 1px solid #FC8019; border-radius: 10px; cursor: pointer;
   transition: color .15s ease, border-color .15s ease, background-color .15s ease, transform .1s ease;
 }
+.couponBtn::after { content: ''; position: absolute; inset: -6px -4px; } /* 32px -> 44px hit area */
 .couponBtn:disabled { color: var(--swiggy-text-3); border-color: var(--swiggy-border); cursor: not-allowed; }
 .couponBtn:active:not(:disabled) { transform: scale(.94); }
 /* "+ Add" -> "✓ Added" (InstamartSearchBox) and coupon "Apply" -> "Applied" (CouponSection) both land here: a
@@ -138,10 +145,11 @@
 .couponBtn.busy { animation: busyPulse 1s ease-in-out infinite; }
 @keyframes confirmPop { 0% { transform: scale(1); } 45% { transform: scale(1.1); } 100% { transform: scale(1); } }
 @keyframes busyPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-.couponApplied { font-size: 13px; line-height: 1.45; color: #2ECC71; background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px 0; animation: bannerIn .25s ease-out; }
+.couponApplied { font-size: 13px; line-height: 1.45; color: var(--success-text); background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px 0; animation: bannerIn .25s ease-out; }
 @keyframes bannerIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .terms { margin-top: 6px; font-size: 12px; color: var(--swiggy-text-2); }
-.terms summary { cursor: pointer; }
+.terms summary { position: relative; cursor: pointer; }
+.terms summary::after { content: ''; position: absolute; inset: -13px 0; } /* 18px line -> 44px hit area */
 .terms ul { margin: 6px 0 0 16px; padding: 0; }
 
 /* Orders sheet: list, live status, details */
@@ -150,21 +158,24 @@
    claim the whole row and squeeze the details (and spill out of the card on a phone). */
 .orderRow { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; padding: 12px; color: inherit; cursor: pointer;
   background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 12px; }
-.orderRow:hover { border-color: rgba(252,128,25,0.5); }
+@media (hover: hover) {
+  .orderRow:hover { border-color: rgba(252,128,25,0.5); }
+}
 .orderHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .orderTitle { display: block; flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--swiggy-text); }
 .orderRow .meta { margin: 0; overflow-wrap: anywhere; }
 .orderRow .chip { align-self: flex-start; max-width: 100%; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; border-radius: 10px; }
 .chip { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
 .chipLive { color: #FC8019; background: rgba(252,128,25,0.12); }
-.chipDone { color: #2ECC71; background: rgba(46,204,113,0.12); }
-.chipBad { color: #ff8f8f; background: rgba(255,107,107,0.12); }
-.backBtn { display: inline-flex; align-items: center; gap: 2px; margin: 0 0 8px -4px; padding: 4px 4px; background: none; border: none; color: #FC8019; font-size: 13px; font-weight: 600; cursor: pointer; }
+.chipDone { color: var(--success-text); background: rgba(46,204,113,0.12); }
+.chipBad { color: var(--red-text); background: rgba(255,107,107,0.12); }
+.backBtn { position: relative; display: inline-flex; align-items: center; gap: 2px; margin: 0 0 8px -4px; padding: 4px 4px; background: none; border: none; color: #FC8019; font-size: 13px; font-weight: 600; cursor: pointer; }
+.backBtn::after { content: ''; position: absolute; inset: -8px -4px; } /* ~28px -> 44px hit area */
 .backBtn svg { width: 16px; height: 16px; }
 .statusCard { display: flex; align-items: flex-start; gap: 14px; padding: 16px; margin-bottom: 16px; background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 16px; }
 .statusIcon { width: 28px; height: 28px; flex-shrink: 0; }
-.statusIcon.ok { color: #2ECC71; }
-.statusIcon.bad { color: #ff6b6b; }
+.statusIcon.ok { color: var(--success-text); }
+.statusIcon.bad { color: var(--red-text); }
 .statusBig { font-size: 17px; font-weight: 700; color: var(--swiggy-text); margin: 0 0 4px 0; }
 .removed { text-decoration: line-through; color: var(--swiggy-text-3); }
 
@@ -173,12 +184,13 @@
 .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .fieldLabel { font-size: 12px; font-weight: 600; color: var(--swiggy-text-2); }
 .fieldRow { display: flex; gap: 12px; }
-.input { width: 100%; padding: 11px 12px; font: inherit; font-size: 14px; color: var(--swiggy-text); background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 10px; }
-.input:focus { outline: none; border-color: #FC8019; }
+.input { width: 100%; padding: 11px 12px; font: inherit; font-size: 14px; color: var(--swiggy-text); background: var(--swiggy-surface-2); border: 1px solid var(--border-control); border-radius: 10px; min-height: 44px; }
+.input:focus { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); }
 select.input { appearance: auto; }
 .geo { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .confirmDelete { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; max-width: 160px; }
-.dangerBtn { padding: 7px 12px; font-size: 13px; font-weight: 700; color: #fff; background: #d64545; border: none; border-radius: 10px; cursor: pointer; }
+.dangerBtn { position: relative; padding: 7px 12px; font-size: 13px; font-weight: 700; color: #fff; background: #d64545; border: none; border-radius: 10px; cursor: pointer; }
+.dangerBtn::after { content: ''; position: absolute; inset: -6px -2px; } /* ~34px -> 46px hit area */
 .dangerBtn:disabled { opacity: .5; cursor: not-allowed; }
 .usualRow { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
 .usualRow::-webkit-scrollbar { display: none; }
@@ -195,7 +207,7 @@ select.input { appearance: auto; }
 /* Food: dish cards, customization, veg marker. Reuses the Instamart rows/options/stepper/bill above. */
 .vegDot { width: 13px; height: 13px; border: 1.5px solid; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 6px; vertical-align: -2px; }
 .vegDot::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.vegOn { color: #2ECC71; }
+.vegOn { color: var(--success-text); }
 .vegOff { color: #e05252; }
 .dishTitle { display: flex; align-items: flex-start; }
 .dishTitle .name { display: block; -webkit-line-clamp: unset; overflow: visible; }
@@ -212,17 +224,19 @@ select.input { appearance: auto; }
 
 /* "Looking for something else?" search (picking screen). Same surface as the rest of the sheet. */
 .searchBox { margin-bottom: 4px; }
-.searchField { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; background: var(--swiggy-surface-2); border: 1px solid var(--swiggy-border); border-radius: 14px; }
-.searchField:focus-within { border-color: #FC8019; }
+.searchField { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; background: var(--swiggy-surface-2); border: 1px solid var(--border-control); border-radius: 14px; }
+.searchField:focus-within { border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); }
 .searchIcon { width: 16px; height: 16px; color: var(--swiggy-text-3); flex-shrink: 0; }
-.searchInput { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--swiggy-text); font-size: 14px; padding: 10px 0; }
+.searchInput { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--swiggy-text); font-size: 14px; padding: 14px 0; }
 /* the field's own border shows focus (:focus-within above); the global input:focus-visible ring would draw a second box inside it */
 .searchInput:focus-visible { outline: none; }
 .searchInput::placeholder { color: var(--swiggy-text-3); }
 .searchInput::-webkit-search-cancel-button { display: none; }
-.searchClear { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; color: var(--swiggy-text-2); cursor: pointer; flex-shrink: 0; }
+.searchClear { position: relative; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; color: var(--swiggy-text-2); cursor: pointer; flex-shrink: 0; }
+.searchClear::after { content: ''; position: absolute; inset: -8px; } /* 28px -> 44px hit area */
 .searchClear svg { width: 15px; height: 15px; }
-.searchGo { flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; background: #FC8019; border: none; border-radius: 10px; cursor: pointer; }
+.searchGo { position: relative; flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; background: #FC8019; border: none; border-radius: 10px; cursor: pointer; }
+.searchGo::after { content: ''; position: absolute; inset: -7px -4px; } /* 31px -> 45px hit area */
 .searchGo:disabled { opacity: .4; cursor: not-allowed; }
 .searchNote { margin: 10px 0 0 0; font-size: 13px; color: var(--swiggy-text-2); }
 .searchNote p { margin: 0 0 4px 0; }
@@ -243,3 +257,12 @@ select.input { appearance: auto; }
     animation: none;
   }
 }
+
+/* Pressed feedback (touch screens have no hover): a subtle overlay (--press-overlay) or, on filled and photo controls, a slight darkening. */
+.secondary:active:not(:disabled),
+.payOption:active:not(:disabled),
+.orderRow:active:not(:disabled),
+.backBtn:active:not(:disabled),
+.searchClear:active:not(:disabled),
+.terms summary:active:not(:disabled) { background-image: linear-gradient(var(--press-overlay), var(--press-overlay)); }
+.dangerBtn:active:not(:disabled), .searchGo:active:not(:disabled) { filter: brightness(0.92); }

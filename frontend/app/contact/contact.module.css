@@ -11,7 +11,9 @@
   font-size: 14px;
   text-decoration: none;
 }
-.emailLink:hover {
+@media (hover: hover) {
+  .emailLink:hover {
   background: var(--orange);
   color: #fff;
+}
 }

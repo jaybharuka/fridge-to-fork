@@ -9,12 +9,17 @@
   color: var(--text-muted);
 }
 .links a {
+  position: relative;
   color: var(--text-muted);
   text-decoration: none;
 }
-.links a:hover {
+/* 16px-tall text links: 44px tall hit area, 4px wider each side (the dots between links leave 19px). */
+.links a::after { content: ''; position: absolute; inset: -14px -4px; }
+@media (hover: hover) {
+  .links a:hover {
   color: var(--text-secondary);
   text-decoration: underline;
+}
 }
 .dot {
   margin: 0 8px;
