@@ -9,6 +9,7 @@ Use this when briefing design work. Each rule was checked against the cited sour
 - Anything that identifies a control or carries meaning (icon, field border, checkbox, focus ring) needs 3:1 against its neighbour. Disabled controls are exempt. [WCAG 1.4.11]
 - Never signal state by colour alone: add text or an icon. [WCAG 1.4.1]
 - For this app: #FC8019 is strong on dark (6.5 to 7.5:1) but only 2.55:1 on light, and white text on it is also 2.55:1. On orange fills use #1A1A1A text (6.8:1) or a fill near #B85D12 with white text. Orange text on light needs about #AE5811 or darker.
+- Shipped values (light / dark): `--text-muted` #707070 / #888888 (4.7 to 5.4:1 on page, card and grey); `--success-text` #1B7A43 / #2ECC71 and `--red-text` #C41E1E / #FF8F8F for status text (use these, never `--success` or `--red`, as text colours); `--border-control` #8E8E8E / #6E6E6E for input borders (3:1 or more); `--focus-ring` #D46C15 / #FC8019. Orange fills and orange text are unchanged until a choice is made in `docs/design-proposals/orange-contrast.md`.
 - Check every new colour pair in both themes before it ships.
 
 ## Touch targets
@@ -24,7 +25,7 @@ Use this when briefing design work. Each rule was checked against the cited sour
 - Lines of 80 characters or fewer, paragraph line height 1.5. Tighter is fine on large headings (the 1.15 to 1.25 now used on 22 to 36px titles). [WCAG 1.4.8, level AAA]
 
 ## States
-- Every control shows a keyboard focus ring. [WCAG 2.4.7, level AA] A solid 2px outline is the simplest way to meet 2.4.13, and it must have 3:1 against the surface behind it (the global orange ring does on dark, not on light). Never set `outline: none` without an equally visible replacement. [WCAG 2.4.13, 1.4.11]
+- Every control shows a keyboard focus ring. [WCAG 2.4.7, level AA] A solid 2px outline is the simplest way to meet 2.4.13, and it must have 3:1 against the surface behind it (the orange ring does on dark; on light the ring is `--focus-ring`, #D46C15, 3.5:1 on white). Never set `outline: none` without an equally visible replacement. [WCAG 2.4.13, 1.4.11]
 - Put hover effects inside `@media (hover: hover)` so touch screens never get a stuck hover. [MDN hover]
 - For hover and press feedback, Material uses an overlay: 8% for hover, 12% for focus and pressed. A reference value, not a requirement. [material-web md-sys-state]
 - Disabled: about 38% opacity for content and 12% for a filled container, and the control should really be disabled, not just dimmed. [material-web md-comp-filled-button]
